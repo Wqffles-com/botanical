@@ -1,55 +1,109 @@
 import { useState } from "react";
-
-interface HealthBody {
-  ok: boolean;
-  service: string;
-  mode: string;
-}
-
-function isHealthBody(value: unknown): value is HealthBody {
-  if (typeof value !== "object" || value === null) return false;
-  const record = value as Record<string, unknown>;
-  return (
-    typeof record.ok === "boolean" &&
-    typeof record.service === "string" &&
-    typeof record.mode === "string"
-  );
-}
+import { ChatList } from "./components/ChatList";
+import { ChatThread } from "./components/ChatThread";
+import { EmptyState } from "./components/EmptyState";
+import { BootScreen, LoginScreen } from "./components/LoginScreen";
+import { NewChatPanel } from "./components/NewChatPanel";
+import { Shell } from "./components/Shell";
+import { profileForChat } from "./state/model";
+import { useChatApp } from "./state/useChatApp";
 
 export function App() {
-  const [health, setHealth] = useState<HealthBody | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const app = useChatApp();
+  const [navOpen, setNavOpen] = useState(false);
+  const { state } = app;
 
-  async function checkHealth() {
-    setError(null);
-    try {
-      const response = await fetch("/api/health");
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const body: unknown = await response.json();
-      if (!isHealthBody(body)) {
-        throw new Error("unexpected health payload");
-      }
-      setHealth(body);
-    } catch (caught) {
-      setHealth(null);
-      setError(caught instanceof Error ? caught.message : "request failed");
-    }
+  if (state.status === "booting") return <BootScreen />;
+  if (state.status === "anonymous") {
+    return (
+      <LoginScreen
+        mode={state.mode}
+        error={state.error}
+        pending={state.busy === "login"}
+        onSubmit={(password) => void app.login(password)}
+      />
+    );
+  }
+
+  const activeChat = state.chats.find((chat) => chat.id === state.activeChatId) ?? null;
+  const activeAgent = activeChat ? (state.agents.find((agent) => agent.id === activeChat.agentId) ?? null) : null;
+
+  let body;
+  if (state.draft) {
+    body = (
+      <NewChatPanel
+        agents={state.agents}
+        profiles={state.profiles}
+        draft={state.draft}
+        pending={state.busy === "create"}
+        agentPending={state.busy === "agent"}
+        onSelectAgent={app.setDraftAgent}
+        onSelectProfile={app.setDraftProfile}
+        onTitle={app.setDraftTitle}
+        onCreateAgent={app.createAgent}
+        onSubmit={() => void app.createChat()}
+        onCancel={() => {
+          setNavOpen(false);
+          app.cancelDraft();
+        }}
+      />
+    );
+  } else if (activeChat) {
+    body = (
+      <ChatThread
+        chat={activeChat}
+        agent={activeAgent}
+        profiles={state.profiles}
+        profileId={profileForChat(state)}
+        messages={state.messages}
+        streaming={state.streaming}
+        onProfile={(profileId) => void app.setProfile(activeChat.id, profileId)}
+        onSend={app.send}
+        onStop={app.stop}
+      />
+    );
+  } else {
+    body = (
+      <EmptyState
+        onNew={() => {
+          setNavOpen(false);
+          app.openDraft();
+        }}
+      />
+    );
   }
 
   return (
-    <main>
-      <h1>Botanical</h1>
-      <p>
-        Web client stub. Dev server proxies <code>/api/health</code> to the Botanical server{" "}
-        <code>GET /health</code> route.
-      </p>
-      <button type="button" onClick={() => void checkHealth()}>
-        Check server health
-      </button>
-      {health ? <pre>{JSON.stringify(health, null, 2)}</pre> : null}
-      {error ? <p role="alert">{error}</p> : null}
-    </main>
+    <Shell
+      mode={state.mode}
+      navOpen={navOpen}
+      onToggleNav={() => setNavOpen((open) => !open)}
+      onLogout={() => void app.logout()}
+      sidebar={
+        <ChatList
+          chats={state.chats}
+          agents={state.agents}
+          profiles={state.profiles}
+          activeChatId={state.draft ? null : state.activeChatId}
+          refreshing={state.busy === "refresh"}
+          onNew={() => {
+            setNavOpen(false);
+            app.openDraft();
+          }}
+          onRefresh={() => void app.refresh()}
+          onSelect={(chatId) => {
+            setNavOpen(false);
+            void app.openChat(chatId);
+          }}
+        />
+      }
+    >
+      {state.error ? (
+        <p role="alert" className="bc-banner bc-banner--inset" data-testid="app-error">
+          {state.error}
+        </p>
+      ) : null}
+      {body}
+    </Shell>
   );
 }

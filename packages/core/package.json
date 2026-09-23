@@ -1,19 +1,17 @@
 {
   "name": "@botanical/core",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
-  "license": "MIT",
   "type": "module",
+  "description": "Shared Botanical types and the web client contract for the v0 server API.",
   "exports": {
-    ".": "./src/index.ts",
-    "./deployment": "./src/deployment/index.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "bun test src"
   },
   "devDependencies": {
-    "@types/node": "^22.19.0",
-    "typescript": "^5.9.2"
+    "typescript": "^5.8.3"
   }
 }
