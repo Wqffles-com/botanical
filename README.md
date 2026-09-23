@@ -1,11 +1,11 @@
 # Botanical
 
-**Non-vendor-locked Grok Bot** — a personal AI agent you host: one server, a web client, any OpenAI-compatible brain.
+**Non-vendor-locked Grok Bot** — an open-source AI agent you can **self-host**, or use as a **SaaS** subscription on our hosted servers. Same codebase, two deployment modes: one server, a web client, any OpenAI-compatible brain. Not local-first.
 
-Botanical is Charlie’s greenfield project for an assistant you own: swap models and providers without rewriting workflows, connectors, or memory. First-class adapters for **GPT (OpenAI)**, **Claude (Anthropic)**, **Grok (xAI)**, **DeepSeek**, and **OpenRouter**, plus anything that speaks the OpenAI Chat Completions (and optionally Responses) API shape.
+Botanical is Charlie’s greenfield project for an assistant with a swappable brain: swap models and providers without rewriting workflows, connectors, or memory. First-class adapters for **GPT (OpenAI)**, **Claude (Anthropic)**, **Grok (xAI)**, **DeepSeek**, and **OpenRouter**, plus anything that speaks the OpenAI Chat Completions (and optionally Responses) API shape. Run the server yourself, or use the same server on our hosted deployment.
 
-> Status: **v0 scaffold**. Runtime is **[Bun](https://bun.sh)**. Chat, tools, and auth are not implemented yet.  
-> License: [MIT](./LICENSE)
+> Status: **v0 integrate**. Runtime is **[Bun](https://bun.sh)**. Self-host and hosted SaaS are deployment modes of the same server.  
+> License: [MIT](./LICENSE) for the OSS core
 
 ## Quickstart (self-host)
 
@@ -67,9 +67,10 @@ Separate from AstroLink / Klusvangen — Botanical is its own product line.
 
 ## Who it’s for (v0)
 
-- **Charlie as personal power user** — not teams or OSS-community-first yet
+- **Charlie as personal power user** — community growth is not the v0 wedge
+- The product is **MIT open-source** and **self-hostable**, and also a **hosted SaaS** (subscription on our servers; billing is post-v0)
 - Power users who want Claude for some tasks, Grok for others, DeepSeek for cost, OpenRouter for routing — without juggling apps
-- Anyone who wants a **personal hosted server** with a web UI, not a vendor cloud lock-in
+- Operators who want a **server** they run themselves, or our hosted deployment, plus a web UI — not a local-first app and not a vendor-locked model cloud
 
 ## High-level shape
 
@@ -80,6 +81,7 @@ Separate from AstroLink / Klusvangen — Botanical is its own product line.
 │  + later    │     │  agents · tools  │     │  first-class SDKs   │
 │  clients    │     │  MCP · Postgres  │     │                     │
 └─────────────┘     └──────────────────┘     └─────────────────────┘
+        self-host or hosted SaaS — same server, deployment mode only
 ```
 
 See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the sketch. Locked product choices live in [docs/DECISIONS.md](./docs/DECISIONS.md).
@@ -106,7 +108,7 @@ See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the sketch. Locked produc
 
 ## v0 MVP (locked)
 
-Personal **hosted Botanical server** + **web UI**:
+**Self-host or hosted SaaS** — the same Botanical **server** + **web UI** (a deployment mode, not a second product). Not a local-first app.
 
 - Streaming **chat + tools + MCP**
 - **Unlimited** user-defined agents (tools + description/prompt); **one agent per chat**; async **agent-to-agent** messaging
@@ -114,13 +116,14 @@ Personal **hosted Botanical server** + **web UI**:
 - **Postgres** persistence; model API keys **server-side only**; web auth via **password / passcode**
 - **No default model** — explicit profile pick; server **portable / host-agnostic**
 - Stack: **TypeScript** on **Bun** (chosen at scaffold; see [docs/DECISIONS.md](./docs/DECISIONS.md))
+- **MIT** for the OSS core. **Billing** and **multi-tenant auth** for the hosted SaaS are **post-v0**
 
 Routines / always-on schedulers are **post-v0**. Details: [docs/DECISIONS.md](./docs/DECISIONS.md).
 
 ## Contributing
 
-Not open for external contributions yet beyond discussion via issues. The tree is a compilable Bun workspace; product behavior still has to be built on top of the packages above. Do not commit secrets.
+MIT-licensed OSS core. An external contribution process is not the v0 focus. Do not commit secrets.
 
 ## License
 
-[MIT](./LICENSE) — use it, fork it, lock yourself out of vendors on purpose.
+[MIT](./LICENSE) for the OSS core — self-host it, or use the same code as the hosted SaaS. Subscription billing is post-v0.
