@@ -1,0 +1,20 @@
+{
+  "name": "botanical",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter @botanical/server dev",
+    "start": "bun run --filter @botanical/server start",
+    "test": "bun test",
+    "typecheck": "bun run --filter @botanical/core typecheck && bun run --filter @botanical/server typecheck"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.4",
+    "typescript": "^5.7.3"
+  }
+}

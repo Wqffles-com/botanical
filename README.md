@@ -4,7 +4,7 @@
 
 Botanical is Charlie’s greenfield project for an assistant you own: swap models and providers without rewriting workflows, connectors, or memory. First-class adapters for **GPT (OpenAI)**, **Claude (Anthropic)**, **Grok (xAI)**, **DeepSeek**, and **OpenRouter**, plus anything that speaks the OpenAI Chat Completions (and optionally Responses) API shape.
 
-> Status: **greenfield**. Product decisions locked 2026-09-23 — no runtime yet.  
+> Status: **greenfield**. Product decisions locked 2026-09-23. The agent runtime and async agent-to-agent bus live in [`packages/core`](./packages/core/README.md) and [`packages/server`](./packages/server/README.md).  
 > License: [MIT](./LICENSE)
 
 ## Why Botanical
