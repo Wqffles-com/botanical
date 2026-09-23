@@ -1,0 +1,12 @@
+.git
+.github
+**/.git
+**/node_modules
+.env
+.env.*
+!.env.example
+*.log
+coverage
+.botanical
+.DS_Store
+**/*.tsbuildinfo

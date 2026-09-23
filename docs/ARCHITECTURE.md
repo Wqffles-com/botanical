@@ -256,7 +256,7 @@ profiles:
 - **Secrets:** environment variables / host secret store on the **server**
 - Web client never receives or submits model API keys
 - **Never** commit `.env` or key files (see root `.gitignore`)
-- Provide `.env.example` naming all `*_API_KEY` vars + `DATABASE_URL` + auth secret
+- `.env.example` names `DATABASE_URL`, `BOTANICAL_PASSCODE`, provider `*_API_KEY`s, and `DEPLOYMENT_MODE` (`self_host` or `saas`). See [DEPLOY.md](./DEPLOY.md).
 
 ---
 
@@ -270,6 +270,8 @@ profiles:
 | ~~Local-first CLI only~~ | Runtime primarily on laptop with SQLite | **SUPERSEDED** |
 
 Always-on routines/schedulers are enabled by this architecture but are **post-v0**.
+
+Reference deploy is Docker Compose ([DEPLOY.md](./DEPLOY.md)): Postgres, server, and web from one codebase. `DEPLOYMENT_MODE=self_host` is the personal server. `DEPLOYMENT_MODE=saas` is the same images on operated hosts. Multi-tenant accounts and billing stay deferred; v0 does not assume a SaaS-only runtime.
 
 ---
 
@@ -319,7 +321,7 @@ Always-on routines/schedulers are enabled by this architecture but are **post-v0
 - [ ] Built-ins: web search/fetch, shell/code exec, file read/write
 - [ ] One MCP server callable from the agent loop
 - [ ] Multi-agent create + one-agent-per-chat + async A2A path
-- [ ] Documented portable deploy (host-agnostic)
+- [x] Documented portable deploy (host-agnostic) — [DEPLOY.md](./DEPLOY.md)
 - [ ] Documented threat model for tools
 
 When those land, revisit this doc and replace sketches with “as-built” diagrams.
