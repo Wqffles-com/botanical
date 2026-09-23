@@ -1,54 +1,110 @@
-# Local self-host reference: Postgres 16 + the Bun server stub.
-# Defaults are for a laptop only. Override passwords before any shared deploy.
-# The server image answers GET /health and does not connect to Postgres yet.
+# Botanical reference deploy: Postgres + server + web.
+# Quickstart: docs/DEPLOY.md
+#   cp .env.example .env
+#   docker compose up --build
 
 name: botanical
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: botanical
-      POSTGRES_PASSWORD: botanical
-      POSTGRES_DB: botanical
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-botanical}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-botanical}
+      POSTGRES_DB: ${POSTGRES_DB:-botanical}
+      TZ: UTC
+      PGTZ: UTC
     volumes:
-      - botanical-pg:/var/lib/postgresql/data
+      - botanical_pg:/var/lib/postgresql/data
+      - ./deploy/postgres/init:/docker-entrypoint-initdb.d:ro
+    # Loopback only. Operators reach SQL from the host, not the public internet.
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U botanical -d botanical"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
+      start_period: 10s
+    networks: [botanical]
 
   server:
     build:
       context: .
       dockerfile: Dockerfile
+      target: ${SERVER_RUNTIME:-runtime-bun}
+      args:
+        BUN_IMAGE: ${BUN_IMAGE:-oven/bun:1.4-alpine}
+        NODE_IMAGE: ${NODE_IMAGE:-node:22-alpine}
     restart: unless-stopped
-    environment:
-      PORT: "8787"
-      BOTANICAL_MODE: self-host
-      BOTANICAL_PASSWORD: changeme
-      DATABASE_URL: postgres://botanical:botanical@postgres:5432/botanical
-    ports:
-      - "8787:8787"
+    init: true
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "bun",
-          "-e",
-          "fetch('http://127.0.0.1:8787/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
+    environment:
+      DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_host}
+      USE_BUNDLED_DATABASE: ${USE_BUNDLED_DATABASE:-1}
+      BOTANICAL_PASSCODE: ${BOTANICAL_PASSCODE:-}
+      BOTANICAL_PASSCODE_FILE: ${BOTANICAL_PASSCODE_FILE:-}
+      BOTANICAL_SESSION_SECRET: ${BOTANICAL_SESSION_SECRET:-}
+      BOTANICAL_SESSION_SECRET_FILE: ${BOTANICAL_SESSION_SECRET_FILE:-}
+      BOTANICAL_PUBLIC_ORIGIN: ${BOTANICAL_PUBLIC_ORIGIN:-http://localhost:8080}
+      BOTANICAL_VERSION: ${BOTANICAL_VERSION:-0.0.0-dev}
+      BOTANICAL_WORKSPACE: /data
+      BOTANICAL_FORCE_BOOTSTRAP: ${BOTANICAL_FORCE_BOOTSTRAP:-0}
+      COOKIE_SECURE: ${COOKIE_SECURE:-auto}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://botanical:botanical@postgres:5432/botanical}
+      DATABASE_SSL: ${DATABASE_SSL:-}
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-4}
+      POSTGRES_USER: ${POSTGRES_USER:-botanical}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-botanical}
+      POSTGRES_DB: ${POSTGRES_DB:-botanical}
+      PORT: 8787
+      HOST: 0.0.0.0
+      SERVE_WEB: ${SERVE_WEB:-0}
+      TRUST_PROXY: "1"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      XAI_API_KEY: ${XAI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      CUSTOM_OPENAI_BASE_URL: ${CUSTOM_OPENAI_BASE_URL:-}
+      CUSTOM_OPENAI_API_KEY: ${CUSTOM_OPENAI_API_KEY:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
+    ports:
+      - "127.0.0.1:${SERVER_PORT:-8787}:8787"
+    volumes:
+      - botanical_workspace:/data
+    networks: [botanical]
+
+  web:
+    build:
+      context: .
+      dockerfile: web.Dockerfile
+      target: ${WEB_RUNTIME:-runtime-nginx}
+      args:
+        BUN_IMAGE: ${BUN_IMAGE:-oven/bun:1.4-alpine}
+        NODE_IMAGE: ${NODE_IMAGE:-node:22-alpine}
+        NGINX_IMAGE: ${NGINX_IMAGE:-nginx:1.27-alpine}
+    restart: unless-stopped
+    init: true
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      API_UPSTREAM: ${API_UPSTREAM:-http://server:8787}
+      NGINX_RESOLVER: ${NGINX_RESOLVER:-127.0.0.11}
+      PORT: "8080"
+    ports:
+      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-8080}:8080"
+    networks: [botanical]
+
+networks:
+  botanical:
 
 volumes:
-  botanical-pg:
+  botanical_pg:
+  botanical_workspace:

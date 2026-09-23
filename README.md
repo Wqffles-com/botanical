@@ -58,7 +58,11 @@ See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the sketch. Locked produc
 | [docs/VISION.md](./docs/VISION.md) | Product vision in depth |
 | [docs/BRAINSTORM.md](./docs/BRAINSTORM.md) | Ideas, UX, milestones (superseded bits marked) |
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Server, web client, adapters, Postgres |
-| [docs/TESTING.md](./docs/TESTING.md) | v0 smoke / e2e harness (health, auth, agent, chat) |
+| [docs/DEPLOY.md](./docs/DEPLOY.md) | Self-host with Docker Compose; hosted SaaS ops |
+
+## Deploy
+
+Personal server, same images for a later hosted service. Copy [.env.example](./.env.example) to `.env`, set `BOTANICAL_PASSCODE`, then `docker compose up --build`. `DEPLOYMENT_MODE` is `self_host` or `saas`. Multi-tenant billing is deferred. Details: [docs/DEPLOY.md](./docs/DEPLOY.md).
 
 ## v0 MVP (locked)
 

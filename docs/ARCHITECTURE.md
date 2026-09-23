@@ -260,7 +260,7 @@ profiles:
 - **Secrets:** environment variables / host secret store on the **server**
 - Web client never receives or submits model API keys
 - **Never** commit `.env` or key files (see root `.gitignore`)
-- Provide `.env.example` naming all `*_API_KEY` vars + `DATABASE_URL` + auth secret
+- `.env.example` names `DATABASE_URL`, `BOTANICAL_PASSCODE`, provider `*_API_KEY`s, and `DEPLOYMENT_MODE` (`self_host` or `saas`). See [DEPLOY.md](./DEPLOY.md).
 
 ---
 
@@ -279,6 +279,8 @@ Same server, two modes. Not local-first: the runtime is always a server that cli
 Mode is configuration (a deployment-mode setting plus env), not a compile-time fork. Core features — chat, tools, MCP, agents, Postgres — behave the same in both modes. SaaS-only concerns (tenant identity, subscription state) stay off the v0 core path so a self-host operator is not blocked on them.
 
 Always-on routines/schedulers are enabled by this architecture but are **post-v0**. Multi-tenant auth for hosted SaaS is also **post-v0**; leave a seam at the auth boundary.
+
+Reference deploy is Docker Compose ([DEPLOY.md](./DEPLOY.md)): Postgres, server, and web from one codebase. `DEPLOYMENT_MODE=self_host` is the personal server. `DEPLOYMENT_MODE=saas` is the same images on operated hosts. Multi-tenant accounts and billing stay deferred; v0 does not assume a SaaS-only runtime.
 
 ---
 
@@ -331,7 +333,7 @@ Runnable v0 smoke (health, passcode auth, create agent, create chat, mock provid
 - [ ] Built-ins: web search/fetch, shell/code exec, file read/write
 - [ ] One MCP server callable from the agent loop
 - [ ] Multi-agent create + one-agent-per-chat + async A2A path
-- [ ] Documented portable deploy for self-host and hosted modes (host-agnostic; no SaaS-only hard-coding)
+- [x] Documented portable deploy (host-agnostic) — [DEPLOY.md](./DEPLOY.md)
 - [ ] Documented threat model for tools
 
 When those land, revisit this doc and replace sketches with “as-built” diagrams.

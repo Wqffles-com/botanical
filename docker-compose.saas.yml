@@ -1,0 +1,14 @@
+# Hosted override. The bundled Postgres service does not start.
+# Point DATABASE_URL at managed Postgres before booting.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.saas.yml up --build -d
+
+services:
+  postgres:
+    profiles: ["bundled-db"]
+
+  server:
+    depends_on: !reset []
+    environment:
+      DEPLOYMENT_MODE: saas
+      USE_BUNDLED_DATABASE: "0"
