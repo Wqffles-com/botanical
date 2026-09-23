@@ -308,6 +308,8 @@ Always-on routines/schedulers are enabled by this architecture but are **post-v0
 - Golden-path e2e: mock provider → tool call → final answer via web API
 - A2A: send → persist → deliver to recipient agent inbox
 
+Runnable v0 smoke (health, passcode auth, create agent, create chat, mock provider) is documented in [TESTING.md](./TESTING.md).
+
 ---
 
 ## 12. What “done” looks like for architecture v0
