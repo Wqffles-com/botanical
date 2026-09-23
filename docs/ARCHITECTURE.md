@@ -1,8 +1,8 @@
 # Botanical — Architecture (First Pass)
 
-Greenfield sketch. Nothing here is implemented yet; this is the target shape aligned with locked decisions in [DECISIONS.md](./DECISIONS.md) (2026-09-23).
+Target shape aligned with locked decisions in [DECISIONS.md](./DECISIONS.md). The monorepo scaffold is in place (Bun, `GET /health`, empty packages). Behavior below is still the target, not as-built.
 
-> Earlier drafts leaned local-first CLI + SQLite. That lean is **superseded**: personal hosted **server**, **web** first client, **Postgres**, TypeScript on **Bun or Deno**.
+> Earlier drafts leaned local-first CLI + SQLite. That lean is **superseded**: a Botanical **server** you **self-host** or that we run as **hosted SaaS** (same codebase, deployment mode), **web** first client, **Postgres**, TypeScript on **Bun**.
 
 ---
 
@@ -16,6 +16,7 @@ Greenfield sketch. Nothing here is implemented yet; this is the target shape ali
                                        │  password / passcode
                     ┌──────────────────▼───────────────────────┐
                     │         Botanical server                 │
+                    │  self-host or hosted SaaS (same code)    │
                     │  sessions · agents · agent loop ·        │
                     │  profiles · MCP · A2A messaging · usage  │
                     └────────────┬─────────────┬───────────────┘
@@ -36,9 +37,11 @@ Server secrets ──▶ env / secret store (API keys never from web client)
 Postgres ────────▶ chats, agents, messages, A2A, usage
 ```
 
-**Invariant:** orchestration and tools never import a vendor SDK directly. Only `packages/adapters/*` talk to OpenAI, Anthropic, xAI, etc.
+**Invariant:** orchestration and tools never import a vendor SDK directly. Only `packages/providers/*` talk to OpenAI, Anthropic, xAI, etc.
 
 **Invariant:** model API keys are **server-side only**.
+
+**Invariant:** self-host and hosted SaaS are deployment modes of this same server. Core paths must run without SaaS billing, our accounts, or our domain.
 
 ---
 
@@ -47,19 +50,19 @@ Postgres ────────▶ chats, agents, messages, A2A, usage
 ```
 botanical/
   packages/
-    core/          # agent loop, profiles, sessions, types, A2A
-    adapters/      # LLMProvider implementations
+    core/          # shared types, agent config schemas, agent loop (later)
+    providers/     # LLMProvider implementations (was sketched as adapters/)
     tools/         # built-in tools + MCP client bridge
-    server/        # HTTP API, auth, Postgres access
-  apps/
-    web/           # v0 client
-    cli/           # optional later client against same API
+    server/        # HTTP API, auth, orchestration, Postgres access
+    web/           # v0 client (Vite + React + TypeScript)
+    db/            # Postgres schema + migrations
+  docker-compose.yml
   docs/            # decisions, vision, brainstorm, architecture
 ```
 
-Language: **TypeScript**. Runtime: **Bun or Deno** (choose at scaffold). Persistence: **Postgres**.
+Language: **TypeScript**. Runtime: **Bun**. Persistence: **Postgres**. A later CLI would be another client against the same API, not a second runtime.
 
-Hosting: **portable / host-agnostic** — no hard dependency on one cloud in core.
+Deployment: **same codebase**, two modes — **self-host** and **hosted SaaS** — selected by config, not a fork. Do not hard-code SaaS-only assumptions (billing, our accounts, our domain) into the core. Hosting vendor stays **portable / host-agnostic**.
 
 ---
 
@@ -76,7 +79,8 @@ Clients are thin: authenticate, send user turns, render `ChatEvent` streams. Bus
 ### Auth (v0)
 
 - Web → server: **password / passcode**
-- Sufficient for personal single-operator deploy; revisit for multi-user later
+- Enough for a personal or single-operator self-host, and for a single-operator hosted deploy
+- Hosted SaaS needs **multi-tenant auth** later. Keep the auth boundary replaceable; do not build tenancy or billing in v0
 
 ---
 
@@ -252,24 +256,31 @@ profiles:
 
 ## 7. Config & secrets
 
-- **Config:** server config file and/or env (providers, profiles, MCP, auth passcode)
+- **Config:** server config file and/or env (providers, profiles, MCP, auth passcode, deployment mode: self-host or hosted)
 - **Secrets:** environment variables / host secret store on the **server**
 - Web client never receives or submits model API keys
 - **Never** commit `.env` or key files (see root `.gitignore`)
-- Provide `.env.example` naming all `*_API_KEY` vars + `DATABASE_URL` + auth secret
+- `.env.example` names `DATABASE_URL`, `BOTANICAL_PASSCODE`, provider `*_API_KEY`s, and `DEPLOYMENT_MODE` (`self_host` or `saas`). See [DEPLOY.md](./DEPLOY.md).
 
 ---
 
 ## 8. Deployment model
 
-| Mode | Description | Lean |
-|------|-------------|------|
-| **Personal hosted server** | Operator runs Botanical server; web clients connect remotely | **v0 locked** |
-| **Portable host** | Docker / bare metal / any VPS — host vendor undecided | Keep agnostic |
-| **User box sandbox** | Optional remote sandbox for heavier computer use | Later / opt-in |
-| ~~Local-first CLI only~~ | Runtime primarily on laptop with SQLite | **SUPERSEDED** |
+Same server, two modes. Not local-first: the runtime is always a server that clients connect to.
 
-Always-on routines/schedulers are enabled by this architecture but are **post-v0**.
+| Mode | Description | v0 |
+|------|-------------|-----|
+| **Self-host** | Operator runs Botanical (Docker / bare metal / any VPS). MIT OSS core. | **Supported** |
+| **Hosted SaaS** | We run the same codebase on our servers. Subscription billing is **post-v0**. | **Same code**; billing deferred |
+| **Portable host** | No hard dependency on one cloud vendor inside the core | **Required** |
+| **User box sandbox** | Optional remote sandbox for heavier computer use | Later / opt-in |
+| ~~Local-first CLI only~~ | Runtime primarily on a laptop with SQLite | **SUPERSEDED** |
+
+Mode is configuration (a deployment-mode setting plus env), not a compile-time fork. Core features — chat, tools, MCP, agents, Postgres — behave the same in both modes. SaaS-only concerns (tenant identity, subscription state) stay off the v0 core path so a self-host operator is not blocked on them.
+
+Always-on routines/schedulers are enabled by this architecture but are **post-v0**. Multi-tenant auth for hosted SaaS is also **post-v0**; leave a seam at the auth boundary.
+
+Reference deploy is Docker Compose ([DEPLOY.md](./DEPLOY.md)): Postgres, server, and web from one codebase. `DEPLOYMENT_MODE=self_host` is the personal server. `DEPLOYMENT_MODE=saas` is the same images on operated hosts. Multi-tenant accounts and billing stay deferred; v0 does not assume a SaaS-only runtime.
 
 ---
 
@@ -297,6 +308,7 @@ Always-on routines/schedulers are enabled by this architecture but are **post-v0
 5. MCP servers treated as **untrusted code** — operator installs them knowingly  
 6. Provider payloads may include tool results — avoid exfiltrating secrets into prompts  
 7. Abort signals on all network calls; timeouts on tools  
+8. v0 auth is a single shared password / passcode. Tenant isolation is a hosted-SaaS follow-on, not a v0 control  
 
 ---
 
@@ -307,6 +319,8 @@ Always-on routines/schedulers are enabled by this architecture but are **post-v0
 - Optional live smoke against server (skipped in CI without keys)
 - Golden-path e2e: mock provider → tool call → final answer via web API
 - A2A: send → persist → deliver to recipient agent inbox
+
+Runnable v0 smoke (health, passcode auth, create agent, create chat, mock provider) is documented in [TESTING.md](./TESTING.md).
 
 ---
 
@@ -319,7 +333,7 @@ Always-on routines/schedulers are enabled by this architecture but are **post-v0
 - [ ] Built-ins: web search/fetch, shell/code exec, file read/write
 - [ ] One MCP server callable from the agent loop
 - [ ] Multi-agent create + one-agent-per-chat + async A2A path
-- [ ] Documented portable deploy (host-agnostic)
+- [x] Documented portable deploy (host-agnostic) — [DEPLOY.md](./DEPLOY.md)
 - [ ] Documented threat model for tools
 
 When those land, revisit this doc and replace sketches with “as-built” diagrams.
