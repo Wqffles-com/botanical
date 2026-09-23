@@ -1,0 +1,25 @@
+{
+  "name": "@botanical/providers",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Streaming model provider adapters for Botanical. OpenAI-compatible chat completions, plus first-class GPT, Claude, Grok, DeepSeek, and OpenRouter.",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  }
+}
