@@ -4,7 +4,7 @@
 
 Botanical is Charlie’s greenfield project for an assistant you own: swap models and providers without rewriting workflows, connectors, or memory. First-class adapters for **GPT (OpenAI)**, **Claude (Anthropic)**, **Grok (xAI)**, **DeepSeek**, and **OpenRouter**, plus anything that speaks the OpenAI Chat Completions (and optionally Responses) API shape.
 
-> Status: **greenfield**. Product decisions locked 2026-09-23 — no runtime yet.  
+> Status: **greenfield**. Product decisions locked 2026-09-23. Deployment mode (`self-host` / `saas`) is in `@botanical/core`; billing is not built.  
 > License: [MIT](./LICENSE)
 
 ## Why Botanical
@@ -56,6 +56,7 @@ See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the sketch. Locked produc
 | [docs/VISION.md](./docs/VISION.md) | Product vision in depth |
 | [docs/BRAINSTORM.md](./docs/BRAINSTORM.md) | Ideas, UX, milestones (superseded bits marked) |
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Server, web client, adapters, Postgres |
+| [docs/BUSINESS_MODEL.md](./docs/BUSINESS_MODEL.md) | MIT self-host vs hosted subscription; what v0 includes |
 
 ## v0 MVP (locked)
 

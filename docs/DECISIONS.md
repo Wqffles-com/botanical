@@ -52,3 +52,4 @@ Authoritative product decisions. When these conflict with earlier brainstorm not
 - [VISION.md](./VISION.md) — product vision (aligned)
 - [BRAINSTORM.md](./BRAINSTORM.md) — ideas; superseded bits marked
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — system sketch (aligned)
+- [BUSINESS_MODEL.md](./BUSINESS_MODEL.md) — MIT self-host vs hosted subscription; deployment mode in v0
