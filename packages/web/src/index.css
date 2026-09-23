@@ -1,0 +1,31 @@
+:root {
+  color: #143024;
+  background: #f3f6f1;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", serif;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  max-width: 40rem;
+  margin: 4rem auto;
+  padding: 0 1.25rem;
+}
+
+button {
+  font: inherit;
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+}
+
+pre {
+  background: #fff;
+  padding: 1rem;
+  overflow: auto;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

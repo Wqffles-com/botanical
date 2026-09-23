@@ -4,8 +4,55 @@
 
 Botanical is Charlie’s greenfield project for an assistant you own: swap models and providers without rewriting workflows, connectors, or memory. First-class adapters for **GPT (OpenAI)**, **Claude (Anthropic)**, **Grok (xAI)**, **DeepSeek**, and **OpenRouter**, plus anything that speaks the OpenAI Chat Completions (and optionally Responses) API shape.
 
-> Status: **greenfield**. Product decisions locked 2026-09-23 — no runtime yet.  
+> Status: **v0 scaffold**. Runtime is **[Bun](https://bun.sh)**. Chat, tools, and auth are not implemented yet.  
 > License: [MIT](./LICENSE)
+
+## Quickstart (self-host)
+
+Requirements: Bun 1.2+ (this repo pins the package manager to Bun 1.4.2) and Docker, for Postgres and the server image.
+
+```bash
+git clone https://github.com/Wqffles-com/botanical.git
+cd botanical
+cp .env.example .env
+bun install
+docker compose up -d postgres
+bun run dev
+```
+
+- API health: [http://localhost:8787/health](http://localhost:8787/health)
+- Web: [http://localhost:5173](http://localhost:5173) — **Check server health** calls `/api/health`, which Vite proxies to the server
+
+`bun run dev` does not need Postgres. The server stub does not open a database connection yet. `DATABASE_URL` in `.env.example` matches the Compose defaults (`botanical` / `botanical` on `localhost:5432`). Change those before any shared deploy.
+
+Postgres and the server image together:
+
+```bash
+docker compose up --build
+```
+
+The Compose server listens on port 8787 and still only serves `GET /health`. Run the web dev server on the host when you want the UI.
+
+| Script | What it does |
+|--------|----------------|
+| `bun run dev` | Server (watch) and Vite together |
+| `bun run build` | Build every workspace package |
+| `bun run typecheck` | `tsc --noEmit` in every package |
+
+### Layout
+
+| Path | Role |
+|------|------|
+| `packages/server` | Bun HTTP API stub (`GET /health`) |
+| `packages/web` | Vite + React + TypeScript client stub |
+| `packages/core` | Shared types (`HealthResponse`, deployment mode) |
+| `packages/providers` | Model provider adapters (ids only) |
+| `packages/tools` | Built-in tool names |
+| `packages/db` | Postgres migrations placeholder |
+| `docker-compose.yml` | Postgres 16 + server image |
+| `tsconfig.base.json` | Shared TypeScript config |
+
+Deployment mode is `BOTANICAL_MODE=self-host` (default) or `saas`. One codebase; nothing here assumes SaaS-only hosting. Model API keys stay in server env (`PROVIDER_*_API_KEY`). See [docs/DECISIONS.md](./docs/DECISIONS.md).
 
 ## Why Botanical
 
@@ -66,13 +113,13 @@ Personal **hosted Botanical server** + **web UI**:
 - Built-ins: **web search/fetch**, **shell/code exec**, **file read/write** (browser/computer use opt-in, not core)
 - **Postgres** persistence; model API keys **server-side only**; web auth via **password / passcode**
 - **No default model** — explicit profile pick; server **portable / host-agnostic**
-- Stack: **TypeScript** on **Bun or Deno** (chosen at scaffold)
+- Stack: **TypeScript** on **Bun** (chosen at scaffold; see [docs/DECISIONS.md](./docs/DECISIONS.md))
 
 Routines / always-on schedulers are **post-v0**. Details: [docs/DECISIONS.md](./docs/DECISIONS.md).
 
 ## Contributing
 
-Not open for external contributions yet beyond discussion via issues. Docs-first bootstrap; code comes next.
+Not open for external contributions yet beyond discussion via issues. The tree is a compilable Bun workspace; product behavior still has to be built on top of the packages above. Do not commit secrets.
 
 ## License
 

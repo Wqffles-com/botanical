@@ -1,0 +1,23 @@
+{
+  "name": "botanical",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Personal hosted agent server with a web client and swappable model providers.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "bun@1.4.2",
+  "engines": {
+    "bun": ">=1.2.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --parallel --filter @botanical/server --filter @botanical/web dev",
+    "build": "bun run --filter '*' build",
+    "typecheck": "bun run --filter '*' typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}
