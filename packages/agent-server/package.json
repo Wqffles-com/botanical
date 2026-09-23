@@ -1,0 +1,22 @@
+{
+  "name": "@botanical/agent-server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "bun --watch src/main.ts",
+    "start": "bun src/main.ts",
+    "test": "bun test",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.7.4",
+    "postgres": "^3.4.5",
+    "zod": "^3.24.2",
+    "@botanical/agent-runtime": "workspace:*"
+  }
+}

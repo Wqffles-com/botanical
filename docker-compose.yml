@@ -44,17 +44,22 @@ services:
         condition: service_healthy
     environment:
       DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_host}
+      BOTANICAL_DEPLOYMENT_MODE: ${BOTANICAL_DEPLOYMENT_MODE:-SELF_HOST}
       USE_BUNDLED_DATABASE: ${USE_BUNDLED_DATABASE:-1}
-      BOTANICAL_PASSCODE: ${BOTANICAL_PASSCODE:-}
+      BOTANICAL_PASSWORD: ${BOTANICAL_PASSWORD:-botanical}
+      BOTANICAL_PASSCODE: ${BOTANICAL_PASSCODE:-botanical}
       BOTANICAL_PASSCODE_FILE: ${BOTANICAL_PASSCODE_FILE:-}
       BOTANICAL_SESSION_SECRET: ${BOTANICAL_SESSION_SECRET:-}
       BOTANICAL_SESSION_SECRET_FILE: ${BOTANICAL_SESSION_SECRET_FILE:-}
       BOTANICAL_PUBLIC_ORIGIN: ${BOTANICAL_PUBLIC_ORIGIN:-http://localhost:8080}
       BOTANICAL_VERSION: ${BOTANICAL_VERSION:-0.0.0-dev}
       BOTANICAL_WORKSPACE: /data
+      BOTANICAL_PROFILES: '[{"id":"mock","name":"Mock echo","provider":"mock","model":"echo"}]'
       BOTANICAL_FORCE_BOOTSTRAP: ${BOTANICAL_FORCE_BOOTSTRAP:-0}
       COOKIE_SECURE: ${COOKIE_SECURE:-auto}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://botanical:botanical@postgres:5432/botanical}
+      # Empty on purpose. packages/db does not yet export the HTTP Store, and a
+      # set DATABASE_URL makes the API refuse to boot. Postgres still runs below.
+      DATABASE_URL: ""
       DATABASE_SSL: ${DATABASE_SSL:-}
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-4}
       POSTGRES_USER: ${POSTGRES_USER:-botanical}
@@ -62,8 +67,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-botanical}
       PORT: 8787
       HOST: 0.0.0.0
+      BOTANICAL_HOST: 0.0.0.0
       SERVE_WEB: ${SERVE_WEB:-0}
       TRUST_PROXY: "1"
+      BOTANICAL_TRUST_PROXY: "1"
       LOG_LEVEL: ${LOG_LEVEL:-info}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -78,6 +85,18 @@ services:
       - "127.0.0.1:${SERVER_PORT:-8787}:8787"
     volumes:
       - botanical_workspace:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "fetch('http://127.0.0.1:8787/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 25s
     networks: [botanical]
 
   web:

@@ -17,6 +17,10 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@botanical/providers": "workspace:*",
+    "@botanical/tools": "workspace:*"
+  },
   "devDependencies": {
     "@types/bun": "^1.2.0",
     "typescript": "^5.6.0"

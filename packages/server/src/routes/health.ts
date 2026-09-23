@@ -1,8 +1,8 @@
 import { json } from "../http.ts";
-import type { Router } from "../router.ts";
+import type { RouteHandler, Router } from "../router.ts";
 
 export function registerHealth(router: Router): void {
-  router.add("GET", "/api/health", (ctx) => {
+  const health: RouteHandler = (ctx) => {
     return json(200, {
       ok: true,
       service: "botanical-server",
@@ -11,7 +11,11 @@ export function registerHealth(router: Router): void {
       brand: { name: ctx.config.brandName },
       persistence: ctx.store.kind,
     });
-  });
+  };
+
+  router.add("GET", "/api/health", health);
+  router.add("GET", "/health", health);
+  router.add("GET", "/ready", health);
 
   router.add("GET", "/", (ctx) => {
     return json(200, {

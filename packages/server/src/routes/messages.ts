@@ -1,7 +1,8 @@
+import { ensureWorkspaceRoot, runMockTurn, type MockTurnResult } from "../chat/mock-turn.ts";
 import { HttpError, isRecord, json, readJson } from "../http.ts";
 import { readRequestedProfileId, resolveProfile } from "../profiles.ts";
 import { authed, type Router } from "../router.ts";
-import { sseResponse, textDeltas } from "../streaming.ts";
+import { sseResponse, textDeltas, type SseEvent } from "../streaming.ts";
 import type { Chat, Message, ModelProfile } from "../types.ts";
 import { LIMITS, readBoundedString, requireParam } from "../validate.ts";
 
@@ -46,9 +47,11 @@ export function registerMessages(router: Router): void {
         role: "user",
         content,
       });
-      // TODO(packages/providers): replace this stub with provider streaming.
-      // The selected profile is explicit; do not fall back to a default model.
-      const assistantText = stubAssistantText(profile);
+      // Profiles other than `mock` stay on the explicit stub until those
+      // providers are called with server-side keys. `mock` runs the echo
+      // provider plus the built-in file_list tool. There is no default profile.
+      const mockTurn = profile.provider === "mock" ? await runMockTurn(content, ensureWorkspaceRoot()) : null;
+      const assistantText = mockTurn ? mockTurn.text : stubAssistantText(profile);
       const assistantMessage = await ctx.store.messages.create({
         chatId: chat.id,
         role: "assistant",
@@ -63,9 +66,10 @@ export function registerMessages(router: Router): void {
           userMessage,
           assistantMessage,
           profileId: profile.id,
+          ...(mockTurn?.toolCall ? { toolCall: mockTurn.toolCall } : {}),
         });
       }
-      return sseResponse(streamEvents(userMessage, assistantMessage, assistantText));
+      return sseResponse(streamEvents(userMessage, assistantMessage, assistantText, mockTurn));
     }),
   );
 }
@@ -95,9 +99,35 @@ function titleFromContent(content: string): string {
   return `${oneLine.slice(0, 77)}...`;
 }
 
-function streamEvents(userMessage: Message, assistantMessage: Message, assistantText: string) {
+function streamEvents(
+  userMessage: Message,
+  assistantMessage: Message,
+  assistantText: string,
+  mockTurn: MockTurnResult | null,
+): SseEvent[] {
+  const toolEvents: SseEvent[] = [];
+  if (mockTurn?.toolCall) {
+    toolEvents.push({
+      event: "tool-call",
+      data: {
+        type: "tool-call",
+        id: mockTurn.toolCall.id,
+        name: mockTurn.toolCall.name,
+        arguments: mockTurn.toolCall.arguments,
+      },
+    });
+    toolEvents.push({
+      event: "tool-result",
+      data: {
+        type: "tool-result",
+        id: mockTurn.toolCall.id,
+        content: mockTurn.toolResult ?? "",
+      },
+    });
+  }
   return [
     { event: "message.created", data: { message: userMessage } },
+    ...toolEvents,
     ...textDeltas(assistantText).map((text) => ({ event: "text-delta", data: { text } })),
     { event: "message.completed", data: { message: assistantMessage } },
     { event: "done", data: {} },

@@ -4,7 +4,7 @@
 
 Botanical is Charlie’s greenfield project for an assistant with a swappable brain: swap models and providers without rewriting workflows, connectors, or memory. First-class adapters for **GPT (OpenAI)**, **Claude (Anthropic)**, **Grok (xAI)**, **DeepSeek**, and **OpenRouter**, plus anything that speaks the OpenAI Chat Completions (and optionally Responses) API shape. Run the server yourself, or use the same server on our hosted deployment.
 
-> Status: **greenfield**. Product decisions locked 2026-09-23. Deployment mode (`self-host` / `saas`) is in `@botanical/core`; billing is not built.  
+> Status: **v0 slice**. `docker compose up` serves login, an explicit model profile, and chat through the mock provider plus `file_list`. Billing is not built.  
 > License: [MIT](./LICENSE)
 
 ## Why Botanical
@@ -62,7 +62,16 @@ See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the sketch. Locked produc
 
 ## Deploy
 
-Personal server, same images for a later hosted service. Copy [.env.example](./.env.example) to `.env`, set `BOTANICAL_PASSCODE`, then `docker compose up --build`. `DEPLOYMENT_MODE` is `self_host` or `saas`. Multi-tenant billing is deferred. Details: [docs/DEPLOY.md](./docs/DEPLOY.md).
+Personal server, same images for a later hosted service.
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Open http://localhost:8080. Sign in with the `BOTANICAL_PASSWORD` from `.env` (default `botanical`). Create an agent, pick the **Mock echo** profile (required — there is no default model), and send a message. The reply is prefixed `mock:` and includes a `file_list` of the server workspace.
+
+The API keeps chats in memory for this slice. Postgres still starts with Compose; wiring `packages/db` into the HTTP store is the next persistence step. `BOTANICAL_DEPLOYMENT_MODE` is `SELF_HOST` or `SAAS`. Multi-tenant billing is deferred. Details: [docs/DEPLOY.md](./docs/DEPLOY.md).
 
 ## v0 MVP (locked)
 
