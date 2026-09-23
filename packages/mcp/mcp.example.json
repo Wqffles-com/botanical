@@ -1,0 +1,25 @@
+{
+  "servers": [
+    {
+      "id": "filesystem",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "${BOTANICAL_WORKSPACE:-/workspace}"],
+      "enabled": true,
+      "timeoutMs": 60000
+    },
+    {
+      "id": "docs",
+      "transport": "http",
+      "url": "https://mcp.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${DOCS_MCP_TOKEN}"
+      }
+    },
+    {
+      "id": "legacy",
+      "transport": "sse",
+      "url": "http://127.0.0.1:3001/sse"
+    }
+  ]
+}

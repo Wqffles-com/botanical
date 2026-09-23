@@ -1,0 +1,323 @@
+import { readFileSync, statSync } from "node:fs";
+
+import { McpConfigError } from "./errors.js";
+import type { McpLogger } from "./logger.js";
+import { silentLogger } from "./logger.js";
+import { assertServerId } from "./names.js";
+import type { McpFileConfig, McpServerConfig } from "./types.js";
+
+const MAX_CONFIG_BYTES = 1_000_000;
+const DEFAULT_CONNECT_TIMEOUT_MS = 15_000;
+const DEFAULT_TOOL_TIMEOUT_MS = 60_000;
+
+const FILE_CANDIDATES = ["config/mcp.json", "mcp.json", "botanical.mcp.json"] as const;
+
+const PLACEHOLDER = /\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}/g;
+
+export interface McpTimeouts {
+  connectTimeoutMs: number;
+  toolTimeoutMs: number;
+}
+
+export interface LoadedMcpConfig {
+  disabled: boolean;
+  source: "disabled" | "env" | "file" | "empty";
+  configPath?: string;
+  servers: McpServerConfig[];
+  timeouts: McpTimeouts;
+}
+
+export interface LoadMcpConfigOptions {
+  env?: NodeJS.ProcessEnv;
+  cwd?: string;
+  /** Explicit file path. Overrides BOTANICAL_MCP_CONFIG. */
+  configPath?: string;
+  logger?: McpLogger;
+}
+
+export function loadMcpConfig(options: LoadMcpConfigOptions = {}): LoadedMcpConfig {
+  const env = options.env ?? process.env;
+  const cwd = options.cwd ?? process.cwd();
+  const logger = options.logger ?? silentLogger;
+  const timeouts = readTimeouts(env);
+
+  if (isDisabled(env.BOTANICAL_MCP_DISABLED)) {
+    return { disabled: true, source: "disabled", servers: [], timeouts };
+  }
+
+  const explicitPath = options.configPath ?? env.BOTANICAL_MCP_CONFIG;
+  const file = readConfigFile(explicitPath, cwd);
+  const envServersRaw = env.BOTANICAL_MCP_SERVERS;
+
+  if (envServersRaw !== undefined && envServersRaw.trim() !== "") {
+    if (file) {
+      logger.warn("BOTANICAL_MCP_SERVERS overrides the MCP config file", { configPath: file.path });
+    }
+    const servers = parseServers(parseJson(envServersRaw, "BOTANICAL_MCP_SERVERS"), "BOTANICAL_MCP_SERVERS");
+    return {
+      disabled: false,
+      source: "env",
+      ...(file ? { configPath: file.path } : {}),
+      servers: servers.map((server) => interpolateServer(server, env)),
+      timeouts,
+    };
+  }
+
+  if (file) {
+    const servers = parseServers(parseJson(file.text, file.path), file.path);
+    return {
+      disabled: false,
+      source: "file",
+      configPath: file.path,
+      servers: servers.map((server) => interpolateServer(server, env)),
+      timeouts,
+    };
+  }
+
+  return { disabled: false, source: "empty", servers: [], timeouts };
+}
+
+function isDisabled(value: string | undefined): boolean {
+  if (value === undefined || value.trim() === "") return false;
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  throw new McpConfigError(
+    `BOTANICAL_MCP_DISABLED must be true/false, 1/0, yes/no, or on/off. Received "${value}".`,
+  );
+}
+
+function readTimeouts(env: NodeJS.ProcessEnv): McpTimeouts {
+  return {
+    connectTimeoutMs: readPositiveInt(env.BOTANICAL_MCP_CONNECT_TIMEOUT_MS, DEFAULT_CONNECT_TIMEOUT_MS, "BOTANICAL_MCP_CONNECT_TIMEOUT_MS"),
+    toolTimeoutMs: readPositiveInt(env.BOTANICAL_MCP_TOOL_TIMEOUT_MS, DEFAULT_TOOL_TIMEOUT_MS, "BOTANICAL_MCP_TOOL_TIMEOUT_MS"),
+  };
+}
+
+function readPositiveInt(raw: string | undefined, fallback: number, name: string): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new McpConfigError(`${name} must be a positive integer. Received "${raw}".`);
+  }
+  return value;
+}
+
+function readConfigFile(explicitPath: string | undefined, cwd: string): { path: string; text: string } | undefined {
+  if (explicitPath !== undefined && explicitPath.trim() !== "") {
+    const path = resolvePath(explicitPath, cwd);
+    return { path, text: readBounded(path) };
+  }
+  for (const relative of FILE_CANDIDATES) {
+    const path = resolvePath(relative, cwd);
+    try {
+      statSync(path);
+    } catch {
+      continue;
+    }
+    return { path, text: readBounded(path) };
+  }
+  return undefined;
+}
+
+function resolvePath(path: string, cwd: string): string {
+  if (path.startsWith("/")) return path;
+  return `${cwd.replace(/\/$/, "")}/${path}`;
+}
+
+function readBounded(path: string): string {
+  let text: string;
+  try {
+    const size = statSync(path).size;
+    if (size > MAX_CONFIG_BYTES) {
+      throw new McpConfigError(`MCP config ${path} exceeds ${MAX_CONFIG_BYTES} bytes.`);
+    }
+    text = readFileSync(path, "utf8");
+  } catch (error) {
+    if (error instanceof McpConfigError) throw error;
+    throw new McpConfigError(`Cannot read MCP config ${path}: ${errorMessage(error)}`);
+  }
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+  return text;
+}
+
+function parseJson(text: string, label: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (error) {
+    throw new McpConfigError(`MCP config ${label} is not valid JSON: ${errorMessage(error)}`);
+  }
+}
+
+function parseServers(value: unknown, label: string): McpServerConfig[] {
+  const list = Array.isArray(value)
+    ? value
+    : isRecord(value) && Array.isArray(value.servers)
+      ? value.servers
+      : undefined;
+  if (!list) {
+    throw new McpConfigError(`${label} must be a JSON array of servers or {"servers": [...]} .`);
+  }
+  const seen = new Set<string>();
+  return list.map((entry, index) => {
+    const server = parseServer(entry, `${label} servers[${index}]`);
+    if (seen.has(server.id)) {
+      throw new McpConfigError(`Duplicate MCP server id "${server.id}" in ${label}.`);
+    }
+    seen.add(server.id);
+    return server;
+  });
+}
+
+function parseServer(value: unknown, label: string): McpServerConfig {
+  if (!isRecord(value)) throw new McpConfigError(`${label} must be an object.`);
+  const id = requiredString(value.id, `${label}.id`);
+  try {
+    assertServerId(id);
+  } catch (error) {
+    throw new McpConfigError(errorMessage(error));
+  }
+  const transport = normalizeTransport(requiredString(value.transport, `${label}.transport`), label);
+  const base = {
+    id,
+    ...optionalBoolean(value.enabled, `${label}.enabled`),
+    ...optionalTimeout(value.timeoutMs, `${label}.timeoutMs`),
+    ...optionalConnectTimeout(value.connectTimeoutMs, `${label}.connectTimeoutMs`),
+  };
+
+  if (transport === "stdio") {
+    const command = requiredString(value.command, `${label}.command`);
+    return {
+      ...base,
+      transport,
+      command,
+      ...(Array.isArray(value.args) ? { args: value.args.map((arg, i) => requiredString(arg, `${label}.args[${i}]`)) } : {}),
+      ...(isRecord(value.env) ? { env: stringMap(value.env, `${label}.env`) } : {}),
+      ...(value.cwd !== undefined ? { cwd: requiredString(value.cwd, `${label}.cwd`) } : {}),
+    };
+  }
+
+  const url = requiredString(value.url, `${label}.url`);
+  assertHttpUrl(url, `${label}.url`);
+  const remote = {
+    ...base,
+    url,
+    ...(isRecord(value.headers) ? { headers: stringMap(value.headers, `${label}.headers`) } : {}),
+  };
+  if (transport === "sse") return { ...remote, transport: "sse" };
+  return {
+    ...remote,
+    transport: "http",
+    ...(value.sseFallback !== undefined ? { sseFallback: requiredBoolean(value.sseFallback, `${label}.sseFallback`) } : {}),
+  };
+}
+
+function normalizeTransport(value: string, label: string): "stdio" | "http" | "sse" {
+  if (value === "streamable-http" || value === "streamable_http") return "http";
+  if (value === "stdio" || value === "http" || value === "sse") return value;
+  throw new McpConfigError(`${label}.transport must be "stdio", "http", or "sse". Received "${value}".`);
+}
+
+function optionalBoolean(value: unknown, label: string): { enabled?: boolean } {
+  if (value === undefined) return {};
+  return { enabled: requiredBoolean(value, label) };
+}
+
+function optionalTimeout(value: unknown, label: string): { timeoutMs?: number } {
+  if (value === undefined) return {};
+  return { timeoutMs: requiredPositiveInt(value, label) };
+}
+
+function optionalConnectTimeout(value: unknown, label: string): { connectTimeoutMs?: number } {
+  if (value === undefined) return {};
+  return { connectTimeoutMs: requiredPositiveInt(value, label) };
+}
+
+function requiredBoolean(value: unknown, label: string): boolean {
+  if (typeof value !== "boolean") throw new McpConfigError(`${label} must be a boolean.`);
+  return value;
+}
+
+function requiredPositiveInt(value: unknown, label: string): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    throw new McpConfigError(`${label} must be a positive integer.`);
+  }
+  return value;
+}
+
+function requiredString(value: unknown, label: string): string {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new McpConfigError(`${label} must be a non-empty string.`);
+  }
+  return value;
+}
+
+function stringMap(value: Record<string, unknown>, label: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, inner] of Object.entries(value)) {
+    if (typeof inner !== "string") throw new McpConfigError(`${label}.${key} must be a string.`);
+    out[key] = inner;
+  }
+  return out;
+}
+
+function assertHttpUrl(value: string, label: string): void {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new McpConfigError(`${label} is not a valid URL.`);
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new McpConfigError(`${label} must use http or https. Received "${url.protocol}".`);
+  }
+}
+
+function interpolateServer(server: McpServerConfig, env: NodeJS.ProcessEnv): McpServerConfig {
+  const missing: string[] = [];
+  const next: McpServerConfig = { ...server };
+  if (next.transport === "stdio") {
+    next.command = interpolate(next.command, env, missing);
+    if (next.args) next.args = next.args.map((arg) => interpolate(arg, env, missing));
+    if (next.env) next.env = mapValues(next.env, (value) => interpolate(value, env, missing));
+    if (next.cwd) next.cwd = interpolate(next.cwd, env, missing);
+  } else {
+    next.url = interpolate(next.url, env, missing);
+    if (next.headers) next.headers = mapValues(next.headers, (value) => interpolate(value, env, missing));
+    assertHttpUrl(next.url, `server ${server.id} url`);
+  }
+  if (missing.length > 0) {
+    const names = [...new Set(missing)].join(", ");
+    throw new McpConfigError(`MCP server "${server.id}" references unset environment variables: ${names}.`);
+  }
+  return next;
+}
+
+function interpolate(input: string, env: NodeJS.ProcessEnv, missing: string[]): string {
+  return input.replace(PLACEHOLDER, (_full, name: string, defaultValue: string | undefined) => {
+    const value = env[name];
+    if (value !== undefined) return value;
+    if (defaultValue !== undefined) return defaultValue;
+    missing.push(name);
+    return "";
+  });
+}
+
+function mapValues(record: Record<string, string>, fn: (value: string) => string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(record)) out[key] = fn(value);
+  return out;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** Shape check used by tests and by callers that already parsed JSON. */
+export function parseMcpFileConfig(value: unknown, label = "mcp config"): McpFileConfig {
+  return { servers: parseServers(value, label) };
+}
