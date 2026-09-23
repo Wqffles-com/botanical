@@ -58,7 +58,7 @@ See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the sketch. Locked produc
 | [docs/VISION.md](./docs/VISION.md) | Product vision in depth |
 | [docs/BRAINSTORM.md](./docs/BRAINSTORM.md) | Ideas, UX, milestones (superseded bits marked) |
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Server, web client, adapters, Postgres |
-| [docs/BUSINESS_MODEL.md](./docs/BUSINESS_MODEL.md) | MIT self-host vs hosted subscription; what v0 includes |
+| [docs/TESTING.md](./docs/TESTING.md) | v0 smoke / e2e harness (health, auth, agent, chat) |
 
 ## v0 MVP (locked)
 
