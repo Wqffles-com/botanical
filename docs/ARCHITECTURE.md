@@ -1,6 +1,8 @@
 # Botanical — Architecture (First Pass)
 
-Greenfield sketch. Nothing here is implemented yet; this is the target shape for early engineering.
+Greenfield sketch. Nothing here is implemented yet; this is the target shape aligned with locked decisions in [DECISIONS.md](./DECISIONS.md) (2026-09-23).
+
+> Earlier drafts leaned local-first CLI + SQLite. That lean is **superseded**: personal hosted **server**, **web** first client, **Postgres**, TypeScript on **Bun or Deno**.
 
 ---
 
@@ -9,13 +11,13 @@ Greenfield sketch. Nothing here is implemented yet; this is the target shape for
 ```
                     ┌──────────────────────────────────────────┐
                     │              Clients                     │
-                    │  CLI (MVP) · Local web · Desktop (later) │
+                    │  Web UI (v0) · CLI/desktop (later)       │
                     └──────────────────┬───────────────────────┘
-                                       │
+                                       │  password / passcode
                     ┌──────────────────▼───────────────────────┐
-                    │           Orchestration core             │
-                    │  session · agent loop · profiles ·       │
-                    │  skills · policies · usage               │
+                    │         Botanical server                 │
+                    │  sessions · agents · agent loop ·        │
+                    │  profiles · MCP · A2A messaging · usage  │
                     └────────────┬─────────────┬───────────────┘
                                  │             │
               ┌──────────────────▼──┐   ┌──────▼────────────────┐
@@ -27,14 +29,16 @@ Greenfield sketch. Nothing here is implemented yet; this is the target shape for
                                                    │
                                         ┌──────────▼────────────┐
                                         │  External LLM APIs /  │
-                                        │  local OpenAI-compat  │
+                                        │  OpenAI-compat hosts  │
                                         └───────────────────────┘
 
-Config / secrets ──▶ core (never committed)
-Local store ───────▶ SQLite / files (threads, skills, usage)
+Server secrets ──▶ env / secret store (API keys never from web client)
+Postgres ────────▶ chats, agents, messages, A2A, usage
 ```
 
 **Invariant:** orchestration and tools never import a vendor SDK directly. Only `packages/adapters/*` talk to OpenAI, Anthropic, xAI, etc.
+
+**Invariant:** model API keys are **server-side only**.
 
 ---
 
@@ -43,17 +47,19 @@ Local store ───────▶ SQLite / files (threads, skills, usage)
 ```
 botanical/
   packages/
-    core/          # agent loop, profiles, sessions, types
+    core/          # agent loop, profiles, sessions, types, A2A
     adapters/      # LLMProvider implementations
     tools/         # built-in tools + MCP client bridge
-    cli/           # MVP interface
+    server/        # HTTP API, auth, Postgres access
   apps/
-    web/           # later: local UI
-    desktop/       # later: Tauri/Electron shell
-  docs/            # vision, brainstorm, architecture
+    web/           # v0 client
+    cli/           # optional later client against same API
+  docs/            # decisions, vision, brainstorm, architecture
 ```
 
-Language lean for MVP: **TypeScript** (Node 20+), shared types, easy streaming, strong ecosystem for MCP.
+Language: **TypeScript**. Runtime: **Bun or Deno** (choose at scaffold). Persistence: **Postgres**.
+
+Hosting: **portable / host-agnostic** — no hard dependency on one cloud in core.
 
 ---
 
@@ -61,60 +67,81 @@ Language lean for MVP: **TypeScript** (Node 20+), shared types, easy streaming, 
 
 | Client | Role | When |
 |--------|------|------|
-| CLI | Chat, profile switch, provider smoke tests | MVP |
-| Local web | Threads, settings, approvals | Milestone 3 |
-| Desktop | OS keychain, notifications, computer-use UX | Milestone 3–4 |
-| Headless daemon | Scheduled routines | After skills |
+| Web UI | Chat, agent picker, mandatory profile pick, settings, A2A activity | **v0** |
+| CLI | Thin client against server API | Later |
+| Desktop | OS integrations, notifications | Later |
 
-Clients are thin: they send user turns and render `ChatEvent` streams. Business logic lives in `core`.
+Clients are thin: authenticate, send user turns, render `ChatEvent` streams. Business logic lives in `core` / `server`.
+
+### Auth (v0)
+
+- Web → server: **password / passcode**
+- Sufficient for personal single-operator deploy; revisit for multi-user later
 
 ---
 
 ## 4. Orchestration core
 
 Responsibilities:
-- Load **config** (providers, profiles, MCP servers)
-- Maintain **session** state (messages, tool results, active profile)
+- Load **config** (providers, profiles, MCP servers) — keys from server env
+- Maintain **session** state (messages, tool results, active profile, owning agent)
 - Run the **agent loop** (model ↔ tools until completion or max steps)
+- Manage **agents** (unlimited user-defined: prompt/description + tool set)
+- Deliver **async agent-to-agent messages** (teammate-style)
 - Apply **policies** (cost caps, tool allowlists, approval gates)
 - Record **usage** (tokens, estimated cost, provider latency)
-- Load **skills/routines** (system prompt fragments + tool subsets + preferred profile)
+- Require **explicit profile** — no silent default model
+
+### Agent UX rules (locked)
+
+- **One agent per chat** — thread owned by one chosen agent
+- User may define unlimited agents
+- Agents may message each other asynchronously without merging chats
 
 ### Agent loop (pseudocode)
 
 ```
 while step < maxSteps:
-  events = provider.complete(messages, tools for active profile)
+  events = provider.complete(messages, tools for agent + profile)
   append assistant content / tool_calls
   if no tool_calls: break
   for each tool_call:
     if needs_approval: wait / deny
     result = tools.execute(tool_call)
     append tool result message
+  # A2A sends are tool-or-runtime side effects; land in recipient inboxes async
 ```
 
-Profile can change between steps if the user requests `/profile` or a skill policy escalates.
+Profile can change between steps if the user requests a switch or a policy escalates — still never “ambient default.”
 
 ---
 
 ## 5. Tool / MCP layer
 
-### Built-ins (MVP candidates)
-- `fetch_url` — HTTP GET with size limits
-- `fs_read` / `fs_write` — workspace-scoped paths only
-- Optional: `shell` behind an allowlist (off by default until approvals exist)
+### Built-ins (v0 — locked)
+
+- **Web search / fetch** — search + HTTP fetch with size limits
+- **Shell / code exec** — gated; approvals / allowlists
+- **File read / write** — workspace-scoped paths only
+
+### Opt-in (not core)
+
+- Browser / computer use and similar — **configurable**, not shipped as required core
 
 ### MCP
-- Botanical acts as an **MCP client**
-- User configures stdio or SSE/HTTP MCP servers in config
+
+- Botanical server acts as an **MCP client**
+- User configures stdio or SSE/HTTP MCP servers in server config
 - Tool namespaced as `mcp.<server>.<tool>` to avoid collisions
 - Capability negotiation: if a profile’s model is weak at tools, warn or disable MCP for that profile
 
 ### Approvals
+
 - Policy levels: `allow` | `ask` | `deny` per tool or pattern
-- CLI: interactive prompt; desktop: modal; daemon: deny-by-default unless allowlisted
+- Web: modal / inline prompt; later CLI/daemon policies as needed
 
 ### Audit
+
 - Append-only log of tool calls (args redacted for secrets) for debugging and trust
 
 ---
@@ -176,7 +203,7 @@ interface LLMProvider {
 | `openrouter` | OpenAI-compat + `HTTP-Referer` / `X-Title` + optional provider routing |
 | `openai-compat` | Generic: `baseURL`, `apiKey`, `defaultHeaders` — covers local and unknown hosts |
 
-### Config sketch
+### Config sketch (server-side)
 
 ```yaml
 providers:
@@ -215,6 +242,8 @@ profiles:
   router:
     provider: openrouter
     model: openrouter/auto
+
+# No defaultProfile — UI must require an explicit pick
 ```
 
 (Exact model IDs will drift — keep them in config, not hardcoded in core.)
@@ -223,45 +252,51 @@ profiles:
 
 ## 7. Config & secrets
 
-- **Config file:** `~/.config/botanical/config.yaml` or project `./botanical.yaml`
-- **Secrets:** environment variables preferred; OS keychain later for desktop
+- **Config:** server config file and/or env (providers, profiles, MCP, auth passcode)
+- **Secrets:** environment variables / host secret store on the **server**
+- Web client never receives or submits model API keys
 - **Never** commit `.env` or key files (see root `.gitignore`)
-- Provide `.env.example` naming all `*_API_KEY` vars
-- Optional: encrypt-at-rest for local thread DB (milestone 2+)
+- Provide `.env.example` naming all `*_API_KEY` vars + `DATABASE_URL` + auth secret
 
 ---
 
-## 8. Local vs cloud
+## 8. Deployment model
 
-| Mode | Description | Default lean |
-|------|-------------|--------------|
-| **Local-first** | CLI/desktop runs on user machine; only LLM API calls leave (BYOK) | **MVP default** |
-| **User box** | Optional remote sandbox for agent computer (shell/browser) | Milestone 4 |
-| **Botanical cloud** | Hosted sync / managed keys | Explicit non-goal until Charlie decides |
+| Mode | Description | Lean |
+|------|-------------|------|
+| **Personal hosted server** | Operator runs Botanical server; web clients connect remotely | **v0 locked** |
+| **Portable host** | Docker / bare metal / any VPS — host vendor undecided | Keep agnostic |
+| **User box sandbox** | Optional remote sandbox for heavier computer use | Later / opt-in |
+| ~~Local-first CLI only~~ | Runtime primarily on laptop with SQLite | **SUPERSEDED** |
 
-Local-first keeps the escape hatch honest: if every provider is down, point `local` at a self-hosted OpenAI-compatible server and keep skills/MCP.
+Always-on routines/schedulers are enabled by this architecture but are **post-v0**.
 
 ---
 
-## 9. Data stores (early)
+## 9. Data stores (v0)
 
 | Data | Store | Notes |
 |------|-------|-------|
-| Threads | SQLite | Portable, single-file |
-| Skills | Filesystem (`skills/*.md`) | Git-friendly |
-| Config | YAML | User-edited |
-| Usage | SQLite | Aggregations per profile/day |
-| Tool audit | SQLite or JSONL | Redact secrets |
+| Chats / threads | **Postgres** | One owning agent per chat |
+| Agents | **Postgres** | Prompt/description + tool bindings |
+| Messages | **Postgres** | User, assistant, tool, system |
+| A2A messages | **Postgres** | Async teammate inbox |
+| Skills (later) | Filesystem or Postgres | Git-friendly files still useful |
+| Config | YAML + env | Operator-edited |
+| Usage | Postgres | Aggregations per profile/day |
+| Tool audit | Postgres or JSONL | Redact secrets |
 
 ---
 
 ## 10. Security boundaries
 
-1. Workspace path jail for file tools  
-2. Shell disabled or allowlisted until approval UX exists  
-3. MCP servers treated as **untrusted code** — user installs them knowingly  
-4. Provider payloads may include tool results — avoid exfiltrating secrets into prompts  
-5. Abort signals on all network calls; timeouts on tools  
+1. Password / passcode gate on the web API  
+2. Model keys never exposed to the browser  
+3. Workspace path jail for file tools  
+4. Shell / code exec behind approvals and allowlists  
+5. MCP servers treated as **untrusted code** — operator installs them knowingly  
+6. Provider payloads may include tool results — avoid exfiltrating secrets into prompts  
+7. Abort signals on all network calls; timeouts on tools  
 
 ---
 
@@ -269,8 +304,9 @@ Local-first keeps the escape hatch honest: if every provider is down, point `loc
 
 - Unit tests for message mapping (especially Anthropic ↔ Botanical)
 - Contract tests with recorded HTTP fixtures (VCR-style) per adapter
-- Optional live smoke: `botanical providers test --live` (skipped in CI without keys)
-- Golden-path e2e: mock provider → tool call → final answer
+- Optional live smoke against server (skipped in CI without keys)
+- Golden-path e2e: mock provider → tool call → final answer via web API
+- A2A: send → persist → deliver to recipient agent inbox
 
 ---
 
@@ -278,8 +314,12 @@ Local-first keeps the escape hatch honest: if every provider is down, point `loc
 
 - [ ] `LLMProvider` interface stabilized
 - [ ] Five named providers + custom base URL work for streaming chat
+- [ ] Web UI auth (passcode) + mandatory profile pick
+- [ ] Postgres-backed chats, agents, messages
+- [ ] Built-ins: web search/fetch, shell/code exec, file read/write
 - [ ] One MCP server callable from the agent loop
-- [ ] Profile switch mid-session without losing thread
+- [ ] Multi-agent create + one-agent-per-chat + async A2A path
+- [ ] Documented portable deploy (host-agnostic)
 - [ ] Documented threat model for tools
 
 When those land, revisit this doc and replace sketches with “as-built” diagrams.

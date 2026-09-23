@@ -1,10 +1,10 @@
 # Botanical
 
-**Non-vendor-locked Grok Bot** — a personal AI agent that works with *any* OpenAI-compatible endpoint.
+**Non-vendor-locked Grok Bot** — a personal AI agent you host: one server, a web client, any OpenAI-compatible brain.
 
-Botanical is Charlie’s greenfield project for an assistant you own: swap models and providers without rewriting your workflows, connectors, or memory. First-class adapters for **GPT (OpenAI)**, **Claude (Anthropic)**, **Grok (xAI)**, **DeepSeek**, and **OpenRouter**, plus anything that speaks the OpenAI Chat Completions (and optionally Responses) API shape.
+Botanical is Charlie’s greenfield project for an assistant you own: swap models and providers without rewriting workflows, connectors, or memory. First-class adapters for **GPT (OpenAI)**, **Claude (Anthropic)**, **Grok (xAI)**, **DeepSeek**, and **OpenRouter**, plus anything that speaks the OpenAI Chat Completions (and optionally Responses) API shape.
 
-> Status: **greenfield**. Vision and architecture brainstorm only — no runtime yet.  
+> Status: **greenfield**. Product decisions locked 2026-09-23 — no runtime yet.  
 > License: [MIT](./LICENSE)
 
 ## Why Botanical
@@ -13,29 +13,29 @@ Vendor-locked assistants couple your UX, tools, memory, and desktop agent to one
 
 - **One agent runtime**, many providers
 - **Model profiles** instead of hard-coded vendor SDKs in product logic
-- **Escape hatch**: point at local, self-hosted, or third-party OpenAI-compatible endpoints
-- **Parity goals** with modern agent bots (tools/MCP, routines, computer use) without locking the brain to a single vendor
+- **Escape hatch**: point the server at local, self-hosted, or third-party OpenAI-compatible endpoints
+- **Parity goals** with modern agent bots (tools/MCP, multi-agent, later routines) without locking the brain to a single vendor
 
 Separate from AstroLink / Klusvangen — Botanical is its own product line.
 
-## Who it’s for
+## Who it’s for (v0)
 
-- Builders who already pay for multiple model APIs and want one agent surface
+- **Charlie as personal power user** — not teams or OSS-community-first yet
 - Power users who want Claude for some tasks, Grok for others, DeepSeek for cost, OpenRouter for routing — without juggling apps
-- Privacy-conscious users who want a path to local / self-hosted endpoints later
-- Early contributors who enjoy agent runtimes, MCP, and provider abstraction
+- Anyone who wants a **personal hosted server** with a web UI, not a vendor cloud lock-in
 
 ## High-level shape
 
 ```
 ┌─────────────┐     ┌──────────────────┐     ┌─────────────────────┐
-│  Clients    │────▶│  Orchestration   │────▶│  Provider adapters  │
-│ desktop/web │     │  runtime + tools │     │  OpenAI-compat +    │
-│ CLI / API   │     │  MCP / routines  │     │  first-class SDKs   │
+│  Web client │────▶│  Botanical       │────▶│  Provider adapters  │
+│  (first)    │     │  server          │     │  OpenAI-compat +    │
+│  + later    │     │  agents · tools  │     │  first-class SDKs   │
+│  clients    │     │  MCP · Postgres  │     │                     │
 └─────────────┘     └──────────────────┘     └─────────────────────┘
 ```
 
-See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the first-pass sketch.
+See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the sketch. Locked product choices live in [docs/DECISIONS.md](./docs/DECISIONS.md).
 
 ## Provider support (target)
 
@@ -52,13 +52,23 @@ See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the first-pass sketch.
 
 | Doc | Purpose |
 |-----|---------|
+| [docs/DECISIONS.md](./docs/DECISIONS.md) | **Authoritative** locked product decisions |
 | [docs/VISION.md](./docs/VISION.md) | Product vision in depth |
-| [docs/BRAINSTORM.md](./docs/BRAINSTORM.md) | Ideas, UX, MVP, open questions |
-| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Client, runtime, adapters, secrets |
+| [docs/BRAINSTORM.md](./docs/BRAINSTORM.md) | Ideas, UX, milestones (superseded bits marked) |
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Server, web client, adapters, Postgres |
 
-## Suggested MVP (see brainstorm)
+## v0 MVP (locked)
 
-Smallest useful product: **CLI + config** that chats against a chosen provider profile, streams tokens, and can call a minimal tool set — with one config file switching between OpenAI / Anthropic / xAI / DeepSeek / OpenRouter / custom base URL.
+Personal **hosted Botanical server** + **web UI**:
+
+- Streaming **chat + tools + MCP**
+- **Unlimited** user-defined agents (tools + description/prompt); **one agent per chat**; async **agent-to-agent** messaging
+- Built-ins: **web search/fetch**, **shell/code exec**, **file read/write** (browser/computer use opt-in, not core)
+- **Postgres** persistence; model API keys **server-side only**; web auth via **password / passcode**
+- **No default model** — explicit profile pick; server **portable / host-agnostic**
+- Stack: **TypeScript** on **Bun or Deno** (chosen at scaffold)
+
+Routines / always-on schedulers are **post-v0**. Details: [docs/DECISIONS.md](./docs/DECISIONS.md).
 
 ## Contributing
 
