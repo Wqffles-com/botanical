@@ -4,55 +4,8 @@
 
 Botanical is Charlie’s greenfield project for an assistant with a swappable brain: swap models and providers without rewriting workflows, connectors, or memory. First-class adapters for **GPT (OpenAI)**, **Claude (Anthropic)**, **Grok (xAI)**, **DeepSeek**, and **OpenRouter**, plus anything that speaks the OpenAI Chat Completions (and optionally Responses) API shape. Run the server yourself, or use the same server on our hosted deployment.
 
-> Status: **v0 integrate**. Runtime is **[Bun](https://bun.sh)**. Self-host and hosted SaaS are deployment modes of the same server.  
-> License: [MIT](./LICENSE) for the OSS core
-
-## Quickstart (self-host)
-
-Requirements: Bun 1.2+ (this repo pins the package manager to Bun 1.4.2) and Docker, for Postgres and the server image.
-
-```bash
-git clone https://github.com/Wqffles-com/botanical.git
-cd botanical
-cp .env.example .env
-bun install
-docker compose up -d postgres
-bun run dev
-```
-
-- API health: [http://localhost:8787/health](http://localhost:8787/health)
-- Web: [http://localhost:5173](http://localhost:5173) — **Check server health** calls `/api/health`, which Vite proxies to the server
-
-`bun run dev` does not need Postgres. The server stub does not open a database connection yet. `DATABASE_URL` in `.env.example` matches the Compose defaults (`botanical` / `botanical` on `localhost:5432`). Change those before any shared deploy.
-
-Postgres and the server image together:
-
-```bash
-docker compose up --build
-```
-
-The Compose server listens on port 8787 and still only serves `GET /health`. Run the web dev server on the host when you want the UI.
-
-| Script | What it does |
-|--------|----------------|
-| `bun run dev` | Server (watch) and Vite together |
-| `bun run build` | Build every workspace package |
-| `bun run typecheck` | `tsc --noEmit` in every package |
-
-### Layout
-
-| Path | Role |
-|------|------|
-| `packages/server` | Bun HTTP API stub (`GET /health`) |
-| `packages/web` | Vite + React + TypeScript client stub |
-| `packages/core` | Shared types (`HealthResponse`, deployment mode) |
-| `packages/providers` | Model provider adapters (ids only) |
-| `packages/tools` | Built-in tool names |
-| `packages/db` | Postgres migrations placeholder |
-| `docker-compose.yml` | Postgres 16 + server image |
-| `tsconfig.base.json` | Shared TypeScript config |
-
-Deployment mode is `BOTANICAL_MODE=self-host` (default) or `saas`. One codebase; nothing here assumes SaaS-only hosting. Model API keys stay in server env (`PROVIDER_*_API_KEY`). See [docs/DECISIONS.md](./docs/DECISIONS.md).
+> Status: **greenfield**. Product decisions locked 2026-09-23. Deployment mode (`self-host` / `saas`) is in `@botanical/core`; billing is not built.  
+> License: [MIT](./LICENSE)
 
 ## Why Botanical
 
@@ -105,6 +58,7 @@ See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the sketch. Locked produc
 | [docs/VISION.md](./docs/VISION.md) | Product vision in depth |
 | [docs/BRAINSTORM.md](./docs/BRAINSTORM.md) | Ideas, UX, milestones (superseded bits marked) |
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Server, web client, adapters, Postgres |
+| [docs/BUSINESS_MODEL.md](./docs/BUSINESS_MODEL.md) | MIT self-host vs hosted subscription; what v0 includes |
 
 ## v0 MVP (locked)
 

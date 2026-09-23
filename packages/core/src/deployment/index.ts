@@ -1,7 +1,11 @@
-/**
- * Shared Botanical types.
- * v0: deployment mode (`self-host` | `saas`). Import this instead of hard-coding a host model.
- */
+export { createBillingHooks } from "./billing.ts";
+export {
+  deriveFeatureFlags,
+  loadDeploymentConfig,
+  readDeploymentMode,
+  summarizeDeployment,
+} from "./config.ts";
+export { hashPasscode, verifySingleTenantPasscode } from "./passcode.ts";
 export {
   BILLING_HOOK_NAMES,
   DEPLOYMENT_ENV,
@@ -10,14 +14,7 @@ export {
   DeploymentConfigErrorCode,
   SAAS_PLACEHOLDER_TENANT_ID,
   SELF_HOST_TENANT_ID,
-  createBillingHooks,
-  deriveFeatureFlags,
-  hashPasscode,
-  loadDeploymentConfig,
-  readDeploymentMode,
-  summarizeDeployment,
-  verifySingleTenantPasscode,
-} from "./deployment/index.ts";
+} from "./types.ts";
 export type {
   BillingDecision,
   BillingHookName,
@@ -35,4 +32,4 @@ export type {
   PasscodeSource,
   SingleTenantPasscode,
   SubscriptionSnapshot,
-} from "./deployment/index.ts";
+} from "./types.ts";
