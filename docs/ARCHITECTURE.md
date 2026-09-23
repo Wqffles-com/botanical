@@ -1,8 +1,8 @@
 # Botanical — Architecture (First Pass)
 
-Greenfield sketch. Nothing here is implemented yet; this is the target shape aligned with locked decisions in [DECISIONS.md](./DECISIONS.md) (2026-09-23).
+Target shape aligned with locked decisions in [DECISIONS.md](./DECISIONS.md). The monorepo scaffold is in place (Bun, `GET /health`, empty packages). Behavior below is still the target, not as-built.
 
-> Earlier drafts leaned local-first CLI + SQLite. That lean is **superseded**: personal hosted **server**, **web** first client, **Postgres**, TypeScript on **Bun or Deno**.
+> Earlier drafts leaned local-first CLI + SQLite. That lean is **superseded**: personal hosted **server**, **web** first client, **Postgres**, TypeScript on **Bun**.
 
 ---
 
@@ -36,7 +36,7 @@ Server secrets ──▶ env / secret store (API keys never from web client)
 Postgres ────────▶ chats, agents, messages, A2A, usage
 ```
 
-**Invariant:** orchestration and tools never import a vendor SDK directly. Only `packages/adapters/*` talk to OpenAI, Anthropic, xAI, etc.
+**Invariant:** orchestration and tools never import a vendor SDK directly. Only `packages/providers/*` talk to OpenAI, Anthropic, xAI, etc.
 
 **Invariant:** model API keys are **server-side only**.
 
@@ -47,17 +47,17 @@ Postgres ────────▶ chats, agents, messages, A2A, usage
 ```
 botanical/
   packages/
-    core/          # agent loop, profiles, sessions, types, A2A
-    adapters/      # LLMProvider implementations
+    core/          # shared types, agent config schemas, agent loop (later)
+    providers/     # LLMProvider implementations (was sketched as adapters/)
     tools/         # built-in tools + MCP client bridge
-    server/        # HTTP API, auth, Postgres access
-  apps/
-    web/           # v0 client
-    cli/           # optional later client against same API
+    server/        # HTTP API, auth, orchestration, Postgres access
+    web/           # v0 client (Vite + React + TypeScript)
+    db/            # Postgres schema + migrations
+  docker-compose.yml
   docs/            # decisions, vision, brainstorm, architecture
 ```
 
-Language: **TypeScript**. Runtime: **Bun or Deno** (choose at scaffold). Persistence: **Postgres**.
+Language: **TypeScript**. Runtime: **Bun**. Persistence: **Postgres**. A later CLI would be another client against the same API, not a second runtime.
 
 Hosting: **portable / host-agnostic** — no hard dependency on one cloud in core.
 

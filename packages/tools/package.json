@@ -1,0 +1,13 @@
+{
+  "name": "@botanical/tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun --format esm",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@botanical/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@botanical/core": "workspace:*",
+    "@botanical/db": "workspace:*",
+    "@botanical/providers": "workspace:*",
+    "@botanical/tools": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2"
+  }
+}
