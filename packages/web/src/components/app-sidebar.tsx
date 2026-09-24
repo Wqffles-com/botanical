@@ -214,7 +214,7 @@ function AgentNavItem({
       <SidebarMenuButton
         render={<Link href={`/agents/${agent.id}`} />}
         isActive={active && !activeChatId}
-        tooltip={identity.name}
+        tooltip={identity.description ? `${identity.name} — ${identity.description}` : identity.name}
       >
         <AgentAvatar icon={identity.icon} color={identity.color} name={identity.name} size="sm" />
         <span>{identity.name}</span>

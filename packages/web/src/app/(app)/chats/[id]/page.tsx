@@ -2,20 +2,21 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { AgentAvatar } from "@/components/agent-avatar";
+import { ChatAgentHeader } from "@/components/chat/chat-agent-header";
+import { AssistantMessageFrame } from "@/components/chat/assistant-message-frame";
 import { EmptyState } from "@/components/empty-state";
 import { useWorkspace } from "@/components/workspace-provider";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { agentIdentity } from "@/lib/agent-identity";
+import { identityFromUnknown } from "@/lib/agent-identity";
 
 export default function ChatPage() {
   const params = useParams<{ id: string }>();
   const { ready, chats, agents } = useWorkspace();
   const chat = chats.find((item) => item.id === params.id) ?? null;
   const agent = chat ? (agents.find((item) => item.id === chat.agentId) ?? null) : null;
-  const identity = agent ? agentIdentity(agent) : null;
+  const identity = agent ? identityFromUnknown(agent) : null;
 
   if (!ready) {
     return (
@@ -47,24 +48,14 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-12 items-center gap-3 border-b px-4">
-        {identity ? (
-          <AgentAvatar icon={identity.icon} color={identity.color} name={identity.name} />
-        ) : null}
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{chat.title || "Untitled chat"}</div>
-          <div className="truncate text-xs text-muted-foreground">
-            {identity?.name ?? "Unknown agent"}
-            {chat.profileId ? ` · profile ${chat.profileId}` : " · pick a model profile to send"}
-          </div>
-        </div>
-      </div>
+      <ChatAgentHeader agent={identity} title={chat.title || "Untitled chat"} />
       <div className="min-h-0 flex-1 overflow-auto p-6">
-        <EmptyState
-          className="min-h-[40vh]"
-          title="Thread"
-          body="Streaming messages, markdown, and tool cards land in the chat UI. Composer stays shut until a profile is picked."
-        />
+        <AssistantMessageFrame agent={identity}>
+          <p className="text-sm text-muted-foreground">
+            Streaming messages, markdown, and tool cards land in the chat UI. Composer stays shut until a
+            profile is picked.
+          </p>
+        </AssistantMessageFrame>
       </div>
       <div className="border-t p-3">
         <Textarea
