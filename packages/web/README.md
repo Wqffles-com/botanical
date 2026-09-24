@@ -1,33 +1,49 @@
 # @botanical/web
 
-Vite + React client for Botanical v0 chat.
+Next.js App Router + TypeScript + Tailwind v4 + shadcn/ui client for Botanical.
 
-The screen flow:
-
-1. **Passcode** unlocks the server (`POST /auth/login`). A bearer token is stored in `localStorage` under `botanical.session.v1` and sent as `Authorization`. Cookie sessions work too (`credentials: "include"`). Reload calls `GET /auth/me` and restores the shell. Logout clears the saved token.
-2. **New chat** asks for exactly one agent (radio) and one model profile. The profile control starts empty — Botanical does not pre-select a model. Start stays disabled until both are chosen.
-3. **Thread** streams `POST /chats/:id/messages`. The composer stays shut until that chat has an explicit profile. The agent is fixed for the life of the chat.
-
-The HTTP contract lives in [`packages/core`](../core/README.md). This package only renders it.
+The shell owns routing, auth, the sidebar, and agent identity primitives. Chat, identity pickers, inbox, and settings tabs are filled in by later packages.
 
 ## Run
 
 ```bash
-cd packages/core && bun install
-cd ../web && bun install
+cd packages/web
 bun run dev
 ```
 
-The dev server listens on `http://127.0.0.1:5173` and proxies `/api/*` to `BOTANICAL_SERVER_URL` (default `http://127.0.0.1:8787`). Paths stay under `/api`, matching the v0 server. Set `VITE_API_BASE` to an absolute origin to skip the proxy (`http://127.0.0.1:8787`).
+Dev server: http://127.0.0.1:3101
 
-`feat/v0-web-design` owns the Tailwind shell (login, profile gate, agents, chats, settings badge). This package wires the same flows against `@botanical/core` and borrows that branch's dark leaf palette. Prefer its components over `bc-*` styles when the branches merge, and keep `src/state` plus the core client.
+`/api/*` is rewritten to `BOTANICAL_API_URL` (default `http://localhost:8787`) so session cookies stay same-origin. Point it at the MVP server with:
 
 ```bash
-bun run test
-bun run typecheck
-bun run build
+BOTANICAL_API_URL=http://localhost:8788 bun run dev
 ```
 
-## Design system
+## Routes
 
-Layout and color sit in `src/styles/tokens.css` and `src/styles/app.css` under the `bc-*` class names. If `feat/v0-web-design` lands a design system, replace those tokens and keep `src/state` plus `@botanical/core` as the API wiring. Screens match the v0 shell: login, profile picker, agent list/editor, chat list, streaming thread, and a self-host / hosted badge.
+| Path | Notes |
+|------|--------|
+| `/login` | Passcode form (`POST /api/auth/login`) |
+| `/` | Redirects to the first agent, or `/agents/new` |
+| `/agents`, `/agents/new`, `/agents/[id]` | Agent list / create / detail |
+| `/chats/[id]` | Chat shell (composer gated on `profileId`) |
+| `/inbox` | A2A inbox shell |
+| `/settings` | Profiles / Tools / MCP / Deployment tabs |
+
+Unauthenticated requests (`GET /api/auth/me` → 401) redirect to `/login`.
+
+## Shared UI for other packages
+
+- `src/components/agent-avatar.tsx` — lucide icon in a colored rounded square
+- `src/lib/agent-colors.ts` — `AgentColor` palette (`red`…`gray`, default `green`)
+- `src/lib/agent-icons.ts` — lucide registry (default `Bot`)
+- `src/lib/api.ts` — browser `BotanicalClient` (base URL `""`)
+- `src/lib/server-api.ts` — RSC client that forwards cookies
+
+## Scripts
+
+```bash
+bun run typecheck
+bun test src
+bun run build
+```

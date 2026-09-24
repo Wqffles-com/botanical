@@ -9,12 +9,12 @@ Lead: m14 on `feat/v0-mvp`. Updated: 2026-09-24 (server-runtime merge).
 - #18 agent-to-agent messaging (`bc56908`). Inbox routes, `send_agent_message`, and `BOTANICAL_A2A_AUTORUN` sit on the same app as identity and MCP. The memory store implements `agentMessages`. Postgres still attaches that in-memory inbox until #21 lands.
 - #20 agent runtime and tool registry. `packages/agent-server` is removed. Chat turns run through `@botanical/agent-runtime`. `GET /api/tools` lists the registry. MCP still connects on boot and those tools are copied into the registry. `send_agent_message` is a built-in, offered when the agent's allowlist includes it. The mock profile calls it when the user text is `send_agent_message {…}`.
 - #21 Postgres HTTP store. `DATABASE_URL` migrates on boot and uses `packages/db` `createStore`. Migration `0001_agent_identity` stays. `0002_mvp_store` adds sessions and `model_profiles.public_id`. Live Postgres integration tests are skipped unless `BOTANICAL_TEST_DATABASE_URL` is set.
+- #22 Next.js App Router + shadcn replaces the Vite client in `packages/web`.
 
 `bun test` for `@botanical/core`, `@botanical/server`, and `@botanical/db` after the Postgres merge: 99 pass, 2 skipped, 0 fail. `@botanical/server` typecheck is green.
 
 ## Open PRs into `feat/v0-mvp`
 
-- #22 Next.js App Router + shadcn foundation (`feat/mvp-next-foundation`).
 - #23 Real model providers (`feat/mvp-providers`).
 - #24 Built-in file, shell, web, and agent-message tools (`feat/mvp-tools`).
 - #25 MVP Compose stack (`feat/mvp-devops`).
@@ -37,7 +37,7 @@ Merge order from here: postgres, next-foundation, providers, tools, then UI (ide
 
 ## What is missing for the MVP
 
-- `packages/web` is still Vite until #22. Chat UI is #27, pages UI is #28, identity UI is #29.
+- Next.js + shadcn foundation is on the branch. Identity UI (#29), pages (#28), and chat (#27) are not merged yet.
 - Shell and web tool packages are dependencies. They register only when they export `createToolContributor` (#24).
 - No `packages/e2e` on this branch yet. The `botanical-mvp` stack (web `3000`, server `8788`, postgres `5433`) is not running.
 
@@ -52,4 +52,8 @@ Merge order from here: postgres, next-foundation, providers, tools, then UI (ide
 
 ## Next
 
-Merge #22 (Next.js foundation), then #29 identity UI (built on that foundation), #28 pages, #27 chat, then providers, tools, devops, and e2e.
+Merge #29 identity UI (built on the Next foundation), then #28 pages and #27 chat. Providers, tools, devops, and e2e follow.
+
+## Merged since the runtime note
+
+- #22 Next.js App Router + shadcn replaces the Vite `packages/web`. `bun test` in `@botanical/web` is 4 pass. `tsc --noEmit` passes. The old Vite `model.test.ts` was removed with the Vite client.
