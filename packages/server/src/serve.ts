@@ -3,6 +3,7 @@ import { createApp } from "./app.ts";
 import { ConfigError, loadConfig, type ServerConfig } from "./config.ts";
 import { createStore } from "./db/store.ts";
 import { startServerMcp } from "./mcp-host.ts";
+import { createDefaultToolRegistry, registerPackageContributors } from "./tools/catalog.ts";
 
 function clientKeyFrom(request: Request, address: string | null, config: ServerConfig): string {
   if (config.trustProxy) {
@@ -16,7 +17,16 @@ async function main(): Promise<void> {
   const config = loadConfig(process.env);
   const store = await createStore(config);
   const mcp = await startServerMcp({ env: process.env });
-  const app = createApp({ config, store, mcp });
+  const toolRegistry = createDefaultToolRegistry();
+  const contributors = await registerPackageContributors(toolRegistry);
+  const app = createApp({
+    config,
+    store,
+    mcp,
+    toolRegistry,
+    installPlatformTools: true,
+    env: process.env,
+  });
   const mcpStatus = mcp.snapshot();
   if (mcpStatus.configError) {
     console.error(`MCP config error: ${mcpStatus.configError}`);
@@ -24,8 +34,11 @@ async function main(): Promise<void> {
     const ready = mcpStatus.servers.filter((server) => server.state === "ready").length;
     const failed = mcpStatus.servers.filter((server) => server.state === "error").length;
     console.log(
-      `MCP ${mcpStatus.source}: ${ready} connected, ${failed} failed, ${app.tools.list().length} tools`,
+      `MCP ${mcpStatus.source}: ${ready} connected, ${failed} failed, ${mcp.registry.list().length} tools`,
     );
+  }
+  if (contributors.length > 0) {
+    console.log(`[botanical] tool contributors: ${contributors.join(", ")}`);
   }
   const server = Bun.serve({
     hostname: config.host,

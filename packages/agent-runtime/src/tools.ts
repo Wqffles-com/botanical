@@ -9,6 +9,8 @@ export interface ToolCallContext {
   agentId: string;
   chatId: string;
   signal?: AbortSignal;
+  /** Jail root for built-ins that touch the filesystem. Set by the server per call. */
+  workspaceRoot?: string;
 }
 
 export interface ListedTool {

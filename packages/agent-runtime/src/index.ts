@@ -100,3 +100,23 @@ export {
   type ToolResult,
   type ToolSource,
 } from "./tools";
+export {
+  TOOL_CONTRIBUTOR_EXPORT,
+  TOOL_REGISTRY_VERSION,
+  contributorFromBuiltins,
+  contributorFromMcpBridge,
+  contributorFromMcpCatalog,
+  contributorFromMcpRuntime,
+  createToolRegistry,
+  normalizeInvocation,
+  type BuiltinCallContext,
+  type BuiltinToolLike,
+  type McpCatalog,
+  type McpCatalogTool,
+  type RegisteredTool,
+  type ToolContributor,
+  type ToolContributorFactory,
+  type ToolInvocationResult,
+  type ToolRegistry,
+  type ToolSourceKind,
+} from "./registry";

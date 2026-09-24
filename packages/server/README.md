@@ -1,6 +1,6 @@
 # @botanical/server
 
-HTTP API for Botanical v0: password or passcode auth, agents, chats, messages, and model profiles.
+HTTP API for Botanical v0: password or passcode auth, agents, chats, messages, model profiles, tools, MCP, and agent-to-agent mail.
 
 Runtime is **Bun**. `SELF_HOST` and `SAAS` are the same server. The deployment mode is a flag plus branding. It does not change auth, routes, or storage.
 
@@ -69,21 +69,25 @@ Error shape: `{ "error": { "code": "...", "message": "..." } }`.
 | GET | `/api/chats/:id` | yes | |
 | DELETE | `/api/chats/:id` | yes | Deletes the chat and its messages |
 | GET | `/api/chats/:id/messages` | yes | |
-| POST | `/api/chats/:id/messages` | yes | Persists a user turn and a stub assistant turn |
+| POST | `/api/chats/:id/messages` | yes | Runs the agent loop for the chat's agent |
 | GET | `/api/agent-messages?agentId=` | yes | Inbox for that agent. Optional `status` and `limit` |
 | POST | `/api/agent-messages` | yes | `{ fromAgentId, toAgentId, body }` then delivers |
 | PATCH | `/api/agent-messages/:id` | yes | `{ status }` — pending, delivered, read, or failed |
 | GET | `/api/profiles` | yes | `defaultProfileId` is always `null` |
+| GET | `/api/tools` | yes | Built-in and MCP tools, each with `source` |
 | GET | `/api/mcp/servers` | yes | Configured MCP servers, tool ids, and connect errors |
 
 `POST /api/chats/:id/messages` body is `{ "content": "...", "profileId"?: "...", "stream"?: boolean }`.
 
-- `stream: false` returns JSON `{ userMessage, assistantMessage, profileId }`.
-- `stream: true`, or `Accept: text/event-stream`, returns server-sent events: `message.created`, `text-delta`, `message.completed`, `done`.
+The turn runs through `@botanical/agent-runtime`. The agent's `systemPrompt` is the system message. Only tools on the agent's `toolIds` allowlist are offered. The model and tools alternate until the model stops.
+
+- `stream: false` returns JSON `{ userMessage, assistantMessage, profileId }`. A tool turn also includes `toolCall` and `toolResult`. A provider failure (for example a missing server API key) is `error: { code, message }` and `assistantMessage` may be null. The user message is still stored.
+- `stream: true`, or `Accept: text/event-stream`, returns server-sent events: `message.created`, `text-delta`, `tool-call`, `tool-result`, `error`, `message.completed`, `done`. Payloads use the core stream types (`text-delta`, `tool-call`, `tool-result`, `error`, `done`).
 - Omitting `profileId` uses the profile stored on the chat (the one chosen at create, or the last explicit switch).
 - Sending a different configured `profileId` switches the chat. Unknown ids return 422. Nothing is chosen for you.
+- The `mock` provider calls `file_list` when that id is on the allowlist, then echoes the user text and the tool output. A user message of the form `send_agent_message {"toAgentId":"…","body":"…"}` calls that tool when it is on the allowlist. It does not use the network.
 
-The assistant text is a stub except for the `mock` profile, which runs the echo provider and `file_list`. Provider streaming for other profiles is not connected yet.
+`GET /api/tools` returns `{ tools: [{ id, name, description, parameters, source, serverId? }] }`. `source` is `builtin` or `mcp`. File tools are registered as `builtin.files`. Shell, web, and MCP packages plug in by exporting `createToolContributor` from `@botanical/tools-shell`, `@botanical/tools-web`, and `@botanical/mcp` (see `@botanical/agent-runtime` tool registry v1). The server loads those factories at startup. MCP servers connected from `BOTANICAL_MCP_CONFIG` are also listed, with ids `mcp:<server>:<tool>`.
 
 ## Agent-to-agent messages
 
@@ -93,7 +97,7 @@ Messages live in `store.agentMessages`. With `DATABASE_URL` unset that repositor
 
 Set `BOTANICAL_A2A_AUTORUN=true` to run one background turn for the recipient in a chat titled `Inbox`. The turn records the mail and an acknowledgement. It does not call tools. The profile is the inbox chat's profile, the agent's `defaultProfileId` when that field exists and is configured, or the profile on the recipient's newest other chat. There is still no silent global default: with no explicit profile the message stays `delivered` and no chat is created.
 
-During a turn the built-in `send_agent_message` tool sends mail. The sender is the chat's agent. On the mock profile, a user message of the form `send_agent_message {"toAgentId":"…","body":"…"}` invokes it.
+During a turn the built-in `send_agent_message` tool sends mail when that id is on the agent's allowlist. The sender is the chat's agent.
 
 ## MCP
 
@@ -116,12 +120,12 @@ A chat's agent does not change after create. The first message replaces the titl
 
 ## Persistence
 
-Repositories live in `src/types.ts` (`Store`: agents, chats, messages, sessions).
+Repositories live in `src/types.ts` (`Store`: agents, chats, messages, sessions, agent messages).
 
 - `DATABASE_URL` unset: in-memory store. Dev and tests. A restart drops data.
 - `DATABASE_URL` set: the server loads `packages/db` and calls `createStore({ connectionString })`. The result must be a `Store` with `kind: "postgres"`. If the package is missing, the process exits. It does not fall back to memory.
 
-`packages/db` is not in this branch. `src/db/postgres.ts` documents the expected export and tables. Session rows store a SHA-256 of the token, not the token itself. Model API keys are not a database column and are not accepted on any route.
+Session rows store a SHA-256 of the token, not the token itself. Model API keys are not a database column and are not accepted on any route.
 
 ## Model profiles
 
@@ -138,13 +142,11 @@ Repositories live in `src/types.ts` (`Store`: agents, chats, messages, sessions)
 ]
 ```
 
-Providers: `openai`, `anthropic`, `xai`, `deepseek`, `openrouter`, `openai-compat`.
+Providers: `openai`, `anthropic`, `xai`, `deepseek`, `openrouter`, `openai-compat`, `mock`.
 
 Provider keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`) stay in the server environment. Profile JSON rejects `apiKey`.
 
 ## What's left
 
-- Postgres implementation in `packages/db` (this server already calls it when `DATABASE_URL` is set)
-- Real token streaming through `packages/providers` (the message route is a stub)
-- Tools, MCP, and agent-to-agent delivery
-- Shared schemas in `packages/core`, if that package becomes the source of these types
+- Postgres `createStore` from `packages/db` is wired when `DATABASE_URL` is set. Message rows now carry tool calls; the db store should persist them and `agent_messages`.
+- Shell and web packages register when they export `createToolContributor`.

@@ -345,12 +345,16 @@ describe("agents, chats, messages, profiles", () => {
     expect(posted.status).toBe(201);
     const saved = await readJson<{
       userMessage: { role: string; content: string };
-      assistantMessage: { role: string; content: string };
+      assistantMessage: { role: string; content: string } | null;
       profileId: string;
+      error: { code: string; message: string };
     }>(posted);
     expect(saved.userMessage.role).toBe("user");
-    expect(saved.assistantMessage.content).toContain("Profile grok");
+    expect(saved.userMessage.content).toBe("Hello from the garden");
+    expect(saved.assistantMessage).toBeNull();
     expect(saved.profileId).toBe("grok");
+    expect(saved.error.code).toBe("missing_api_key");
+    expect(saved.error.message).toContain("XAI_API_KEY");
 
     const titled = await readJson<{ chat: { title: string; agentId: string } }>(
       await app.fetch(new Request(`http://localhost/api/chats/${chatId}`, { headers: bearer(token) })),
@@ -373,15 +377,15 @@ describe("agents, chats, messages, profiles", () => {
     expect(streamed.headers.get("content-type")).toContain("text/event-stream");
     const events = await streamed.text();
     expect(events).toContain("event: message.created");
-    expect(events).toContain("event: text-delta");
-    expect(events).toContain("event: message.completed");
+    expect(events).toContain("event: error");
     expect(events).toContain("event: done");
-    expect(events).toContain("Profile grok");
+    expect(events).toContain("XAI_API_KEY");
+    expect(events).not.toContain("event: text-delta");
 
     const messages = await readJson<{ messages: { role: string }[] }>(
       await app.fetch(new Request(`http://localhost/api/chats/${otherId}/messages`, { headers: bearer(token) })),
     );
-    expect(messages.messages.map((message) => message.role)).toEqual(["user", "assistant"]);
+    expect(messages.messages.map((message) => message.role)).toEqual(["user"]);
 
     const switched = await readJson<{ chat: { profileId: string; title: string } }>(
       await app.fetch(new Request(`http://localhost/api/chats/${otherId}`, { headers: bearer(token) })),

@@ -6,6 +6,8 @@ export { createApp } from "./app.ts";
 export type { App, AppDeps } from "./app.ts";
 export { emptyServerMcp, startServerMcp } from "./mcp-host.ts";
 export type { McpServersResponse, McpServerToolView, McpServerView, ServerMcp } from "./mcp-host.ts";
+export { ensureWorkspaceRoot } from "./runtime/workspace.ts";
+export { createDefaultToolRegistry, registerPackageContributors, TOOL_CONTRIBUTOR_PACKAGES } from "./tools/catalog.ts";
 export { ConfigError, defaultBrandName, loadConfig, SERVER_VERSION } from "./config.ts";
 export type { PasswordAuth, ServerConfig } from "./config.ts";
 export { adoptAgentMessages, attachAgentMessages, createMemoryStore, createStore } from "./db/store.ts";
@@ -22,6 +24,7 @@ export type {
   DeploymentMode,
   Message,
   MessageRole,
+  ToolCall,
   ModelProfile,
   ModelProvider,
   NewAgent,

@@ -18,3 +18,25 @@ Persistence and HTTP live in `@botanical/server`. Model adapters implement `LLMP
 `runAgentTurn` yields `RuntimeEvent`s: `inbox`, `step`, `text-delta`, `tool-call`, `tool-result`, `usage`, `a2a-sent`, `error`, `done`. Provider `done` events are not forwarded; the runtime emits one `done` after the step's tool calls finish.
 
 Register tools in this order: runtime A2A source, built-in source, MCP source. `createMcpToolSource` namespaces tools as `mcp.<server>.<tool>`.
+
+## Tool registry (v1)
+
+`createToolRegistry` is the catalog the HTTP server exposes at `GET /api/tools` and passes into `runAgentTurn`. m08 and m09 implement `ToolContributor` and export it as `createToolContributor` from:
+
+- `@botanical/tools-shell`
+- `@botanical/tools-web`
+- `@botanical/mcp`
+
+```ts
+import {
+  contributorFromBuiltins,
+  contributorFromMcpRuntime,
+  type ToolContributor,
+} from "@botanical/agent-runtime";
+
+export function createToolContributor(): ToolContributor {
+  return contributorFromBuiltins(myTools, { id: "builtin.shell" });
+}
+```
+
+`RegisteredTool.id` is the allowlist id. `source` is `"builtin"` or `"mcp"`. MCP tools set `serverId` and use ids `mcp.<server>.<tool>`. `register` replaces a contributor with the same id. The earlier contributor keeps a duplicated tool id. `callTool` reports failures as `{ content, isError: true }` instead of throwing. Helpers: `contributorFromBuiltins`, `contributorFromMcpBridge`, `contributorFromMcpCatalog`, `contributorFromMcpRuntime`.
