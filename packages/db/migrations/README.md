@@ -1,5 +1,5 @@
 # migrations
 
-Empty on purpose. Add ordered SQL files here (`0001_*.sql`, then `0002_*.sql`, and so on).
+Ordered SQL applied by `migrateDatabase` and by the HTTP server on boot when `DATABASE_URL` is set.
 
-No migration runner is wired in the v0 scaffold. Do not expect these files to apply on `docker compose up`.
+`drizzle-kit migrate` alone skips `sql/guards.sql` and `sql/bootstrap.sql`. Use `bun run migrate` or start the server.

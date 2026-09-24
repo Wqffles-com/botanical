@@ -29,12 +29,16 @@ async function main(): Promise<void> {
   );
   if (store.kind === "memory") {
     console.warn(
-      "Persistence is in-memory. TODO: set DATABASE_URL and provide packages/db for Postgres. Data will not survive a restart.",
+      "Persistence is in-memory because DATABASE_URL is unset. Data will not survive a restart.",
     );
+  } else {
+    console.log("Postgres migrations applied.");
   }
 
   const shutdown = () => {
-    void server.stop(false).finally(() => process.exit(0));
+    void server.stop(false).finally(() => {
+      void store.close().finally(() => process.exit(0));
+    });
   };
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);

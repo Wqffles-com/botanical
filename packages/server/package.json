@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@botanical/db": "workspace:*",
     "@botanical/providers": "workspace:*",
     "@botanical/tools": "workspace:*"
   },

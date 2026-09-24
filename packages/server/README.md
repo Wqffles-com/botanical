@@ -129,7 +129,6 @@ Provider keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_A
 
 ## What's left
 
-- Postgres `createStore` in `packages/db` (the server already calls it when `DATABASE_URL` is set)
 - Real token streaming through `packages/providers` (the message route is a stub)
 - Tools, MCP, and agent-to-agent delivery
 - Shared schemas in `packages/core`, if that package becomes the source of these types

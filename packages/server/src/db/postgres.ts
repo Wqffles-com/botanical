@@ -4,27 +4,14 @@ import { fileURLToPath } from "node:url";
 import type { Store } from "../types.ts";
 
 /**
- * TODO(packages/db): Postgres is not wired in this workspace yet.
+ * Load `@botanical/db` when DATABASE_URL is set.
  *
- * When packages/db lands, export:
+ * packages/db exports `createStore({ connectionString })`, runs Drizzle
+ * migrations, and returns a Store with kind "postgres". This module does not
+ * import a Postgres driver; packages/db owns the pool.
  *
- *   export function createStore(options: { connectionString: string }): Promise<Store>;
- *
- * The Store shape is defined in src/types.ts (agents including name/icon/color,
- * chats, messages including tool calls, profiles metadata, agent_messages,
- * sessions) and must use kind: "postgres".
- *
- * Suggested tables (docs/ARCHITECTURE.md):
- *   agents(id, name, description, system_prompt, tool_ids jsonb, created_at, updated_at)
- *   chats(id, agent_id, profile_id, title, created_at, updated_at)
- *     — one owning agent per chat; do not update agent_id
- *   messages(id, chat_id, role, content, created_at)
- *     — v0 rows are plain text. Tool-call parts can extend this table later.
- *   sessions(id, token_hash, created_at, expires_at)
- *     — store the sha256 of the bearer/cookie token, never the raw token
- *
- * Chat delete should remove the chat and its messages in one transaction.
- * This module does not import a Postgres driver; packages/db owns the pool.
+ * The Store covers agents (name, icon, color), chats, messages including tool
+ * calls, profile metadata, agent messages, and sessions.
  */
 export const POSTGRES_NOT_WIRED =
   "DATABASE_URL is set but packages/db is not available or does not export createStore(). " +

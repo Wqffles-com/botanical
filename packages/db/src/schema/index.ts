@@ -15,6 +15,7 @@ export {
   usersRelations,
 } from './relations.ts';
 export { secretRefs } from './secret-refs.ts';
+export { sessions } from './sessions.ts';
 export { settings } from './settings.ts';
 export { tenants } from './tenants.ts';
 export { toolAudit } from './tool-audit.ts';
@@ -27,6 +28,7 @@ import { chats } from './chats.ts';
 import { messages } from './messages.ts';
 import { modelProfiles } from './model-profiles.ts';
 import { secretRefs } from './secret-refs.ts';
+import { sessions } from './sessions.ts';
 import { settings } from './settings.ts';
 import { tenants } from './tenants.ts';
 import { toolAudit } from './tool-audit.ts';
@@ -51,6 +53,8 @@ export type Setting = typeof settings.$inferSelect;
 export type NewSetting = typeof settings.$inferInsert;
 export type SecretRef = typeof secretRefs.$inferSelect;
 export type NewSecretRef = typeof secretRefs.$inferInsert;
+export type Session = typeof sessions.$inferSelect;
+export type NewSession = typeof sessions.$inferInsert;
 export type UsageEvent = typeof usageEvents.$inferSelect;
 export type NewUsageEvent = typeof usageEvents.$inferInsert;
 export type ToolAudit = typeof toolAudit.$inferSelect;

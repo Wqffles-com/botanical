@@ -71,6 +71,7 @@
       "name": "@botanical/server",
       "version": "0.1.0",
       "dependencies": {
+        "@botanical/db": "workspace:*",
         "@botanical/providers": "workspace:*",
         "@botanical/tools": "workspace:*",
       },
