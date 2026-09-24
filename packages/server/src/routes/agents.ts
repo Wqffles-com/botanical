@@ -1,7 +1,15 @@
 import { HttpError, isRecord, json, noContent, readJson } from "../http.ts";
 import { authed, type Router } from "../router.ts";
 import type { AgentPatch } from "../types.ts";
-import { LIMITS, readBoundedString, readToolIds, requireParam } from "../validate.ts";
+import {
+  LIMITS,
+  readAgentColor,
+  readAgentIcon,
+  readBoundedString,
+  readDefaultProfileId,
+  readToolIds,
+  requireParam,
+} from "../validate.ts";
 
 export function registerAgents(router: Router): void {
   router.add(
@@ -33,7 +41,19 @@ export function registerAgents(router: Router): void {
       if (!name || !systemPrompt) {
         throw new HttpError(400, "invalid_body", "name and systemPrompt are required");
       }
-      const agent = await ctx.store.agents.create({ name, description, systemPrompt, toolIds });
+      const icon = body.icon === undefined ? undefined : readAgentIcon(body.icon);
+      const color = body.color === undefined ? undefined : readAgentColor(body.color);
+      const defaultProfileId =
+        body.defaultProfileId === undefined ? undefined : readDefaultProfileId(body.defaultProfileId);
+      const agent = await ctx.store.agents.create({
+        name,
+        description,
+        systemPrompt,
+        toolIds,
+        ...(icon !== undefined ? { icon } : {}),
+        ...(color !== undefined ? { color } : {}),
+        ...(defaultProfileId !== undefined ? { defaultProfileId } : {}),
+      });
       return json(201, { agent });
     }),
   );
@@ -79,11 +99,17 @@ export function registerAgents(router: Router): void {
       if ("toolIds" in body) {
         patch.toolIds = readToolIds(body.toolIds);
       }
+      if ("icon" in body) patch.icon = readAgentIcon(body.icon);
+      if ("color" in body) patch.color = readAgentColor(body.color);
+      if ("defaultProfileId" in body) patch.defaultProfileId = readDefaultProfileId(body.defaultProfileId);
       if (
         patch.name === undefined &&
         patch.description === undefined &&
         patch.systemPrompt === undefined &&
-        patch.toolIds === undefined
+        patch.toolIds === undefined &&
+        patch.icon === undefined &&
+        patch.color === undefined &&
+        patch.defaultProfileId === undefined
       ) {
         throw new HttpError(400, "invalid_body", "No fields to update");
       }

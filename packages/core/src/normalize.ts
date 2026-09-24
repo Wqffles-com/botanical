@@ -1,17 +1,19 @@
 import { BotanicalApiError } from "./errors";
-import type {
-  Agent,
-  Chat,
-  ChatMessage,
-  ChatStreamEvent,
-  DeploymentMode,
-  Health,
-  LoginResult,
-  Me,
-  MessageRole,
-  ModelProfile,
-  TokenUsage,
-  ToolCall,
+import {
+  AGENT_COLORS,
+  type Agent,
+  type AgentColor,
+  type Chat,
+  type ChatMessage,
+  type ChatStreamEvent,
+  type DeploymentMode,
+  type Health,
+  type LoginResult,
+  type Me,
+  type MessageRole,
+  type ModelProfile,
+  type TokenUsage,
+  type ToolCall,
 } from "./types";
 
 export function unwrapList(body: unknown, keys: string[]): unknown[] {
@@ -121,12 +123,16 @@ export function normalizeProfile(body: unknown): ModelProfile {
 export function normalizeAgent(body: unknown): Agent {
   const record = unwrapEntity(body, ["agent"]);
   const createdAt = stringField(record, ["createdAt", "created_at"]);
+  const defaultProfileId = stringField(record, ["defaultProfileId", "default_profile_id"]);
   return {
     id: requireRecordId(record, "Agent"),
     name: stringField(record, ["name"], "Agent"),
+    icon: stringField(record, ["icon"], "Bot") || "Bot",
+    color: normalizeAgentColor(record.color),
     description: stringField(record, ["description"]),
     systemPrompt: stringField(record, ["systemPrompt", "system_prompt", "prompt"]),
     toolIds: normalizeToolIds(record.toolIds ?? record.tool_ids ?? record.tools),
+    defaultProfileId: defaultProfileId || null,
     createdAt,
     updatedAt: stringField(record, ["updatedAt", "updated_at"], createdAt),
   };
@@ -150,6 +156,9 @@ export function normalizeMessage(body: unknown): ChatMessage {
   const record = unwrapEntity(body, ["message"]);
   const usage = normalizeUsage(record.usage);
   const toolCalls = normalizeToolCalls(record.toolCalls ?? record.tool_calls);
+  const toolCallId = stringField(record, ["toolCallId", "tool_call_id"]);
+  const name = stringField(record, ["name"]);
+  const profileId = stringField(record, ["profileId", "profile_id"]);
   return {
     id: requireRecordId(record, "Message"),
     chatId: stringField(record, ["chatId", "chat_id"]),
@@ -157,6 +166,9 @@ export function normalizeMessage(body: unknown): ChatMessage {
     content: normalizeContent(record.content),
     createdAt: stringField(record, ["createdAt", "created_at"]),
     ...(toolCalls.length > 0 ? { toolCalls } : {}),
+    ...(toolCallId ? { toolCallId } : {}),
+    ...(name ? { name } : {}),
+    ...(profileId ? { profileId } : {}),
     ...(usage ? { usage } : {}),
   };
 }
@@ -211,6 +223,13 @@ export function normalizeContent(value: unknown): string {
     if (typeof record.text === "string") return record.text;
   }
   return "";
+}
+
+function normalizeAgentColor(value: unknown): AgentColor {
+  if (typeof value === "string" && (AGENT_COLORS as readonly string[]).includes(value)) {
+    return value as AgentColor;
+  }
+  return "green";
 }
 
 function normalizeRole(value: unknown): MessageRole {

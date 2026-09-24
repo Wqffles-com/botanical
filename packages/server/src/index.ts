@@ -6,6 +6,10 @@ export { createMemoryStore, createStore } from "./db/store.ts";
 export { POSTGRES_NOT_WIRED } from "./db/postgres.ts";
 export type {
   Agent,
+  AgentColor,
+  AgentMessage,
+  AgentMessagePatch,
+  AgentMessageStatus,
   AgentPatch,
   Chat,
   ChatPatch,
@@ -15,9 +19,12 @@ export type {
   ModelProfile,
   ModelProvider,
   NewAgent,
+  NewAgentMessage,
   NewChat,
   NewMessage,
   Operator,
   Session,
   Store,
+  ToolCall,
 } from "./types.ts";
+export { AGENT_COLORS, AGENT_MESSAGE_STATUSES, DEFAULT_AGENT_COLOR, DEFAULT_AGENT_ICON } from "./types.ts";

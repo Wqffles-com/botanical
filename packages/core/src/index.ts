@@ -12,9 +12,10 @@ export {
 export { normalizeAgent, normalizeChat, normalizeMessage, normalizeProfile } from "./normalize";
 export { API } from "./paths";
 export { parseNdjsonLine, parseSseFrame, readChatStream } from "./sse";
-export { CLIENT_CONTRACT_VERSION } from "./types";
+export { AGENT_COLORS, CLIENT_CONTRACT_VERSION } from "./types";
 export type {
   Agent,
+  AgentColor,
   Chat,
   ChatMessage,
   ChatStreamEvent,

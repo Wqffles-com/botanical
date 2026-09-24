@@ -10,8 +10,9 @@ import type { Store } from "../types.ts";
  *
  *   export function createStore(options: { connectionString: string }): Promise<Store>;
  *
- * The Store shape is defined in src/types.ts (agents, chats, messages, sessions)
- * and must use kind: "postgres".
+ * The Store shape is defined in src/types.ts (agents including name/icon/color,
+ * chats, messages including tool calls, profiles metadata, agent_messages,
+ * sessions) and must use kind: "postgres".
  *
  * Suggested tables (docs/ARCHITECTURE.md):
  *   agents(id, name, description, system_prompt, tool_ids jsonb, created_at, updated_at)
@@ -125,6 +126,11 @@ function isPostgresStore(value: unknown): value is Store {
     typeof store.messages?.listByChat === "function" &&
     typeof store.messages.create === "function" &&
     typeof store.sessions?.getByTokenHash === "function" &&
-    typeof store.sessions.create === "function"
+    typeof store.sessions.create === "function" &&
+    typeof store.profiles?.list === "function" &&
+    typeof store.profiles.upsert === "function" &&
+    typeof store.agentMessages?.list === "function" &&
+    typeof store.agentMessages.create === "function" &&
+    typeof store.close === "function"
   );
 }

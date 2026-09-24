@@ -1,7 +1,8 @@
 import { HttpError } from "./http.ts";
+import { AGENT_COLORS, type AgentColor } from "./types.ts";
 
 export const LIMITS = {
-  name: 120,
+  name: 40,
   description: 4_000,
   systemPrompt: 100_000,
   title: 200,
@@ -10,6 +11,9 @@ export const LIMITS = {
   toolIds: 64,
   id: 200,
 } as const;
+
+const ICON_PATTERN = /^[A-Za-z][A-Za-z0-9]{0,39}$/;
+const PROFILE_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 export function readBoundedString(
   value: unknown,
@@ -43,6 +47,29 @@ export function requireParam(params: Readonly<Record<string, string>>, name: str
 export function readRequiredId(value: unknown, field: string): string {
   if (typeof value !== "string" || value.trim() === "" || value.trim().length > LIMITS.id) {
     throw new HttpError(400, "invalid_body", `${field} is required`);
+  }
+  return value.trim();
+}
+
+export function readAgentIcon(value: unknown): string {
+  if (typeof value !== "string" || !ICON_PATTERN.test(value)) {
+    throw new HttpError(400, "invalid_body", 'icon must be a Lucide icon name such as "Bot" or "Sprout"');
+  }
+  return value;
+}
+
+export function readAgentColor(value: unknown): AgentColor {
+  if (typeof value !== "string" || !(AGENT_COLORS as readonly string[]).includes(value)) {
+    throw new HttpError(400, "invalid_body", `color must be one of ${AGENT_COLORS.join(", ")}`);
+  }
+  return value as AgentColor;
+}
+
+/** A public profile id, or null when the caller is clearing the suggestion. */
+export function readDefaultProfileId(value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value !== "string" || !PROFILE_ID_PATTERN.test(value.trim())) {
+    throw new HttpError(400, "invalid_body", "defaultProfileId must be a profile id or null");
   }
   return value.trim();
 }

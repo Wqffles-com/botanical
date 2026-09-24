@@ -31,28 +31,54 @@ export interface ModelProfile {
   description: string | null;
 }
 
+export const AGENT_COLORS = [
+  "red",
+  "orange",
+  "amber",
+  "green",
+  "teal",
+  "cyan",
+  "blue",
+  "violet",
+  "pink",
+  "gray",
+] as const;
+export type AgentColor = (typeof AGENT_COLORS)[number];
+
 export interface Agent {
   id: string;
+  /** Display name, 1–40 characters. */
   name: string;
+  /** Lucide icon name. Defaults to "Bot" when the server omits it. */
+  icon: string;
+  color: AgentColor;
   description: string;
   systemPrompt: string;
   toolIds: string[];
+  /** Suggestion only. Sending a message still requires an explicit profile. */
+  defaultProfileId: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateAgentInput {
   name: string;
+  icon?: string;
+  color?: AgentColor;
   description?: string;
   systemPrompt?: string;
   toolIds?: string[];
+  defaultProfileId?: string | null;
 }
 
 export interface UpdateAgentInput {
   name?: string;
+  icon?: string;
+  color?: AgentColor;
   description?: string;
   systemPrompt?: string;
   toolIds?: string[];
+  defaultProfileId?: string | null;
 }
 
 /**
@@ -100,6 +126,9 @@ export interface ChatMessage {
   content: string;
   createdAt: string;
   toolCalls?: ToolCall[];
+  toolCallId?: string;
+  name?: string;
+  profileId?: string | null;
   usage?: TokenUsage | null;
 }
 

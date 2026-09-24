@@ -92,12 +92,21 @@ A chat's agent does not change after create. The first message replaces the titl
 
 ## Persistence
 
-Repositories live in `src/types.ts` (`Store`: agents, chats, messages, sessions).
+Repositories live in `src/types.ts`:
+
+| Repository | Contents |
+| --- | --- |
+| `agents` | `name` (1–40), Lucide `icon` (default `Bot`), `color` (default `green`), `description`, `systemPrompt`, `toolIds`, optional `defaultProfileId` |
+| `chats` | One owning agent, explicit `profileId`, title |
+| `messages` | Transcript rows, including `toolCalls` and tool-result `toolCallId` |
+| `profiles` | Model profile metadata. No API keys |
+| `agentMessages` | Agent-to-agent inbox (`pending`, `delivered`, `read`, `failed`) |
+| `sessions` | SHA-256 token hash, never the raw token |
 
 - `DATABASE_URL` unset: in-memory store. Dev and tests. A restart drops data.
-- `DATABASE_URL` set: the server loads `packages/db` and calls `createStore({ connectionString })`. The result must be a `Store` with `kind: "postgres"`. If the package is missing, the process exits. It does not fall back to memory.
+- `DATABASE_URL` set: the server loads `packages/db` and calls `createStore({ connectionString })`. The result must be a `Store` with `kind: "postgres"`, including `profiles`, `agentMessages`, and `close()`. If the package is missing or the export is incomplete, the process exits. It does not fall back to memory.
 
-`packages/db` is not in this branch. `src/db/postgres.ts` documents the expected export and tables. Session rows store a SHA-256 of the token, not the token itself. Model API keys are not a database column and are not accepted on any route.
+Session rows store a SHA-256 of the token, not the token itself. Model API keys are not a database column and are not accepted on any route.
 
 ## Model profiles
 
@@ -120,7 +129,7 @@ Provider keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_A
 
 ## What's left
 
-- Postgres implementation in `packages/db` (this server already calls it when `DATABASE_URL` is set)
+- Postgres `createStore` in `packages/db` (the server already calls it when `DATABASE_URL` is set)
 - Real token streaming through `packages/providers` (the message route is a stub)
 - Tools, MCP, and agent-to-agent delivery
 - Shared schemas in `packages/core`, if that package becomes the source of these types

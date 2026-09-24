@@ -98,6 +98,9 @@ export class BotanicalClient {
         description: input.description?.trim() ?? "",
         systemPrompt,
         toolIds: input.toolIds ?? [],
+        ...(input.icon !== undefined ? { icon: input.icon } : {}),
+        ...(input.color !== undefined ? { color: input.color } : {}),
+        ...(input.defaultProfileId !== undefined ? { defaultProfileId: input.defaultProfileId } : {}),
       }),
     });
     return normalizeAgent(body);
