@@ -6,13 +6,16 @@ const SIZE = {
   sm: { box: "size-6 rounded-[7px]", icon: "size-3.5" },
   md: { box: "size-8 rounded-[9px]", icon: "size-4" },
   lg: { box: "size-10 rounded-[11px]", icon: "size-5" },
+  xl: { box: "size-14 rounded-[14px]", icon: "size-7" },
 } as const;
+
+export type AgentAvatarSize = keyof typeof SIZE;
 
 export type AgentAvatarProps = {
   icon?: string | null;
   color?: string | AgentColor | null;
   name?: string;
-  size?: keyof typeof SIZE;
+  size?: AgentAvatarSize;
   className?: string;
 };
 
