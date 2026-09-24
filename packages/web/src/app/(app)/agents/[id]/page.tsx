@@ -4,6 +4,7 @@ import { BotanicalApiError } from "@botanical/core";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { api } from "@/lib/api";
 import { AgentAvatar } from "@/components/agent-avatar";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -52,16 +53,14 @@ export default function AgentDetailPage() {
     );
   }
 
-  const agentId = agent.id;
-
   async function onDelete() {
+    const id = params.id;
     setError(null);
     setPending(true);
     try {
-      const { api } = await import("@/lib/api");
-      await api.deleteAgent(agentId);
+      await api.deleteAgent(id);
       await refresh();
-      const next = agents.find((item) => item.id !== agentId);
+      const next = agents.find((item) => item.id !== id);
       router.replace(next ? `/agents/${next.id}` : "/agents/new");
     } catch (cause) {
       setError(cause instanceof BotanicalApiError ? cause.message : "Could not delete the agent.");

@@ -42,7 +42,7 @@ import { relativeTime } from "@/lib/format";
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { ready, me, agents, chats } = useWorkspace();
+  const { ready, me, agents, chats, error } = useWorkspace();
   const [query, setQuery] = useState("");
 
   const activeChatId = pathname.startsWith("/chats/") ? pathname.split("/")[2] : undefined;
@@ -161,6 +161,9 @@ export function AppSidebar() {
 
       <SidebarSeparator />
       <SidebarFooter className="gap-1">
+        {error ? (
+          <p className="px-2 text-xs text-destructive group-data-[collapsible=icon]:hidden">{error}</p>
+        ) : null}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton

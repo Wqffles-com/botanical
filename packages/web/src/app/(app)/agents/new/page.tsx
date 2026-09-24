@@ -131,12 +131,12 @@ function Field({
   children: ReactNode;
 }) {
   return (
-    <label className="grid gap-1.5">
+    <div className="grid gap-1.5">
       <span className="flex items-baseline justify-between">
         <Label>{label}</Label>
         {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
       </span>
       {children}
-    </label>
+    </div>
   );
 }

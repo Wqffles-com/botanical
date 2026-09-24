@@ -2,7 +2,7 @@
 
 import type { Agent, Chat, DeploymentMode, Me } from "@botanical/core";
 import { BotanicalApiError, isUnauthorized } from "@botanical/core";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   createContext,
   useCallback,
@@ -27,7 +27,6 @@ const WorkspaceContext = createContext<WorkspaceState | null>(null);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const [me, setMe] = useState<Me | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -60,7 +59,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refresh();
-  }, [refresh, pathname]);
+  }, [refresh]);
 
   const value = useMemo<WorkspaceState>(
     () => ({ ready, me, agents, chats, error, refresh }),
