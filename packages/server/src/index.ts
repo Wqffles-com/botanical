@@ -6,6 +6,7 @@ export { createMemoryStore, createStore } from "./db/store.ts";
 export { POSTGRES_NOT_WIRED } from "./db/postgres.ts";
 export type {
   Agent,
+  AgentColor,
   AgentPatch,
   Chat,
   ChatPatch,

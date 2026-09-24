@@ -27,10 +27,10 @@ export function baseEnv(overrides: Record<string, string> = {}): Record<string, 
 
 export function setup(
   overrides: Record<string, string> = {},
-  options: { now?: () => Date; rateLimiter?: LoginRateLimiter } = {},
+  options: { now?: () => Date; rateLimiter?: LoginRateLimiter; store?: Store } = {},
 ): TestApp {
   const config = loadConfig(baseEnv(overrides));
-  const store = createMemoryStore();
+  const store = options.store ?? createMemoryStore();
   const app = createApp({
     config,
     store,

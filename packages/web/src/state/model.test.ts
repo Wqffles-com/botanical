@@ -16,9 +16,14 @@ const other: ModelProfile = { ...profile, id: "fast", name: "Fast", provider: "d
 const research: Agent = {
   id: "agent-research",
   name: "Research",
+  icon: "Bot",
+  color: "green",
   description: "Looks things up",
   systemPrompt: "",
+  prompt: "",
   toolIds: [],
+  tools: [],
+  defaultProfileId: null,
   createdAt: "2026-09-23T00:00:00.000Z",
   updatedAt: "2026-09-23T00:00:00.000Z",
 };

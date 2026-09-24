@@ -32,7 +32,7 @@ bun run migrate
 | --- | --- |
 | `users` | Operator (self-host) or account (SaaS later). Optional `tenant_id`. |
 | `tenants` | Placeholder grouping for hosted mode. Unused when `tenant_id` is null. |
-| `agents` | `name`, `description`, `prompt`, `tools` jsonb. |
+| `agents` | `name` (1–40), `description`, `prompt`, `tools` jsonb, `icon` (Lucide, default `Bot`), `color` (`agent_color`, default `green`), optional `default_profile_id` suggestion. |
 | `model_profiles` | `name`, `provider`, `model`, `config` jsonb. No default-profile flag. |
 | `chats` | `agent_id` (immutable), required `profile_id`, `title`. |
 | `messages` | `role`, `content`, optional tool fields. Order by `seq`. |
@@ -86,6 +86,8 @@ group by 1, 2;
 | `OPENROUTER_API_KEY` | Provider key |
 
 `bun run migrate` seeds `settings` and `secret_refs` with those **names**. `ON CONFLICT DO NOTHING` keeps operator edits. A trigger rejects `deployment.mode` values other than `self_host` and `saas`, and rejects auth settings that are not env-var names.
+
+The same migrate inserts three example agents once (`Gardener` / Sprout / green, `Builder` / Code / blue, `Scout` / Search / amber) and records `settings.seed.example_agents`. A later migrate does not recreate them. If `users` is empty, the seed also inserts a local `Owner` row to own those agents. `default_profile_id` stays null — it is only a suggestion, and chats still require an explicit profile.
 
 `model_profiles.config` may contain `apiKeyEnv` (a name). It may not contain `apiKey`, `api_key`, `secret`, `token`, or `password`.
 

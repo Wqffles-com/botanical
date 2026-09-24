@@ -141,6 +141,26 @@ describe('v0 postgres schema', () => {
       })
       .returning();
     if (!agent || !otherAgent || !foreignAgent) throw new Error('expected agents');
+    expect(agent.icon).toBe('Bot');
+    expect(agent.color).toBe('green');
+    expect(agent.defaultProfileId).toBeNull();
+
+    await rejects(
+      db.insert(agents).values({ userId: owner.id, name: 'x'.repeat(41), prompt: 'too long' }),
+      /agents_name_length|check constraint/i,
+    );
+    await rejects(
+      db.insert(agents).values({ userId: owner.id, name: 'Bad Icon', icon: 'sprout' }),
+      /agents_icon_lucide_name|check constraint/i,
+    );
+    await rejects(
+      db.insert(agents).values({
+        userId: owner.id,
+        name: 'Bad Color',
+        color: 'lime' as never,
+      }),
+      /agent_color|invalid input value|check constraint/i,
+    );
 
     const [chat] = await db
       .insert(chats)
