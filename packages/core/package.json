@@ -1,0 +1,18 @@
+{
+  "name": "@botanical/core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Shared Botanical types and the web client contract for the v0 server API.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./deployment": "./src/deployment/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test src"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

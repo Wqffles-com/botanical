@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Botanical fixture</title>
+    <script>
+      (function () {
+        var session = false;
+        try {
+          session = !!(JSON.parse(localStorage.getItem("botanical.fixture.v1") || "null") || {}).session;
+        } catch (error) {
+          session = false;
+        }
+        var path = location.pathname.replace(/\/+$/, "") || "/";
+        if (!session && path !== "/login") location.replace("/login");
+        else if (session && (path === "/" || path === "/login")) location.replace("/agents");
+      })();
+    </script>
+    <style>
+      :root { color-scheme: light; font: 15px/1.4 "Segoe UI", sans-serif; }
+      body { margin: 0; }
+      .shell { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+      aside { padding: 16px; border-right: 1px solid #ddd; }
+      main { padding: 24px; }
+      nav { display: flex; gap: 12px; margin-bottom: 16px; }
+      ul { list-style: none; padding: 0; }
+      li { margin: 8px 0; }
+      a { color: inherit; text-decoration: none; }
+      label { display: block; margin: 12px 0; }
+      input, textarea, select, button { font: inherit; }
+      textarea { width: min(100%, 480px); }
+      .avatar { display: inline-flex; width: 28px; height: 28px; border-radius: 8px; align-items: center; justify-content: center; vertical-align: middle; }
+      .agent-color-red { background: #d45d5d; }
+      .agent-color-orange { background: #e07a3d; }
+      .agent-color-amber { background: #d4a017; }
+      .agent-color-green { background: #3f8f4e; }
+      .agent-color-teal { background: #2a9d8f; }
+      .agent-color-cyan { background: #2a8fad; }
+      .agent-color-blue { background: #3d6fbf; }
+      .agent-color-violet { background: #7c5cbf; }
+      .agent-color-pink { background: #c45d8a; }
+      .agent-color-gray { background: #8a8f98; }
+      [data-testid="tool-call"] { border: 1px solid #ccc; border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
+      .login { max-width: 360px; margin: 10vh auto; padding: 24px; border: 1px solid #ddd; border-radius: 12px; }
+      [role="tablist"] { display: flex; gap: 8px; }
+      [role="tab"][aria-selected="true"] { font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      const PASSCODE = __PASSCODE_JSON__;
+      const KEY = "botanical.fixture.v1";
+      const COLORS = ["red", "orange", "amber", "green", "teal", "cyan", "blue", "violet", "pink", "gray"];
+      const ICONS = ["Sprout", "Bot", "Brain", "Code", "Search", "Leaf", "Rocket", "Sparkles"];
+
+      function empty() {
+        return { session: false, agents: [], chats: [], inbox: [] };
+      }
+      function load() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(KEY) || "null");
+          if (!parsed || typeof parsed !== "object") return empty();
+          return { session: Boolean(parsed.session), agents: parsed.agents || [], chats: parsed.chats || [], inbox: parsed.inbox || [] };
+        } catch (error) {
+          return empty();
+        }
+      }
+      let state = load();
+      function save() {
+        localStorage.setItem(KEY, JSON.stringify(state));
+      }
+      function uid(prefix) {
+        return prefix + Math.random().toString(36).slice(2, 10);
+      }
+      function esc(value) {
+        return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+      }
+      function pathOf() {
+        return location.pathname.replace(/\/+$/, "") || "/";
+      }
+      function agentById(id) {
+        return state.agents.find((agent) => agent.id === id) || null;
+      }
+      function currentAgentId() {
+        const parts = pathOf().split("/").filter(Boolean);
+        if (parts[0] === "agents" && parts[1] && parts[1] !== "new") return parts[1];
+        if (parts[0] === "chats" && parts[1]) {
+          const chat = state.chats.find((item) => item.id === parts[1]);
+          if (chat) return chat.agentId;
+        }
+        return state.agents.length ? state.agents[state.agents.length - 1].id : null;
+      }
+      function avatar(agent) {
+        const icon = String(agent.icon || "Bot").replace(/[^A-Za-z0-9]/g, "") || "Bot";
+        const color = COLORS.includes(agent.color) ? agent.color : "green";
+        const slug = icon.toLowerCase();
+        return `<span data-testid="agent-avatar" data-icon="${esc(icon)}" data-color="${esc(color)}" data-agent-name="${esc(agent.name)}" class="avatar agent-color-${esc(color)}" role="img" aria-label="${esc(agent.name)}, ${esc(icon)}, ${esc(color)}"><svg class="lucide lucide-${slug}" aria-hidden="true" viewBox="0 0 24 24" width="16" height="16"></svg></span>`;
+      }
+      function startNewChat(agentId) {
+        const chat = { id: uid("c_"), agentId, profileId: null, messages: [] };
+        state.chats.push(chat);
+        save();
+        location.href = "/chats/" + chat.id;
+      }
+      function shell(mainHtml) {
+        const items = state.agents
+          .map(
+            (agent) =>
+              `<li data-testid="sidebar-agent"><a href="/agents/${agent.id}">${avatar(agent)} <span>${esc(agent.name)}</span></a></li>`,
+          )
+          .join("");
+        return `<div class="shell"><aside data-sidebar="sidebar" aria-label="Agents"><nav aria-label="Workspace"><a href="/agents">Agents</a><a href="/inbox">Inbox</a><a href="/settings">Settings</a></nav><ul>${items}</ul><button type="button" id="sidebar-new-chat">New chat</button></aside><main>${mainHtml}</main></div>`;
+      }
+      function bindNewChat() {
+        const button = document.getElementById("sidebar-new-chat");
+        if (!button) return;
+        button.addEventListener("click", () => {
+          const agentId = currentAgentId();
+          if (agentId) startNewChat(agentId);
+        });
+      }
+      function mount(html, withShell) {
+        document.getElementById("root").innerHTML = withShell ? shell(html) : html;
+        if (withShell) bindNewChat();
+      }
+
+      function renderLogin() {
+        mount(
+          `<main class="login"><h1>Botanical</h1><p>Personal agent server.</p><form id="login-form"><label>Passcode <input data-testid="passcode" name="passcode" type="password" autocomplete="current-password" /></label><p id="login-error" role="alert" hidden>Invalid passcode</p><button type="submit">Continue</button></form></main>`,
+          false,
+        );
+        document.getElementById("login-form").addEventListener("submit", (event) => {
+          event.preventDefault();
+          const value = String(new FormData(event.currentTarget).get("passcode") ?? "");
+          if (value !== PASSCODE) {
+            document.getElementById("login-error").hidden = false;
+            return;
+          }
+          state.session = true;
+          save();
+          location.href = "/agents";
+        });
+      }
+
+      function renderAgentForm() {
+        const colors = COLORS.map(
+          (color) =>
+            `<button type="button" role="radio" aria-label="${color}" aria-checked="${color === "green" ? "true" : "false"}" data-color-choice="${color}">${color}</button>`,
+        ).join(" ");
+        mount(
+          `<h1>New agent</h1><form id="agent-form"><label>Name <input name="name" required /></label><label>Description <input name="description" /></label><label>Prompt <textarea name="prompt" rows="4" required></textarea></label><div><span id="icon-label">Icon</span> <button type="button" id="icon-trigger" aria-label="Choose icon"><span id="icon-current">Bot</span></button></div><div role="radiogroup" aria-label="Color">${colors}</div><label><input type="checkbox" name="tool" value="file_list" checked /> file_list</label><button type="submit">Save agent</button></form>`,
+          true,
+        );
+        let selectedIcon = "Bot";
+        let selectedColor = "green";
+        document.getElementById("icon-trigger").addEventListener("click", () => openIconPicker((icon) => {
+          selectedIcon = icon;
+          document.getElementById("icon-current").textContent = icon;
+        }));
+        document.querySelectorAll("[data-color-choice]").forEach((button) => {
+          button.addEventListener("click", () => {
+            selectedColor = button.getAttribute("data-color-choice");
+            document.querySelectorAll("[data-color-choice]").forEach((item) => {
+              item.setAttribute("aria-checked", item === button ? "true" : "false");
+            });
+          });
+        });
+        document.getElementById("agent-form").addEventListener("submit", (event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          const name = String(data.get("name") ?? "").trim();
+          const prompt = String(data.get("prompt") ?? "").trim();
+          if (!name || !prompt) return;
+          const tools = [...event.currentTarget.querySelectorAll('input[type="checkbox"]:checked')].map((node) => node.value);
+          const agent = {
+            id: uid("a_"),
+            name,
+            description: String(data.get("description") ?? "").trim(),
+            prompt,
+            icon: selectedIcon,
+            color: selectedColor,
+            tools,
+          };
+          state.agents.push(agent);
+          save();
+          location.href = "/agents/" + agent.id;
+        });
+      }
+
+      function openIconPicker(onPick) {
+        const existing = document.getElementById("icon-dialog");
+        if (existing) existing.remove();
+        const dialog = document.createElement("div");
+        dialog.id = "icon-dialog";
+        dialog.setAttribute("role", "dialog");
+        dialog.setAttribute("aria-label", "Choose icon");
+        dialog.innerHTML = `<input id="icon-search" placeholder="Search icons" /><div id="icon-options">${ICONS.map((icon) => `<button type="button" data-icon-option="${icon}">${icon}</button>`).join("")}</div>`;
+        document.body.appendChild(dialog);
+        const search = dialog.querySelector("#icon-search");
+        const applyFilter = () => {
+          const query = search.value.trim().toLowerCase();
+          dialog.querySelectorAll("[data-icon-option]").forEach((button) => {
+            const name = button.getAttribute("data-icon-option").toLowerCase();
+            button.hidden = query.length > 0 && !name.includes(query);
+          });
+        };
+        search.addEventListener("input", applyFilter);
+        dialog.querySelectorAll("[data-icon-option]").forEach((button) => {
+          button.addEventListener("click", () => {
+            onPick(button.getAttribute("data-icon-option"));
+            dialog.remove();
+          });
+        });
+        search.focus();
+      }
+
+      function renderAgent(agent) {
+        mount(
+          `<header>${avatar(agent)}<h1>${esc(agent.name)}</h1></header><p>${esc(agent.description)}</p><button type="button" id="main-new-chat">New chat</button>`,
+          true,
+        );
+        document.getElementById("main-new-chat").addEventListener("click", () => startNewChat(agent.id));
+      }
+
+      function renderAgentList() {
+        const items = state.agents
+          .map(
+            (agent) =>
+              `<li data-testid="agent-option"><a href="/agents/${agent.id}">${avatar(agent)} <span>${esc(agent.name)}</span> <small>${esc(agent.description)}</small></a></li>`,
+          )
+          .join("");
+        mount(`<h1>Agents</h1><ul aria-label="Agent picker">${items || "<li>No agents yet.</li>"}</ul>`, true);
+      }
+
+      function messageHtml(message) {
+        const tool = message.tool
+          ? `<div data-testid="tool-call" data-tool-name="${esc(message.tool.name)}" aria-label="Tool call ${esc(message.tool.name)}"><button type="button">${esc(message.tool.name)}</button><code>${esc(JSON.stringify(message.tool.arguments))}</code><pre>${esc(message.tool.result || "")}</pre></div>`
+          : "";
+        return `<article data-testid="message" data-role="${esc(message.role)}"><p>${esc(message.content)}</p>${tool}</article>`;
+      }
+
+      function renderChat(chat) {
+        const agent = agentById(chat.agentId);
+        if (!agent) {
+          mount("<h1>Chat not found</h1>", true);
+          return;
+        }
+        const ready = Boolean(chat.profileId);
+        mount(
+          `<header>${avatar(agent)}<h1>${esc(agent.name)}</h1></header><label>Model profile <select data-testid="profile-select" id="profile"><option value="">Select a model profile…</option><option value="mock"${chat.profileId === "mock" ? " selected" : ""}>Mock · mock / mock-echo</option></select></label><p id="profile-hint"${ready ? " hidden" : ""}>Choose a model profile. Botanical has no default model.</p><div id="thread" data-testid="messages">${chat.messages.map(messageHtml).join("")}</div><form id="composer-form"><label for="composer">Message</label><textarea id="composer" data-testid="composer" rows="3" placeholder="${ready ? "Message this agent" : "Choose a model profile to write"}"${ready ? "" : " disabled"}></textarea><button type="submit" data-testid="send"${ready ? "" : " disabled"}>Send</button></form>`,
+          true,
+        );
+        const profile = document.getElementById("profile");
+        const composer = document.getElementById("composer");
+        const send = document.querySelector('[data-testid="send"]');
+        const hint = document.getElementById("profile-hint");
+        const sync = () => {
+          const on = profile.value !== "";
+          composer.disabled = !on;
+          composer.placeholder = on ? "Message this agent" : "Choose a model profile to write";
+          send.disabled = !on || composer.value.trim() === "";
+          hint.hidden = on;
+        };
+        profile.addEventListener("change", () => {
+          chat.profileId = profile.value || null;
+          save();
+          sync();
+        });
+        composer.addEventListener("input", sync);
+        document.getElementById("composer-form").addEventListener("submit", (event) => {
+          event.preventDefault();
+          const content = composer.value.trim();
+          if (!chat.profileId || !content) return;
+          chat.messages.push({ id: uid("u_"), role: "user", content });
+          composer.value = "";
+          sync();
+          save();
+          paintThread();
+          window.setTimeout(() => {
+            chat.messages.push({ id: uid("a_"), role: "assistant", content: "mock:", tool: null });
+            save();
+            paintThread();
+          }, 40);
+          window.setTimeout(() => {
+            const assistant = chat.messages[chat.messages.length - 1];
+            assistant.content = `mock:${content}\n\nUsed file_list:\n(workspace)`;
+            assistant.tool = { name: "file_list", arguments: { path: "." }, result: "(workspace)" };
+            save();
+            paintThread();
+          }, 120);
+        });
+        function paintThread() {
+          const thread = document.getElementById("thread");
+          if (thread) thread.innerHTML = chat.messages.map(messageHtml).join("");
+        }
+      }
+
+      function renderInbox() {
+        const options = state.agents.map((agent) => `<option value="${agent.id}">${esc(agent.name)}</option>`).join("");
+        const rows = state.inbox
+          .map((message) => {
+            const from = agentById(message.fromId);
+            const to = agentById(message.toId);
+            return `<li>${from ? avatar(from) : ""}${to ? avatar(to) : ""}<span>${esc(from ? from.name : "Agent")} → ${esc(to ? to.name : "Agent")}</span><p>${esc(message.body)}</p><span>${esc(message.status)}</span></li>`;
+          })
+          .join("");
+        mount(
+          `<h1>Inbox</h1><form id="inbox-form"><label>From <select data-testid="inbox-from" name="from"><option value="">Choose an agent</option>${options}</select></label><label>To <select data-testid="inbox-to" name="to"><option value="">Choose an agent</option>${options}</select></label><label>Message <textarea name="body" rows="3"></textarea></label><button type="submit">Send</button></form><ul aria-label="Agent messages">${rows}</ul>`,
+          true,
+        );
+        document.getElementById("inbox-form").addEventListener("submit", (event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          const fromId = String(data.get("from") ?? "");
+          const toId = String(data.get("to") ?? "");
+          const body = String(data.get("body") ?? "").trim();
+          if (!fromId || !toId || !body || fromId === toId) return;
+          state.inbox.push({ id: uid("m_"), fromId, toId, body, status: "pending" });
+          save();
+          renderInbox();
+        });
+      }
+
+      function renderSettings() {
+        mount(
+          `<h1>Settings</h1><div role="tablist" aria-label="Settings"><button type="button" role="tab" id="tab-profiles" aria-controls="panel-profiles" aria-selected="true">Profiles</button><button type="button" role="tab" id="tab-tools" aria-controls="panel-tools" aria-selected="false">Tools</button><button type="button" role="tab" id="tab-mcp" aria-controls="panel-mcp" aria-selected="false">MCP</button><button type="button" role="tab" id="tab-deployment" aria-controls="panel-deployment" aria-selected="false">Deployment</button></div><section role="tabpanel" id="panel-profiles" aria-labelledby="tab-profiles"><h2>Profiles</h2><ul><li>Mock · mock / mock-echo</li></ul><p>The mock profile is always available.</p></section><section role="tabpanel" id="panel-tools" aria-labelledby="tab-tools" hidden><h2>Tools</h2><ul><li>file_list</li><li>web_search</li></ul></section><section role="tabpanel" id="panel-mcp" aria-labelledby="tab-mcp" hidden><h2>MCP</h2><p>Configured MCP servers and their status.</p></section><section role="tabpanel" id="panel-deployment" aria-labelledby="tab-deployment" hidden><h2>Deployment</h2><p>Self-host</p><p>Version 0.0.0</p></section>`,
+          true,
+        );
+        const tabs = [
+          ["profiles", "Profiles"],
+          ["tools", "Tools"],
+          ["mcp", "MCP"],
+          ["deployment", "Deployment"],
+        ];
+        tabs.forEach(([id]) => {
+          document.getElementById("tab-" + id).addEventListener("click", () => {
+            tabs.forEach(([other]) => {
+              const selected = other === id;
+              document.getElementById("tab-" + other).setAttribute("aria-selected", selected ? "true" : "false");
+              document.getElementById("panel-" + other).hidden = !selected;
+            });
+          });
+        });
+      }
+
+      function render() {
+        const path = pathOf();
+        if (!state.session && path !== "/login") return;
+        if (state.session && (path === "/" || path === "/login")) return;
+        if (path === "/login") return renderLogin();
+        if (path === "/agents/new") return renderAgentForm();
+        if (path === "/agents") return renderAgentList();
+        if (path === "/inbox") return renderInbox();
+        if (path === "/settings") return renderSettings();
+        if (path.startsWith("/agents/")) {
+          const agent = agentById(path.slice("/agents/".length));
+          if (!agent) return mount("<h1>Agent not found</h1>", true);
+          return renderAgent(agent);
+        }
+        if (path.startsWith("/chats/")) {
+          const chat = state.chats.find((item) => item.id === path.slice("/chats/".length));
+          if (!chat) return mount("<h1>Chat not found</h1>", true);
+          return renderChat(chat);
+        }
+        mount("<h1>Not found</h1>", true);
+      }
+
+      render();
+    </script>
+  </body>
+</html>

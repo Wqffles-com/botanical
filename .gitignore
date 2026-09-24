@@ -66,7 +66,14 @@ Thumbs.db
 
 # Local agent / runtime data
 .data/
+/data/
 .botanical/
 *.local.json
 tmp/
 temp/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
