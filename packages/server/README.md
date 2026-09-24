@@ -120,10 +120,19 @@ A chat's agent does not change after create. The first message replaces the titl
 
 ## Persistence
 
-Repositories live in `src/types.ts` (`Store`: agents, chats, messages, sessions, agent messages).
+Repositories live in `src/types.ts`:
+
+| Repository | Contents |
+| --- | --- |
+| `agents` | `name` (1–40), Lucide `icon` (default `Bot`), `color` (default `green`), `description`, `systemPrompt`, `toolIds`, optional `defaultProfileId` |
+| `chats` | One owning agent, explicit `profileId`, title |
+| `messages` | Transcript rows, including `toolCalls` and tool-result `toolCallId` |
+| `profiles` | Model profile metadata. No API keys |
+| `agentMessages` | Agent-to-agent inbox (`pending`, `delivered`, `read`, `failed`). The runtime bus uses `insert`, `deliverPending`, and `markRead` on the same rows. |
+| `sessions` | SHA-256 token hash, never the raw token |
 
 - `DATABASE_URL` unset: in-memory store. Dev and tests. A restart drops data.
-- `DATABASE_URL` set: the server loads `packages/db` and calls `createStore({ connectionString })`. The result must be a `Store` with `kind: "postgres"`. If the package is missing, the process exits. It does not fall back to memory.
+- `DATABASE_URL` set: the server loads `packages/db` and calls `createStore({ connectionString })`. The result must be a `Store` with `kind: "postgres"`, including `profiles`, `agentMessages`, and `close()`. If the package is missing or the export is incomplete, the process exits. It does not fall back to memory.
 
 Session rows store a SHA-256 of the token, not the token itself. Model API keys are not a database column and are not accepted on any route.
 
@@ -148,5 +157,6 @@ Provider keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_A
 
 ## What's left
 
-- Postgres `createStore` from `packages/db` is wired when `DATABASE_URL` is set. Message rows now carry tool calls; the db store should persist them and `agent_messages`.
+- Postgres `createStore` from `packages/db` runs migrations on boot when `DATABASE_URL` is set. It persists agents, chats, messages (including tool calls), sessions, profile metadata, and `agent_messages`.
 - Shell and web packages register when they export `createToolContributor`.
+- Chat turns already go through `@botanical/agent-runtime` (`prepareTurn` / `collectChatTurn` / `streamChatTurn`). MCP boots with the server, and `send_agent_message` is a built-in tool.

@@ -5,31 +5,17 @@ import type { Store } from "../types.ts";
 import { attachAgentMessages } from "./agent-messages.ts";
 
 /**
- * TODO(packages/db): Postgres is not wired in this workspace yet.
+ * Load `@botanical/db` when DATABASE_URL is set.
  *
- * When packages/db lands, export:
+ * packages/db exports `createStore({ connectionString })`, runs Drizzle
+ * migrations, and returns a Store with kind "postgres". This module does not
+ * import a Postgres driver; packages/db owns the pool.
  *
- *   export function createStore(options: { connectionString: string }): Promise<Store>;
- *
- * The Store shape is defined in src/types.ts (agents, chats, messages, sessions)
- * and must use kind: "postgres".
- *
- * Suggested tables (docs/ARCHITECTURE.md):
- *   agents(id, name, description, system_prompt, tool_ids jsonb, created_at, updated_at)
- *   chats(id, agent_id, profile_id, title, created_at, updated_at)
- *     — one owning agent per chat; do not update agent_id
- *   messages(id, chat_id, role, content, tool_calls, tool_call_id, name, profile_id, created_at)
- *     — tool rows set tool_call_id; assistant rows may set tool_calls.
- *   sessions(id, token_hash, created_at, expires_at)
- *     — store the sha256 of the bearer/cookie token, never the raw token
- *   agent_messages(id, from_agent, to_agent, body, status, created_at, updated_at)
- *     — implement Store.agentMessages (insert, get, listForAgent, deliverPending,
- *       markRead, updateStatus). deliverPending must SKIP LOCKED.
- *
- * Chat delete should remove the chat and its messages in one transaction.
- * This module does not import a Postgres driver; packages/db owns the pool.
- * If createStore() omits agentMessages, the server attaches the in-memory
- * repository (see src/db/agent-messages.ts) rather than failing boot.
+ * The Store covers agents (name, Lucide icon, color, default profile suggestion),
+ * chats, messages including tool calls, profile metadata, agent messages, and
+ * sessions (token hash only). When the db repository has `list`/`create` but not
+ * the runtime bus methods, those methods are filled in here. If `agentMessages`
+ * is missing entirely, `attachAgentMessages` keeps an in-memory repository.
  */
 export const POSTGRES_NOT_WIRED =
   "DATABASE_URL is set but packages/db is not available or does not export createStore(). " +
@@ -56,7 +42,95 @@ export async function openPostgresStore(connectionString: string): Promise<Store
       'packages/db createStore() must return a Store with kind "postgres" and agents, chats, messages, and sessions repositories.',
     );
   }
-  return attachAgentMessages(created);
+  return attachAgentMessages(bridgeAgentMessages(created));
+}
+
+/**
+ * packages/db persists agent mail with list/get/create/update.
+ * The runtime bus also needs insert, listForAgent, deliverPending, markRead, and updateStatus.
+ */
+function bridgeAgentMessages(store: Store): Store {
+  const repo = store.agentMessages;
+  if (
+    typeof repo.insert === "function" &&
+    typeof repo.listForAgent === "function" &&
+    typeof repo.deliverPending === "function" &&
+    typeof repo.markRead === "function" &&
+    typeof repo.updateStatus === "function"
+  ) {
+    return store;
+  }
+  return {
+    ...store,
+    agentMessages: {
+      list: (query) => repo.list(query),
+      get: (id) => repo.get(id),
+      create: (input) => repo.create(input),
+      update: (id, patch) => repo.update(id, patch),
+      async insert(input) {
+        return repo.create({
+          fromAgentId: input.fromAgentId,
+          toAgentId: input.toAgentId,
+          body: input.body,
+          ...(input.id ? { id: input.id } : {}),
+          ...(input.fromChatId ? { fromChatId: input.fromChatId } : {}),
+        });
+      },
+      async listForAgent(agentId, opts) {
+        const rows = await repo.list({ agentId });
+        const filtered = rows.filter((message) => {
+          if (message.toAgentId !== agentId) return false;
+          if (opts?.status && opts.status.length > 0 && !opts.status.includes(message.status)) return false;
+          return true;
+        });
+        filtered.sort((a, b) => {
+          const byTime = a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
+          return opts?.newestFirst ? -byTime : byTime;
+        });
+        return filtered.slice(0, opts?.limit ?? 100);
+      },
+      async deliverPending(opts) {
+        const limit = opts?.limit ?? 50;
+        const rows = await repo.list({
+          ...(opts?.toAgentId ? { agentId: opts.toAgentId } : {}),
+          status: "pending",
+        });
+        const pending = rows
+          .filter((message) => message.status === "pending")
+          .filter((message) => !opts?.toAgentId || message.toAgentId === opts.toAgentId)
+          .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+        const delivered = [];
+        for (const row of pending) {
+          if (delivered.length >= limit) break;
+          const updated = await repo.update(row.id, { status: "delivered" });
+          if (updated) delivered.push({ ...updated, deliveredAt: updated.deliveredAt ?? updated.updatedAt });
+        }
+        return delivered;
+      },
+      async markRead(ids) {
+        const updated = [];
+        for (const id of ids) {
+          const current = await repo.get(id);
+          if (!current || current.status !== "delivered") continue;
+          const next = await repo.update(id, { status: "read" });
+          if (next) updated.push({ ...next, readAt: next.readAt ?? next.updatedAt });
+        }
+        return updated;
+      },
+      async updateStatus(id, status) {
+        const current = await repo.get(id);
+        if (!current) return null;
+        if (current.status === status) return current;
+        const next = await repo.update(id, { status });
+        if (!next) return null;
+        return {
+          ...next,
+          ...(status === "delivered" ? { deliveredAt: next.deliveredAt ?? next.updatedAt } : {}),
+          ...(status === "read" ? { readAt: next.readAt ?? next.updatedAt } : {}),
+        };
+      },
+    },
+  };
 }
 
 async function loadDbModule(): Promise<DbModule | null> {
@@ -131,6 +205,11 @@ function isPostgresStore(value: unknown): value is Store {
     typeof store.messages?.listByChat === "function" &&
     typeof store.messages.create === "function" &&
     typeof store.sessions?.getByTokenHash === "function" &&
-    typeof store.sessions.create === "function"
+    typeof store.sessions.create === "function" &&
+    typeof store.profiles?.list === "function" &&
+    typeof store.profiles.upsert === "function" &&
+    typeof store.agentMessages?.list === "function" &&
+    typeof store.agentMessages.create === "function" &&
+    typeof store.close === "function"
   );
 }

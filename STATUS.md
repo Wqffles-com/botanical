@@ -8,12 +8,12 @@ Lead: m14 on `feat/v0-mvp`. Updated: 2026-09-24 (server-runtime merge).
 - #19 MCP servers connect on API boot (`31493f8`). `GET /api/mcp/servers` and `BOTANICAL_MCP_CONFIG` are wired. `packages/server` depends on `@botanical/mcp`.
 - #18 agent-to-agent messaging (`bc56908`). Inbox routes, `send_agent_message`, and `BOTANICAL_A2A_AUTORUN` sit on the same app as identity and MCP. The memory store implements `agentMessages`. Postgres still attaches that in-memory inbox until #21 lands.
 - #20 agent runtime and tool registry. `packages/agent-server` is removed. Chat turns run through `@botanical/agent-runtime`. `GET /api/tools` lists the registry. MCP still connects on boot and those tools are copied into the registry. `send_agent_message` is a built-in, offered when the agent's allowlist includes it. The mock profile calls it when the user text is `send_agent_message {…}`.
+- #21 Postgres HTTP store. `DATABASE_URL` migrates on boot and uses `packages/db` `createStore`. Migration `0001_agent_identity` stays. `0002_mvp_store` adds sessions and `model_profiles.public_id`. Live Postgres integration tests are skipped unless `BOTANICAL_TEST_DATABASE_URL` is set.
 
-`bun test` passed for `@botanical/core`, `@botanical/server`, `@botanical/agent-runtime`, and `@botanical/mcp` after the runtime merge (153 tests). `@botanical/server` typecheck is green after adding the DOM lib so provider streams typecheck with the server.
+`bun test` for `@botanical/core`, `@botanical/server`, and `@botanical/db` after the Postgres merge: 99 pass, 2 skipped, 0 fail. `@botanical/server` typecheck is green.
 
 ## Open PRs into `feat/v0-mvp`
 
-- #21 Persist the HTTP store in Postgres (`feat/mvp-postgres`).
 - #22 Next.js App Router + shadcn foundation (`feat/mvp-next-foundation`).
 - #23 Real model providers (`feat/mvp-providers`).
 - #24 Built-in file, shell, web, and agent-message tools (`feat/mvp-tools`).
@@ -27,7 +27,8 @@ Merge order from here: postgres, next-foundation, providers, tools, then UI (ide
 
 ## What works
 
-- Passcode auth and the in-memory store.
+- Passcode auth. With `DATABASE_URL` unset the store is in memory. With it set, the server migrates and uses Postgres.
+
 - Agents have name, Lucide icon, and color. Three example agents are seeded.
 - Chat turns go through the agent runtime. The mock profile calls `file_list` when it is allowlisted and can call `send_agent_message` the same way. A missing provider key returns `missing_api_key` and still stores the user message.
 - A2A inbox API. Autorun is off unless `BOTANICAL_A2A_AUTORUN=true`.
@@ -36,8 +37,7 @@ Merge order from here: postgres, next-foundation, providers, tools, then UI (ide
 
 ## What is missing for the MVP
 
-- Postgres is not the live store. #21 adds `createStore` and boot migrations. Until then a set `DATABASE_URL` still fails closed or attaches an in-memory inbox.
-- `packages/web` is still Vite. Next.js + shadcn is #22, chat UI is #27, identity UI and pages UI are not open yet.
+- `packages/web` is still Vite until #22. Chat UI is #27, pages UI is #28, identity UI is #29.
 - Shell and web tool packages are dependencies. They register only when they export `createToolContributor` (#24).
 - No `packages/e2e` on this branch yet. The `botanical-mvp` stack (web `3000`, server `8788`, postgres `5433`) is not running.
 
@@ -52,4 +52,4 @@ Merge order from here: postgres, next-foundation, providers, tools, then UI (ide
 
 ## Next
 
-Merge #21 (Postgres), then #22 (Next.js foundation). UI, providers, tools, devops, and e2e follow.
+Merge #22 (Next.js foundation), then #29 identity UI (built on that foundation), #28 pages, #27 chat, then providers, tools, devops, and e2e.

@@ -26,6 +26,15 @@ export DATABASE_URL=postgres://botanical:botanical@127.0.0.1:5432/botanical
 bun run migrate
 ```
 
+Store integration tests stay skipped unless `BOTANICAL_TEST_DATABASE_URL` is set. They use compose project `botanical-mvp-test` on port **5434**, not the botanical stack on 5432 or the MVP stack on 5433.
+
+```sh
+docker compose -p botanical-mvp-test -f docker-compose.test.yml up -d --wait
+export BOTANICAL_TEST_DATABASE_URL=postgres://botanical:botanical@127.0.0.1:5434/botanical
+bun test
+docker compose -p botanical-mvp-test -f docker-compose.test.yml down -v
+```
+
 ## Tables
 
 | Table | Purpose |
@@ -33,7 +42,8 @@ bun run migrate
 | `users` | Operator (self-host) or account (SaaS later). Optional `tenant_id`. |
 | `tenants` | Placeholder grouping for hosted mode. Unused when `tenant_id` is null. |
 | `agents` | `name` (1–40), `description`, `prompt`, `tools` jsonb, `icon` (Lucide, default `Bot`), `color` (`agent_color`, default `green`), optional `default_profile_id` suggestion. |
-| `model_profiles` | `name`, `provider`, `model`, `config` jsonb. No default-profile flag. |
+| `sessions` | SHA-256 `token_hash`, expiry. No raw token. |
+| `model_profiles` | Public `public_id` plus `name`, `provider`, `model`, `config` jsonb. No default-profile flag. |
 | `chats` | `agent_id` (immutable), required `profile_id`, `title`. |
 | `messages` | `role`, `content`, optional tool fields. Order by `seq`. |
 | `agent_messages` | A2A inbox: `from_agent`, `to_agent`, `body`, `status`. |
@@ -110,6 +120,17 @@ Then create model profiles and agents for that user before opening a chat.
 ## Use from other packages
 
 Bun workspace name: `@botanical/db`. Source exports point at TypeScript.
+
+```ts
+import { createStore } from '@botanical/db';
+
+// Applies Drizzle migrations, guards, and the operator row, then returns the HTTP Store.
+const store = await createStore({ connectionString: process.env.DATABASE_URL! });
+```
+
+`createStore` is what `@botanical/server` calls when `DATABASE_URL` is set. It persists agents (name, Lucide icon, color, optional profile suggestion), chats, messages including tool calls, profile metadata, agent-to-agent rows, and session token hashes. Profile rows keep the API's public id (`grok`) separately from the uuid foreign key. API keys are not written.
+
+The lower-level client is still available:
 
 ```ts
 import {

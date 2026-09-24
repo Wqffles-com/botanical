@@ -1,4 +1,4 @@
-export { createDb, pingDb } from './client.ts';
+export { createDb, ensureDatabase, pingDb } from './client.ts';
 export type { BotanicalDb, CreateDbOptions } from './client.ts';
 export {
   DEPLOYMENT_MODE_ENV_VARS,
@@ -11,5 +11,6 @@ export {
 export type { SettingKey } from './constants.ts';
 export { normalizeDeploymentMode, resolveDeploymentMode } from './deployment-mode.ts';
 export { migrateDatabase } from './migrate.ts';
+export { createStore } from './store.ts';
 export * from './schema/index.ts';
 export * from './types.ts';

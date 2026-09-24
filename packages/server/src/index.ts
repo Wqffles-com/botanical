@@ -16,6 +16,7 @@ export type {
   Agent,
   AgentColor,
   AgentMessage,
+  AgentMessagePatch,
   AgentMessageRepository,
   AgentMessageStatus,
   AgentPatch,
@@ -24,7 +25,6 @@ export type {
   DeploymentMode,
   Message,
   MessageRole,
-  ToolCall,
   ModelProfile,
   ModelProvider,
   NewAgent,
@@ -34,5 +34,6 @@ export type {
   Operator,
   Session,
   Store,
+  ToolCall,
 } from "./types.ts";
-export { AGENT_MESSAGE_STATUSES } from "./types.ts";
+export { AGENT_COLORS, AGENT_MESSAGE_STATUSES, DEFAULT_AGENT_COLOR, DEFAULT_AGENT_ICON } from "./types.ts";

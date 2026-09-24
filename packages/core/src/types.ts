@@ -129,6 +129,9 @@ export interface ChatMessage {
   content: string;
   createdAt: string;
   toolCalls?: ToolCall[];
+  toolCallId?: string;
+  name?: string;
+  profileId?: string | null;
   usage?: TokenUsage | null;
 }
 

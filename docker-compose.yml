@@ -57,9 +57,9 @@ services:
       BOTANICAL_PROFILES: '[{"id":"mock","name":"Mock echo","provider":"mock","model":"echo"}]'
       BOTANICAL_FORCE_BOOTSTRAP: ${BOTANICAL_FORCE_BOOTSTRAP:-0}
       COOKIE_SECURE: ${COOKIE_SECURE:-auto}
-      # Empty on purpose. packages/db does not yet export the HTTP Store, and a
-      # set DATABASE_URL makes the API refuse to boot. Postgres still runs below.
-      DATABASE_URL: ""
+      # Set: the server migrates on boot and persists in Postgres.
+      # Unset or empty: the server keeps the in-memory store.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://botanical:botanical@postgres:5432/botanical}
       DATABASE_SSL: ${DATABASE_SSL:-}
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-4}
       POSTGRES_USER: ${POSTGRES_USER:-botanical}

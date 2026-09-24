@@ -1,4 +1,4 @@
-import type { AgentMessageRepository, Store } from "../types.ts";
+import type { AgentMessageRepository, AgentMessageStatus, Store } from "../types.ts";
 import { createMemoryStore } from "./memory.ts";
 
 /**
@@ -11,21 +11,13 @@ export function attachAgentMessages(store: Store): Store {
   if (adopted && adopted === store.agentMessages) return store;
   if (adopted) {
     return {
-      kind: store.kind,
-      agents: store.agents,
-      chats: store.chats,
-      messages: store.messages,
-      sessions: store.sessions,
+      ...store,
       agentMessages: adopted,
     };
   }
   const memory = createMemoryStore();
   return {
-    kind: store.kind,
-    agents: store.agents,
-    chats: store.chats,
-    messages: store.messages,
-    sessions: store.sessions,
+    ...store,
     agentMessages: memory.agentMessages,
   };
 }
@@ -47,28 +39,50 @@ export function adoptAgentMessages(value: unknown): AgentMessageRepository | nul
   ) {
     return null;
   }
-  if (typeof repo.updateStatus === "function") {
+  if (
+    typeof repo.updateStatus === "function" &&
+    typeof repo.list === "function" &&
+    typeof repo.create === "function" &&
+    typeof repo.update === "function"
+  ) {
     return repo as AgentMessageRepository;
   }
   const get = repo.get.bind(repo);
   const markRead = repo.markRead.bind(repo);
+  const listForAgent = repo.listForAgent.bind(repo);
+  const insert = repo.insert.bind(repo);
+  async function updateStatus(id: string, status: AgentMessageStatus) {
+    if (typeof repo.updateStatus === "function") return repo.updateStatus(id, status);
+    const current = await get(id);
+    if (!current) return null;
+    if (current.status === status) return current;
+    if (status === "read" && current.status === "delivered") {
+      const updated = await markRead([id]);
+      return updated.find((message) => message.id === id) ?? (await get(id));
+    }
+    throw new Error("agentMessages.updateStatus is not implemented by the persistence store");
+  }
   return {
-    insert: repo.insert.bind(repo),
+    insert,
     get,
-    listForAgent: repo.listForAgent.bind(repo),
+    listForAgent,
     deliverPending: repo.deliverPending.bind(repo),
     markRead,
-    async updateStatus(id, status) {
-      const current = await get(id);
-      if (!current) return null;
-      if (current.status === status) return current;
-      if (status === "read" && current.status === "delivered") {
-        const updated = await markRead([id]);
-        return updated.find((message) => message.id === id) ?? (await get(id));
-      }
-      throw new Error(
-        "agentMessages.updateStatus is not implemented by the persistence store",
-      );
-    },
+    updateStatus,
+    list:
+      typeof repo.list === "function"
+        ? repo.list.bind(repo)
+        : async (query) => {
+            if (!query?.agentId) return [];
+            return listForAgent(query.agentId, query.status ? { status: [query.status] } : {});
+          },
+    create: typeof repo.create === "function" ? repo.create.bind(repo) : async (input) => insert(input),
+    update:
+      typeof repo.update === "function"
+        ? repo.update.bind(repo)
+        : async (id, patch) => {
+            if (patch.status === undefined) return get(id);
+            return updateStatus(id, patch.status);
+          },
   };
 }

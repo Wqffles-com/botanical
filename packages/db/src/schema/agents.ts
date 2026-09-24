@@ -25,8 +25,10 @@ export const agents = pgTable(
       .$type<AgentToolBinding[]>()
       .notNull()
       .default(sql`'[]'::jsonb`),
+    /** Lucide icon name shown in the picker and chat. */
     icon: text('icon').notNull().default('Bot'),
     color: agentColorEnum('color').notNull().default('green'),
+    /** Public profile id. A suggestion only; chats still require an explicit pick. */
     defaultProfileId: text('default_profile_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

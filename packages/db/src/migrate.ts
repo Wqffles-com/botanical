@@ -7,7 +7,7 @@ import { finishMigrations, migrationsFolder } from './sql.ts';
 
 /** Apply Drizzle SQL migrations, then guards and idempotent metadata seeds. */
 export async function migrateDatabase(databaseUrl: string): Promise<void> {
-  const client = postgres(databaseUrl, { max: 1 });
+  const client = postgres(databaseUrl, { max: 1, onnotice() {} });
   try {
     const db = drizzle(client, { schema });
     await migrate(db, { migrationsFolder: migrationsFolder() });

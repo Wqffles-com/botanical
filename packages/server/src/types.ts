@@ -1,19 +1,23 @@
 import type { AgentColor } from "@botanical/core";
 
 /**
- * HTTP-layer domain types.
+ * HTTP-layer domain types. This Store is the persistence contract.
  *
  * Agent identity (name, icon, color, prompt, tools, defaultProfileId) matches
  * @botanical/core. This store still uses systemPrompt and toolIds; routes
  * accept prompt/tools as aliases and return both names.
  * A2A message shapes also live in `@botanical/core` and are re-exported here.
  *
- * TODO(packages/db): the Store interfaces below are the persistence contract.
- * packages/db should export `createStore({ connectionString })` returning a
- * Store with kind "postgres". See src/db/postgres.ts.
- * `agentMessages` must persist to the `agent_messages` table. Until that
- * repository is present, the server attaches an in-memory one with the same methods.
+ * packages/db exports `createStore({ connectionString })` returning a Store
+ * with kind "postgres". Field names here (`systemPrompt`, `toolIds`) are the
+ * HTTP shape. The database columns are `prompt` and `tools`.
+ * `agentMessages` persists to `agent_messages`. The runtime bus uses `insert`,
+ * `listForAgent`, `deliverPending`, and `markRead`. The HTTP store also exposes
+ * `list`, `create`, and `update` for the same rows.
  */
+
+export { AGENT_COLORS, DEFAULT_AGENT_COLOR, DEFAULT_AGENT_ICON } from "@botanical/core";
+export type { AgentColor };
 
 export const DEPLOYMENT_MODES = ["SELF_HOST", "SAAS"] as const;
 export type DeploymentMode = (typeof DEPLOYMENT_MODES)[number];
@@ -40,7 +44,9 @@ export interface ModelProfile {
 
 export interface Agent {
   id: string;
+  /** Display name, 1–40 characters. */
   name: string;
+  /** Lucide icon name, for example "Bot" or "Sprout". */
   icon: string;
   color: AgentColor;
   description: string;
@@ -54,12 +60,12 @@ export interface Agent {
 
 export interface NewAgent {
   name: string;
-  icon: string;
-  color: AgentColor;
+  icon?: string;
+  color?: AgentColor;
   description: string;
   systemPrompt: string;
   toolIds: string[];
-  defaultProfileId: string | null;
+  defaultProfileId?: string | null;
 }
 
 export interface AgentPatch {
@@ -71,8 +77,6 @@ export interface AgentPatch {
   toolIds?: string[];
   defaultProfileId?: string | null;
 }
-
-export type { AgentColor };
 
 /** One chat is owned by exactly one agent. agentId is immutable after create. */
 export interface Chat {
@@ -110,10 +114,12 @@ export interface Message {
   content: string;
   createdAt: string;
   toolCalls?: ToolCall[];
+  /** Set on role "tool". References the assistant tool call this result answers. */
   toolCallId?: string;
+  /** Tool name for a tool result. */
   name?: string;
-  /** Profile used for this row. Set on user, assistant, and tool messages. */
-  profileId?: string;
+  /** Profile used for this row. Null when the row has no profile. */
+  profileId?: string | null;
 }
 
 export interface NewMessage {
@@ -123,7 +129,7 @@ export interface NewMessage {
   toolCalls?: ToolCall[];
   toolCallId?: string;
   name?: string;
-  profileId?: string;
+  profileId?: string | null;
 }
 
 export const AGENT_MESSAGE_STATUSES = ["pending", "delivered", "read", "failed"] as const;
@@ -132,6 +138,7 @@ export type AgentMessageStatus = (typeof AGENT_MESSAGE_STATUSES)[number];
 /**
  * One async agent-to-agent note. `insert` stores `pending`.
  * `deliverPending` moves pending → delivered. `markRead` moves delivered → read.
+ * It does not belong to a user chat.
  */
 export interface AgentMessage {
   id: string;
@@ -153,6 +160,10 @@ export interface NewAgentMessage {
   toAgentId: string;
   body: string;
   fromChatId?: string;
+}
+
+export interface AgentMessagePatch {
+  status?: AgentMessageStatus;
 }
 
 export interface AgentMessageRepository {
@@ -178,6 +189,13 @@ export interface AgentMessageRepository {
    * Callers enforce allowed transitions. Returns null when the id is missing.
    */
   updateStatus(id: string, status: AgentMessageStatus): Promise<AgentMessage | null>;
+  /**
+   * `agentId` matches either endpoint. `status` filters that column.
+   * Order is oldest first.
+   */
+  list(query?: { agentId?: string; status?: AgentMessageStatus }): Promise<AgentMessage[]>;
+  create(input: NewAgentMessage): Promise<AgentMessage>;
+  update(id: string, patch: AgentMessagePatch): Promise<AgentMessage | null>;
 }
 
 export interface Session {
@@ -216,6 +234,17 @@ export interface SessionRepository {
   delete(id: string): Promise<boolean>;
 }
 
+/**
+ * Profile metadata only. Implementations must not persist API keys, tokens, or passwords.
+ * `id` is the public profile id (for example "grok"), not an internal row id.
+ */
+export interface ProfileRepository {
+  list(): Promise<ModelProfile[]>;
+  get(id: string): Promise<ModelProfile | null>;
+  upsert(profile: ModelProfile): Promise<ModelProfile>;
+  delete(id: string): Promise<boolean>;
+}
+
 export interface Store {
   /** "memory" is process-local. "postgres" is packages/db. */
   readonly kind: "memory" | "postgres";
@@ -223,7 +252,10 @@ export interface Store {
   readonly chats: ChatRepository;
   readonly messages: MessageRepository;
   readonly sessions: SessionRepository;
+  readonly profiles: ProfileRepository;
   readonly agentMessages: AgentMessageRepository;
+  /** Release the backing pool. Memory stores resolve immediately. */
+  close(): Promise<void>;
 }
 
 /** Single v0 operator. SaaS multi-user accounts are not implemented. */

@@ -214,6 +214,9 @@ export function normalizeMessage(body: unknown): ChatMessage {
   const record = unwrapEntity(body, ["message"]);
   const usage = normalizeUsage(record.usage);
   const toolCalls = normalizeToolCalls(record.toolCalls ?? record.tool_calls);
+  const toolCallId = stringField(record, ["toolCallId", "tool_call_id"]);
+  const name = stringField(record, ["name"]);
+  const profileId = stringField(record, ["profileId", "profile_id"]);
   return {
     id: requireRecordId(record, "Message"),
     chatId: stringField(record, ["chatId", "chat_id"]),
@@ -221,6 +224,9 @@ export function normalizeMessage(body: unknown): ChatMessage {
     content: normalizeContent(record.content),
     createdAt: stringField(record, ["createdAt", "created_at"]),
     ...(toolCalls.length > 0 ? { toolCalls } : {}),
+    ...(toolCallId ? { toolCallId } : {}),
+    ...(name ? { name } : {}),
+    ...(profileId ? { profileId } : {}),
     ...(usage ? { usage } : {}),
   };
 }
