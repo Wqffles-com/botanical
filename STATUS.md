@@ -10,6 +10,7 @@ Lead: m14 on `feat/v0-mvp`. Updated: 2026-09-24 (server-runtime merge).
 - #20 agent runtime and tool registry. `packages/agent-server` is removed. Chat turns run through `@botanical/agent-runtime`. `GET /api/tools` lists the registry. MCP still connects on boot and those tools are copied into the registry. `send_agent_message` is a built-in, offered when the agent's allowlist includes it. The mock profile calls it when the user text is `send_agent_message {…}`.
 - #21 Postgres HTTP store. `DATABASE_URL` migrates on boot and uses `packages/db` `createStore`. Migration `0001_agent_identity` stays. `0002_mvp_store` adds sessions and `model_profiles.public_id`. Live Postgres integration tests are skipped unless `BOTANICAL_TEST_DATABASE_URL` is set.
 - #22 Next.js App Router + shadcn replaces the Vite client in `packages/web`.
+- #29 Agent identity UI: picker, icon and color form, avatars in the sidebar and chat. Web tests 11 pass, typecheck green.
 
 `bun test` for `@botanical/core`, `@botanical/server`, and `@botanical/db` after the Postgres merge: 99 pass, 2 skipped, 0 fail. `@botanical/server` typecheck is green.
 
@@ -20,10 +21,9 @@ Lead: m14 on `feat/v0-mvp`. Updated: 2026-09-24 (server-runtime merge).
 - #25 MVP Compose stack (`feat/mvp-devops`).
 - #26 Playwright e2e (`feat/mvp-e2e`).
 - #27 Next.js chat UI (`feat/mvp-chat-ui`).
+- #28 Login, settings, and A2A inbox UI (`feat/mvp-pages-ui`).
 
-Still expected, not open yet: `feat/mvp-agent-identity-ui`, `feat/mvp-pages-ui`.
-
-Merge order from here: postgres, next-foundation, providers, tools, then UI (identity, chat, pages), devops, e2e.
+Merge order from here: pages, chat, providers, tools, devops, e2e.
 
 ## What works
 
@@ -37,7 +37,7 @@ Merge order from here: postgres, next-foundation, providers, tools, then UI (ide
 
 ## What is missing for the MVP
 
-- Next.js + shadcn foundation is on the branch. Identity UI (#29), pages (#28), and chat (#27) are not merged yet.
+- Identity picker, icon, and color are in the Next app. Pages (#28) and chat (#27) are not merged yet.
 - Shell and web tool packages are dependencies. They register only when they export `createToolContributor` (#24).
 - No `packages/e2e` on this branch yet. The `botanical-mvp` stack (web `3000`, server `8788`, postgres `5433`) is not running.
 
@@ -52,7 +52,7 @@ Merge order from here: postgres, next-foundation, providers, tools, then UI (ide
 
 ## Next
 
-Merge #29 identity UI (built on the Next foundation), then #28 pages and #27 chat. Providers, tools, devops, and e2e follow.
+Merge #28 pages and #27 chat. Providers, tools, devops, and e2e follow.
 
 ## Merged since the runtime note
 
