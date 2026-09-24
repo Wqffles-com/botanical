@@ -13,18 +13,19 @@ Lead: m14 on `feat/v0-mvp`. Updated: 2026-09-24 (server-runtime merge).
 - #29 Agent identity UI: picker, icon and color form, avatars in the sidebar and chat.
 - #28 Login, settings, and A2A inbox pages.
 - #27 Chat UI is integrated without a branch merge: required profile, SSE streaming, markdown, and tool-call cards. Agent icon, color, and name stay on the header and messages. `PATCH /api/chats/:id` sets title and profile.
-- #23 Real providers. `GET /api/profiles` lists mock plus providers whose env key is set. Non-mock turns use that registry inside the agent runtime. Mock turns still call `file_list` and `send_agent_message`. Server + provider tests: 109 pass, 1 postgres boot skipped.
+- #23 Real providers. `GET /api/profiles` lists mock plus providers whose env key is set. Non-mock turns use that registry inside the agent runtime. Mock turns still call `file_list` and `send_agent_message`.
+- #24 File, shell, web, and agent-message tools. The default registry loads `createToolContributor` from `@botanical/tools-shell` and `@botanical/tools-web`. Server and tool tests: 161 pass, 1 postgres boot skipped.
 
 `bun test` for `@botanical/core`, `@botanical/server`, and `@botanical/db` after the Postgres merge: 99 pass, 2 skipped, 0 fail. `@botanical/server` typecheck is green.
 
 ## Open PRs into `feat/v0-mvp`
 
-- #24 Built-in file, shell, web, and agent-message tools (`feat/mvp-tools`).
+
 - #25 MVP Compose stack (`feat/mvp-devops`).
 - #26 Playwright e2e (`feat/mvp-e2e`).
 
 
-Merge order from here: tools, devops, e2e.
+Merge order from here: devops, e2e. Then bring up botanical-mvp.
 
 ## What works
 

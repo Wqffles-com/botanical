@@ -89,7 +89,7 @@ services:
     ports:
       - "127.0.0.1:${SERVER_PORT:-8787}:8787"
     volumes:
-      - botanical_workspace:/data
+      - botanical_workspace:/data/workspace
     healthcheck:
       test:
         [

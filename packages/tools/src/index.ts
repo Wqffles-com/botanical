@@ -31,6 +31,29 @@ export { DEFAULT_FILE_LIMITS, resolveFileConfig } from "./files/config.ts";
 export type { FileToolsConfig, ResolvedFileLimits } from "./files/config.ts";
 export { FILE_TOOL_NAMES, createFileTools } from "./files/index.ts";
 export type { FileToolName } from "./files/index.ts";
+export { createToolContributor } from "./contributor.ts";
+export type {
+  FileContributorOptions,
+  RegisteredTool,
+  ToolCallContext,
+  ToolContributor,
+  ToolInvocationResult,
+} from "./contributor.ts";
+export {
+  DEFAULT_FILE_TIMEOUT_MS,
+  DEFAULT_MAX_OUTPUT_CHARS,
+  executeWithLimits,
+  readBoundedInt,
+  truncateContent,
+  withLimitNote,
+} from "./limits.ts";
+export type { LimitedToolResult } from "./limits.ts";
+export {
+  DEFAULT_WORKSPACE_DIR,
+  ensureWorkspaceDir,
+  ensureWorkspaceRoot,
+  resolveWorkspaceDir,
+} from "./workspace.ts";
 export type { FileReadData } from "./files/read.ts";
 export type { FileWriteData } from "./files/write.ts";
 export type { FileListData, FileListEntry } from "./files/list.ts";

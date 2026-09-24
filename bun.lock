@@ -87,6 +87,9 @@
     "packages/tools-shell": {
       "name": "@botanical/tools-shell",
       "version": "0.0.0",
+      "dependencies": {
+        "@botanical/tools": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "^1.2.0",
         "typescript": "^5.8.0",
@@ -96,6 +99,7 @@
       "name": "@botanical/tools-web",
       "version": "0.0.0",
       "dependencies": {
+        "@botanical/tools": "workspace:*",
         "linkedom": "^0.18.13",
       },
       "devDependencies": {

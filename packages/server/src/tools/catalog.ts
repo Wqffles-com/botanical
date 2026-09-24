@@ -8,6 +8,8 @@ import {
   type ToolRegistry,
 } from "@botanical/agent-runtime";
 import { createFileTools } from "@botanical/tools";
+import { createToolContributor as createShellContributor } from "@botanical/tools-shell";
+import { createToolContributor as createWebContributor } from "@botanical/tools-web";
 import type { ServerMcp } from "../mcp-host.ts";
 
 /** Packages m08 and m09 export `createToolContributor` from. */
@@ -31,7 +33,10 @@ export function createFileToolsContributor(): ToolContributor {
 }
 
 export function createDefaultToolRegistry(): ToolRegistry {
-  return createToolRegistry([createFileToolsContributor()]);
+  const registry = createToolRegistry([createFileToolsContributor()]);
+  registry.register(createShellContributor());
+  registry.register(createWebContributor());
+  return registry;
 }
 
 /** MCP servers connected by `startServerMcp`, listed under their registry ids. */

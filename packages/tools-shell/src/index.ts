@@ -34,6 +34,8 @@ import { resolveShellOptions, type ShellToolsOptions } from "./shell/options.ts"
 import type { ToolDefinition } from "./types.ts";
 
 export { createCodeExecTool, createShellTool };
+export { createToolContributor } from "./contributor.ts";
+export type { ShellContributorOptions, ToolContributor } from "./contributor.ts";
 
 /**
  * v0 builtin registry. Names stay stable across tool packages.

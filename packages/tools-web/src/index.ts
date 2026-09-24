@@ -1,3 +1,5 @@
+export { createToolContributor } from "./contributor.ts";
+export type { WebContributorOptions, ToolContributor } from "./contributor.ts";
 export { htmlToMarkdown } from "./html-to-markdown.ts";
 export type { HtmlExtract } from "./html-to-markdown.ts";
 export { isNonPublicAddress, isBlockedHostname } from "./net/ssrf.ts";

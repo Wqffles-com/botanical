@@ -74,7 +74,7 @@ Error shape: `{ "error": { "code": "...", "message": "..." } }`.
 | POST | `/api/agent-messages` | yes | `{ fromAgentId, toAgentId, body }` then delivers |
 | PATCH | `/api/agent-messages/:id` | yes | `{ status }` — pending, delivered, read, or failed |
 | GET | `/api/profiles` | yes | `defaultProfileId` is always `null` |
-| GET | `/api/tools` | yes | Built-in and MCP tools, each with `source` |
+| GET | `/api/tools` | yes | Built-in file, shell, web, and agent-message tools, plus MCP tools. Each entry has `source` |
 | GET | `/api/mcp/servers` | yes | Configured MCP servers, tool ids, and connect errors |
 
 `POST /api/chats/:id/messages` body is `{ "content": "...", "profileId"?: "...", "stream"?: boolean }`.
@@ -104,6 +104,20 @@ During a turn the built-in `send_agent_message` tool sends mail when that id is 
 `BOTANICAL_MCP_CONFIG` is a path to a Claude Desktop `mcpServers` JSON file. On boot the server connects each entry (stdio, streamable HTTP, or SSE) and registers the tools that came up. Ids look like `mcp:echo:echo`. One dead server is reported on `GET /api/mcp/servers` and does not drop the others. A missing or invalid file is a `configError` on that route; the API still starts.
 
 See `config/mcp.example.json` for a local echo fixture. `BOTANICAL_MCP_DISABLED=true` connects nothing.
+
+## Built-in tools
+
+`GET /api/tools` lists the tools registered for agent allowlists:
+
+| Id | Risk | Approval |
+| --- | --- | --- |
+| `file_read`, `file_list` | read | no |
+| `file_write` | write | yes |
+| `shell`, `code_exec` | execute | yes |
+| `web_search`, `web_fetch` | network | no |
+| `send_agent_message` | write | no |
+
+File and shell calls stay inside `BOTANICAL_WORKSPACE` (default `./data/workspace`; Compose mounts a volume at `/data/workspace`). Each call is aborted at a wall-clock cap and its text is truncated (`BOTANICAL_TOOL_MAX_OUTPUT_CHARS`, default 32000). Packages export `createToolContributor` for m06's registry (`builtin.files`, `builtin.shell`, `builtin.web`). `send_agent_message` (`builtin.a2a`) calls the A2A service (`agentMessages` on `createApp`, or `agentServiceFromBus`). Until that service is wired the tool returns an error and does not pretend to deliver. The sender id always comes from the running turn. Pass `toAgentId` or `toAgentName`.
 
 A chat's agent does not change after create. The first message replaces the title `"New chat"` with a short clip of that message.
 

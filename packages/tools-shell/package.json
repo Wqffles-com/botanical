@@ -13,6 +13,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "bun test"
   },
+  "dependencies": {
+    "@botanical/tools": "workspace:*"
+  },
   "devDependencies": {
     "@types/bun": "^1.2.0",
     "typescript": "^5.8.0"
