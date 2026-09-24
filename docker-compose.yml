@@ -90,7 +90,6 @@ services:
       - "127.0.0.1:${SERVER_PORT:-8788}:8787"
     volumes:
       - botanical_workspace:/data
-      - ${BOTANICAL_MCP_CONFIG_FILE:-./config/mcp.json}:/config/mcp.json:ro
     healthcheck:
       test:
         [

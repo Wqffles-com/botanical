@@ -14,18 +14,29 @@ Lead: m14 on `feat/v0-mvp`. Updated: 2026-09-24 (server-runtime merge).
 - #28 Login, settings, and A2A inbox pages.
 - #27 Chat UI is integrated without a branch merge: required profile, SSE streaming, markdown, and tool-call cards. Agent icon, color, and name stay on the header and messages. `PATCH /api/chats/:id` sets title and profile.
 - #23 Real providers. `GET /api/profiles` lists mock plus providers whose env key is set. Non-mock turns use that registry inside the agent runtime. Mock turns still call `file_list` and `send_agent_message`.
-- #24 File, shell, web, and agent-message tools. The default registry loads `createToolContributor` from `@botanical/tools-shell` and `@botanical/tools-web`. Server and tool tests: 161 pass, 1 postgres boot skipped.
+- #24 File, shell, web, and agent-message tools. The default registry loads `createToolContributor` from `@botanical/tools-shell` and `@botanical/tools-web`.
+- #25 Compose project `botanical-mvp`: web `3000`, API `8788`, Postgres `5433`. The MCP config file is baked into the server image. A host bind mount of that file failed on this daemon.
+- #26 Playwright suite is on the branch (`bun run e2e`).
+
+## Running
+
+`botanical-mvp` is up. Web http://localhost:3000, API http://127.0.0.1:8788, Postgres `127.0.0.1:5433`. Local passcode `botanical`. Checked: login, agents with icon/color/name, mock profile, `file_list` tool call, chat row still present after a server restart, A2A inbox, `GET /api/mcp/servers`, shell and web contributors in the log. Project `botanical` on 8080/8787/5432 was not restarted.
+
+## What's left
+
+- Playwright was not run against the live UI in this session.
+- Postgres integration tests still skip unless `BOTANICAL_TEST_DATABASE_URL` is set.
+- `@botanical/core` and `@botanical/agent-runtime` `tsc` still fail on pre-existing tsconfig gaps (`.ts` imports, missing DOM/Bun libs). Server and web typecheck pass.
 
 `bun test` for `@botanical/core`, `@botanical/server`, and `@botanical/db` after the Postgres merge: 99 pass, 2 skipped, 0 fail. `@botanical/server` typecheck is green.
 
 ## Open PRs into `feat/v0-mvp`
 
 
-- #25 MVP Compose stack (`feat/mvp-devops`).
-- #26 Playwright e2e (`feat/mvp-e2e`).
 
 
-Merge order from here: devops, e2e. Then bring up botanical-mvp.
+
+Open the pull request from `feat/v0-mvp` into `main`. Leave `botanical-mvp` running.
 
 ## What works
 
@@ -41,7 +52,7 @@ Merge order from here: devops, e2e. Then bring up botanical-mvp.
 
 - Identity picker, login, settings, A2A inbox, and chat streaming (profile required, tool cards) are in the Next app.
 - Shell and web tool packages are dependencies. They register only when they export `createToolContributor` (#24).
-- No `packages/e2e` on this branch yet. The `botanical-mvp` stack (web `3000`, server `8788`, postgres `5433`) is not running.
+- Playwright against the live UI was not run in this session.
 
 ## Typecheck baseline
 
