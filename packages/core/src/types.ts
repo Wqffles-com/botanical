@@ -1,3 +1,5 @@
+import type { AgentColor } from "./agents";
+
 /** Deployment flag from server config. Behavior is the same in v0; the client only badges it. */
 export type DeploymentMode = "SELF_HOST" | "SAAS";
 
@@ -33,26 +35,53 @@ export interface ModelProfile {
 
 export interface Agent {
   id: string;
+  /** Display name, 1–40 characters. */
   name: string;
+  /** Lucide icon name. Defaults to "Bot" when the server omits it. */
+  icon: string;
+  /** Picker swatch. Defaults to "green" when the server omits it. */
+  color: AgentColor;
   description: string;
+  /** System prompt. Same text as `prompt`. */
   systemPrompt: string;
+  /** System prompt. Same text as `systemPrompt` (shared contract name). */
+  prompt: string;
   toolIds: string[];
+  /** Tool ids. Same list as `toolIds` (shared contract name). */
+  tools: string[];
+  /**
+   * Suggested profile only. Creating or sending a chat still requires an explicit profileId.
+   * Null when the agent has no suggestion.
+   */
+  defaultProfileId: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateAgentInput {
   name: string;
+  icon?: string;
+  color?: AgentColor;
   description?: string;
   systemPrompt?: string;
+  /** Alias of systemPrompt. If both are set they must match. */
+  prompt?: string;
   toolIds?: string[];
+  /** Alias of toolIds. If both are set they must match. */
+  tools?: string[];
+  defaultProfileId?: string | null;
 }
 
 export interface UpdateAgentInput {
   name?: string;
+  icon?: string;
+  color?: AgentColor;
   description?: string;
   systemPrompt?: string;
+  prompt?: string;
   toolIds?: string[];
+  tools?: string[];
+  defaultProfileId?: string | null;
 }
 
 /**

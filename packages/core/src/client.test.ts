@@ -46,13 +46,37 @@ function startStub() {
         });
       }
       if (url.pathname === "/api/agents" && request.method === "POST") {
-        const input = body as { name: string; systemPrompt?: string; toolIds?: string[] };
+        const input = body as {
+          name: string;
+          systemPrompt?: string;
+          prompt?: string;
+          toolIds?: string[];
+          tools?: string[];
+          icon?: string;
+          color?: string;
+          defaultProfileId?: string | null;
+        };
         return Response.json({
           id: "agent-1",
           name: input.name,
           description: "",
-          system_prompt: input.systemPrompt ?? "",
-          tool_ids: input.toolIds ?? [],
+          system_prompt: input.systemPrompt ?? input.prompt ?? "",
+          tool_ids: input.toolIds ?? input.tools ?? [],
+          icon: input.icon,
+          color: input.color,
+          defaultProfileId: input.defaultProfileId ?? null,
+          created_at: "2026-09-23T00:00:00.000Z",
+        });
+      }
+      if (url.pathname === "/api/agents/agent-1" && request.method === "PATCH") {
+        const input = body as { icon?: string; color?: string; prompt?: string };
+        return Response.json({
+          id: "agent-1",
+          name: "Research",
+          icon: input.icon ?? "Bot",
+          color: input.color ?? "green",
+          prompt: input.prompt ?? "Look it up.",
+          tools: ["web_search"],
           created_at: "2026-09-23T00:00:00.000Z",
         });
       }
@@ -127,7 +151,24 @@ describe("BotanicalClient", () => {
 
       const agent = await client.createAgent({ name: "Research", systemPrompt: "Look it up.", toolIds: ["web_search"] });
       expect(agent.systemPrompt).toBe("Look it up.");
+      expect(agent.prompt).toBe("Look it up.");
       expect(agent.toolIds).toEqual(["web_search"]);
+      expect(agent.tools).toEqual(["web_search"]);
+      expect(agent.icon).toBe("Bot");
+      expect(agent.color).toBe("green");
+      expect(agent.defaultProfileId).toBeNull();
+      const createAgentCall = calls.find((call) => call.path === "/api/agents" && call.method === "POST");
+      expect(createAgentCall?.body).toEqual({
+        name: "Research",
+        icon: "Bot",
+        color: "green",
+        description: "",
+        prompt: "Look it up.",
+        systemPrompt: "Look it up.",
+        tools: ["web_search"],
+        toolIds: ["web_search"],
+        defaultProfileId: null,
+      });
 
       const chat = await client.createChat({ agentId: agent.id, profileId: "grok", title: "Soil" });
       expect(chat).toMatchObject({ id: "chat-1", agentId: "agent-1", profileId: "grok", title: "Soil" });
@@ -187,9 +228,65 @@ describe("BotanicalClient", () => {
     expect(normalizeProfile({ id: "p", name: "Fast", provider: "deepseek", model_id: "deepseek-chat" }).model).toBe(
       "deepseek-chat",
     );
-    expect(normalizeAgent({ id: "a", name: "A", prompt: "Be brief", tools: "web_search, file_read" }).toolIds).toEqual([
-      "web_search",
-      "file_read",
-    ]);
+    expect(normalizeAgent({ id: "a", name: "A", prompt: "Be brief", tools: "web_search, file_read" })).toMatchObject({
+      toolIds: ["web_search", "file_read"],
+      tools: ["web_search", "file_read"],
+      prompt: "Be brief",
+      systemPrompt: "Be brief",
+      icon: "Bot",
+      color: "green",
+      defaultProfileId: null,
+    });
+    expect(
+      normalizeAgent({
+        id: "b",
+        name: "Scout",
+        icon: "Search",
+        color: "amber",
+        default_profile_id: "grok",
+        prompt: "Look",
+      }),
+    ).toMatchObject({ icon: "Search", color: "amber", defaultProfileId: "grok", prompt: "Look" });
+    expect(normalizeAgent({ id: "c", name: "C", icon: "nope", color: "lime" })).toMatchObject({
+      icon: "Bot",
+      color: "green",
+    });
+  });
+
+  test("sends contract identity fields and rejects a bad name, icon, or color", async () => {
+    const client = new BotanicalClient();
+    await expect(client.createAgent({ name: " ", prompt: "x" })).rejects.toThrow(/Name/);
+    await expect(client.createAgent({ name: "x".repeat(41), prompt: "x" })).rejects.toThrow(/40/);
+    await expect(client.createAgent({ name: "Ok", prompt: "x", icon: "sprout" })).rejects.toThrow(/Lucide/);
+    await expect(client.createAgent({ name: "Ok", prompt: "x", color: "lime" as "green" })).rejects.toThrow(/Color/);
+    await expect(client.createAgent({ name: "Ok", prompt: "a", systemPrompt: "b" })).rejects.toThrow(/match/);
+
+    const { server, calls, url } = startStub();
+    try {
+      const authed = new BotanicalClient({ baseUrl: url, getToken: () => "secret-token" });
+      await authed.login("sprout");
+      const agent = await authed.createAgent({
+        name: "Scout",
+        prompt: "Look it up.",
+        tools: ["web_search"],
+        icon: "Search",
+        color: "amber",
+        defaultProfileId: "grok",
+      });
+      expect(agent).toMatchObject({
+        name: "Scout",
+        icon: "Search",
+        color: "amber",
+        prompt: "Look it up.",
+        tools: ["web_search"],
+        defaultProfileId: "grok",
+      });
+      const patched = await authed.updateAgent(agent.id, { icon: "Leaf", color: "teal" });
+      expect(patched).toMatchObject({ icon: "Leaf", color: "teal" });
+      const patchCall = calls.find((call) => call.method === "PATCH");
+      expect(patchCall?.body).toEqual({ icon: "Leaf", color: "teal" });
+    } finally {
+      server.stop(true);
+    }
   });
 });

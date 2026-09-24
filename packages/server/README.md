@@ -29,6 +29,10 @@ docker run --rm -p 8787:8787 \
 
 There is no default model. `BOTANICAL_PROFILES` lists the choices, and every chat names one of them.
 
+An agent's `defaultProfileId` is only a suggestion for the picker. It does not select a profile for a chat.
+
+With no `DATABASE_URL`, the memory store starts with three example agents: Gardener (Sprout, green), Builder (Code, blue), and Scout (Search, amber). Postgres gets the same rows from `packages/db` migrations. `icon` is a Lucide name and defaults to `Bot`. `color` is one of `red`, `orange`, `amber`, `green`, `teal`, `cyan`, `blue`, `violet`, `pink`, `gray`, and defaults to `green`. Responses include both `prompt` / `systemPrompt` and `tools` / `toolIds`.
+
 ## Auth
 
 One operator. `POST /api/auth/login` accepts `{ "password": "..." }` or `{ "passcode": "..." }`.
@@ -56,7 +60,7 @@ Error shape: `{ "error": { "code": "...", "message": "..." } }`.
 | POST | `/api/auth/logout` | session | 204, clears the cookie |
 | GET | `/api/auth/me` | yes | Operator, brand, session expiry |
 | GET | `/api/agents` | yes | |
-| POST | `/api/agents` | yes | `name`, `systemPrompt`, optional `description`, `toolIds` |
+| POST | `/api/agents` | yes | `name` (1–40), `prompt` (alias `systemPrompt`), optional `icon` (default `Bot`), `color` (default `green`), `description`, `tools` (alias `toolIds`), `defaultProfileId` |
 | GET | `/api/agents/:id` | yes | |
 | PATCH | `/api/agents/:id` | yes | |
 | DELETE | `/api/agents/:id` | yes | 409 `agent_in_use` when the agent owns chats |

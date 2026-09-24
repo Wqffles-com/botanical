@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { EXAMPLE_AGENTS, EXAMPLE_AGENTS_CREATED_AT } from "@botanical/core";
 import type {
   Agent,
   AgentPatch,
@@ -16,7 +17,7 @@ import type {
  * Process-local stand-in used when DATABASE_URL is unset.
  * TODO(packages/db): do not use this for a real deploy once Postgres is wired.
  */
-export function createMemoryStore(): Store {
+export function createMemoryStore(options?: { seed?: boolean }): Store {
   const agents = new Map<string, Agent>();
   const chats = new Map<string, Chat>();
   const messages: Message[] = [];
@@ -29,6 +30,23 @@ export function createMemoryStore(): Store {
     clock = millis;
     return new Date(millis).toISOString();
   };
+
+  if (options?.seed) {
+    for (const example of EXAMPLE_AGENTS) {
+      agents.set(example.id, {
+        id: example.id,
+        name: example.name,
+        icon: example.icon,
+        color: example.color,
+        description: example.description,
+        systemPrompt: example.prompt,
+        toolIds: [...example.tools],
+        defaultProfileId: null,
+        createdAt: EXAMPLE_AGENTS_CREATED_AT,
+        updatedAt: EXAMPLE_AGENTS_CREATED_AT,
+      });
+    }
+  }
 
   return {
     kind: "memory",
@@ -47,9 +65,12 @@ export function createMemoryStore(): Store {
         const agent: Agent = {
           id: randomUUID(),
           name: input.name,
+          icon: input.icon,
+          color: input.color,
           description: input.description,
           systemPrompt: input.systemPrompt,
           toolIds: [...input.toolIds],
+          defaultProfileId: input.defaultProfileId,
           createdAt: now,
           updatedAt: now,
         };
@@ -65,8 +86,11 @@ export function createMemoryStore(): Store {
           updatedAt: timestamp(),
         };
         if (patch.name !== undefined) next.name = patch.name;
+        if (patch.icon !== undefined) next.icon = patch.icon;
+        if (patch.color !== undefined) next.color = patch.color;
         if (patch.description !== undefined) next.description = patch.description;
         if (patch.systemPrompt !== undefined) next.systemPrompt = patch.systemPrompt;
+        if (patch.defaultProfileId !== undefined) next.defaultProfileId = patch.defaultProfileId;
         agents.set(id, next);
         return clone(next);
       },
