@@ -1,4 +1,7 @@
-# Portable Botanical server image. Build from the repo root:
+# Package-only image. It does not install workspace dependencies.
+# The supported API image is the repo-root Dockerfile:
+#   docker build -t botanical-server .
+# This file still builds a single-package image from packages/server:
 #   docker build -f packages/server/Dockerfile -t botanical-server packages/server
 FROM oven/bun:1.2
 WORKDIR /app

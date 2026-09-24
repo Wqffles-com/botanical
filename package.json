@@ -13,9 +13,13 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "bun run --parallel --filter @botanical/server --filter @botanical/web dev",
-    "build": "bun run --filter '*' build",
-    "typecheck": "bun run --filter '*' typecheck"
+    "dev": "bun run --parallel dev:server dev:web",
+    "dev:server": "bun run --cwd packages/server dev",
+    "dev:web": "bun run --cwd packages/web dev",
+    "build": "bun run --if-present --filter '*' build",
+    "typecheck": "bun run --if-present --filter '*' typecheck",
+    "test": "bun run --if-present --filter '*' test",
+    "db:migrate": "bun run --filter @botanical/db migrate"
   },
   "devDependencies": {
     "typescript": "^7.0.2"
