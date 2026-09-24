@@ -21,12 +21,20 @@ export {
   requireAgentId,
   requireProfileId,
 } from "./errors";
-export { normalizeAgent, normalizeChat, normalizeMessage, normalizeProfile } from "./normalize";
+export {
+  normalizeAgent,
+  normalizeAgentMessage,
+  normalizeChat,
+  normalizeMessage,
+  normalizeProfile,
+} from "./normalize";
 export { API } from "./paths";
 export { parseNdjsonLine, parseSseFrame, readChatStream } from "./sse";
-export { CLIENT_CONTRACT_VERSION } from "./types";
+export { AGENT_MESSAGE_STATUSES, CLIENT_CONTRACT_VERSION, INBOX_CHAT_TITLE } from "./types";
 export type {
   Agent,
+  AgentMessage,
+  AgentMessageStatus,
   Chat,
   ChatMessage,
   ChatStreamEvent,
@@ -38,9 +46,11 @@ export type {
   Me,
   MessageRole,
   ModelProfile,
+  SendAgentMessageInput,
   SendMessageInput,
   TokenUsage,
   ToolCall,
   UpdateAgentInput,
+  UpdateAgentMessageInput,
   UpdateChatInput,
 } from "./types";

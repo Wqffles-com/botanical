@@ -8,6 +8,8 @@ import {
 import { BotanicalApiError } from "./errors";
 import type {
   Agent,
+  AgentMessage,
+  AgentMessageStatus,
   Chat,
   ChatMessage,
   ChatStreamEvent,
@@ -20,6 +22,7 @@ import type {
   TokenUsage,
   ToolCall,
 } from "./types";
+import { AGENT_MESSAGE_STATUSES } from "./types";
 
 export function unwrapList(body: unknown, keys: string[]): unknown[] {
   if (Array.isArray(body)) return body;
@@ -174,6 +177,37 @@ export function normalizeChat(body: unknown): Chat {
     createdAt,
     updatedAt: stringField(record, ["updatedAt", "updated_at"], createdAt),
   };
+}
+
+export function normalizeAgentMessage(body: unknown): AgentMessage {
+  const record = unwrapEntity(body, ["message", "agentMessage"]);
+  const createdAt = stringField(record, ["createdAt", "created_at"]);
+  const status = normalizeAgentMessageStatus(record.status);
+  const message: AgentMessage = {
+    id: requireRecordId(record, "Agent message"),
+    fromAgentId: stringField(record, ["fromAgentId", "from_agent", "from_agent_id"]),
+    toAgentId: stringField(record, ["toAgentId", "to_agent", "to_agent_id"]),
+    body: stringField(record, ["body", "content", "preview"]),
+    status,
+    createdAt,
+    updatedAt: stringField(record, ["updatedAt", "updated_at"], createdAt),
+  };
+  const fromChatId = stringField(record, ["fromChatId", "from_chat_id"]);
+  if (fromChatId) message.fromChatId = fromChatId;
+  const deliveredAt = stringField(record, ["deliveredAt", "delivered_at"]);
+  if (deliveredAt) message.deliveredAt = deliveredAt;
+  const readAt = stringField(record, ["readAt", "read_at"]);
+  if (readAt) message.readAt = readAt;
+  const error = stringField(record, ["error"]);
+  if (error) message.error = error;
+  return message;
+}
+
+function normalizeAgentMessageStatus(value: unknown): AgentMessageStatus {
+  if (typeof value === "string" && (AGENT_MESSAGE_STATUSES as readonly string[]).includes(value)) {
+    return value as AgentMessageStatus;
+  }
+  return "pending";
 }
 
 export function normalizeMessage(body: unknown): ChatMessage {

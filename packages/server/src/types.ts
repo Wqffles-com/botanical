@@ -6,10 +6,13 @@ import type { AgentColor } from "@botanical/core";
  * Agent identity (name, icon, color, prompt, tools, defaultProfileId) matches
  * @botanical/core. This store still uses systemPrompt and toolIds; routes
  * accept prompt/tools as aliases and return both names.
+ * A2A message shapes also live in `@botanical/core` and are re-exported here.
  *
  * TODO(packages/db): the Store interfaces below are the persistence contract.
  * packages/db should export `createStore({ connectionString })` returning a
  * Store with kind "postgres". See src/db/postgres.ts.
+ * `agentMessages` must persist to the `agent_messages` table. Until that
+ * repository is present, the server attaches an in-memory one with the same methods.
  */
 
 export const DEPLOYMENT_MODES = ["SELF_HOST", "SAAS"] as const;
@@ -108,6 +111,60 @@ export interface NewMessage {
   content: string;
 }
 
+export const AGENT_MESSAGE_STATUSES = ["pending", "delivered", "read", "failed"] as const;
+export type AgentMessageStatus = (typeof AGENT_MESSAGE_STATUSES)[number];
+
+/**
+ * One async agent-to-agent note. `insert` stores `pending`.
+ * `deliverPending` moves pending → delivered. `markRead` moves delivered → read.
+ */
+export interface AgentMessage {
+  id: string;
+  fromAgentId: string;
+  toAgentId: string;
+  body: string;
+  status: AgentMessageStatus;
+  createdAt: string;
+  updatedAt: string;
+  fromChatId?: string;
+  deliveredAt?: string;
+  readAt?: string;
+  error?: string;
+}
+
+export interface NewAgentMessage {
+  id?: string;
+  fromAgentId: string;
+  toAgentId: string;
+  body: string;
+  fromChatId?: string;
+}
+
+export interface AgentMessageRepository {
+  insert(input: NewAgentMessage): Promise<AgentMessage>;
+  get(id: string): Promise<AgentMessage | null>;
+  /**
+   * Inbox for `agentId` (rows whose recipient is that agent).
+   * Oldest first unless `newestFirst`.
+   */
+  listForAgent(
+    agentId: string,
+    opts?: { status?: AgentMessageStatus[]; limit?: number; newestFirst?: boolean },
+  ): Promise<AgentMessage[]>;
+  /**
+   * Atomically move pending rows to delivered.
+   * Postgres implementations must use SKIP LOCKED so overlapping workers don't double-deliver.
+   */
+  deliverPending(opts?: { limit?: number; toAgentId?: string }): Promise<AgentMessage[]>;
+  /** Transition delivered → read. Rows in any other status are left alone. */
+  markRead(ids: readonly string[]): Promise<AgentMessage[]>;
+  /**
+   * Explicit status write for `PATCH /api/agent-messages/:id`.
+   * Callers enforce allowed transitions. Returns null when the id is missing.
+   */
+  updateStatus(id: string, status: AgentMessageStatus): Promise<AgentMessage | null>;
+}
+
 export interface Session {
   id: string;
   tokenHash: string;
@@ -151,6 +208,7 @@ export interface Store {
   readonly chats: ChatRepository;
   readonly messages: MessageRepository;
   readonly sessions: SessionRepository;
+  readonly agentMessages: AgentMessageRepository;
 }
 
 /** Single v0 operator. SaaS multi-user accounts are not implemented. */

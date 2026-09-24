@@ -1,7 +1,9 @@
 import { mkdirSync } from "node:fs";
 
-import { createMockProvider, type ChatMessage, type ToolDefinition } from "@botanical/providers";
-import { createFileTools } from "@botanical/tools";
+import { createMockProvider, type ChatMessage, type ToolDefinition as ProviderTool } from "@botanical/providers";
+import { createFileTools, type ToolDefinition } from "@botanical/tools";
+
+import { SEND_AGENT_MESSAGE_TOOL } from "../a2a/constants.ts";
 
 export interface MockToolCall {
   id: string;
@@ -15,6 +17,12 @@ export interface MockTurnResult {
   toolResult?: string;
 }
 
+export interface MockTurnOptions {
+  extraTools?: readonly ToolDefinition[];
+  agentId?: string;
+  chatId?: string;
+}
+
 /** Directory jailed for the built-in file tools. Created if it is missing. */
 export function ensureWorkspaceRoot(): string {
   const configured = process.env.BOTANICAL_WORKSPACE?.trim() || process.env.BOTANICAL_WORKSPACE_ROOT?.trim();
@@ -24,16 +32,34 @@ export function ensureWorkspaceRoot(): string {
 }
 
 /**
- * One mock-provider turn that always calls the built-in `file_list` tool,
- * then echoes the user text plus the tool output. No network and no default profile.
+ * One mock-provider turn. Ordinary text calls `file_list`.
+ * A message shaped as `send_agent_message { ... }` calls that tool when it is registered.
+ * No network and no default profile.
  */
-export async function runMockTurn(userText: string, workspaceRoot: string): Promise<MockTurnResult> {
-  const tools = createFileTools();
+export async function runMockTurn(
+  userText: string,
+  workspaceRoot: string,
+  options: MockTurnOptions = {},
+): Promise<MockTurnResult> {
+  const tools = [...createFileTools(), ...(options.extraTools ?? [])];
   const fileList = tools.find((tool) => tool.name === "file_list");
+  const sendTool = tools.find((tool) => tool.name === SEND_AGENT_MESSAGE_TOOL);
+  const sendDirective = sendTool ? parseSendDirective(userText) : null;
   const provider = createMockProvider("mock", {
     capabilities: { tools: true, streaming: true },
     events(request) {
       const usedTool = request.messages.some((message) => message.role === "tool");
+      if (!usedTool && sendDirective) {
+        return [
+          {
+            type: "tool-call",
+            id: "call_send_agent_message",
+            name: SEND_AGENT_MESSAGE_TOOL,
+            arguments: sendDirective,
+          },
+          { type: "done" },
+        ];
+      }
       if (!usedTool && fileList) {
         return [
           {
@@ -50,15 +76,11 @@ export async function runMockTurn(userText: string, workspaceRoot: string): Prom
     },
   });
 
-  const toolDefs: ToolDefinition[] = fileList
-    ? [
-        {
-          name: fileList.name,
-          description: fileList.description,
-          parameters: fileList.parameters as unknown as Record<string, unknown>,
-        },
-      ]
-    : [];
+  const toolDefs: ProviderTool[] = tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters as unknown as Record<string, unknown>,
+  }));
 
   const messages: ChatMessage[] = [{ role: "user", content: userText }];
   let text = "";
@@ -74,7 +96,11 @@ export async function runMockTurn(userText: string, workspaceRoot: string): Prom
         toolResult = `Unknown tool ${event.name}`;
       } else {
         try {
-          const result = await tool.execute(event.arguments, { workspaceRoot });
+          const result = await tool.execute(event.arguments, {
+            workspaceRoot,
+            ...(options.agentId ? { agentId: options.agentId } : {}),
+            ...(options.chatId ? { chatId: options.chatId } : {}),
+          });
           toolResult = result.content;
         } catch (error) {
           toolResult = error instanceof Error ? error.message : "Tool failed";
@@ -102,7 +128,8 @@ export async function runMockTurn(userText: string, workspaceRoot: string): Prom
   }
 
   if (!text) {
-    text = toolResult ? `mock:${userText}\n\nUsed file_list:\n${toolResult}` : `mock:${userText}`;
+    const name = toolCall?.name ?? "tool";
+    text = toolResult ? `mock:${userText}\n\nUsed ${name}:\n${toolResult}` : `mock:${userText}`;
   }
 
   return {
@@ -115,12 +142,40 @@ export async function runMockTurn(userText: string, workspaceRoot: string): Prom
 function mockReply(messages: readonly ChatMessage[]): string {
   const lastUser = [...messages].reverse().find((message) => message.role === "user");
   const userText = typeof lastUser?.content === "string" ? lastUser.content : "";
-  const toolText = messages
-    .filter((message) => message.role === "tool")
+  const toolMessages = messages.filter((message) => message.role === "tool");
+  const toolText = toolMessages
     .map((message) => (typeof message.content === "string" ? message.content : ""))
     .join("\n");
   if (!toolText) return `mock:${userText}`;
-  return `mock:${userText}\n\nUsed file_list:\n${toolText}`;
+  const toolName = toolMessages[0]?.name || "tool";
+  return `mock:${userText}\n\nUsed ${toolName}:\n${toolText}`;
+}
+
+/**
+ * Mock-provider seam so a turn can call `send_agent_message` without a live model.
+ * The whole user text must be `send_agent_message` plus a JSON object.
+ */
+function parseSendDirective(text: string): { toAgentId?: string; toAgentName?: string; body: string } | null {
+  const match = /^send_agent_message\s+(\{[\s\S]*\})$/.exec(text.trim());
+  const json = match?.[1];
+  if (!json) return null;
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const record = parsed as Record<string, unknown>;
+    if (typeof record.body !== "string" || record.body.trim() === "") return null;
+    const directive: { toAgentId?: string; toAgentName?: string; body: string } = { body: record.body };
+    if (typeof record.toAgentId === "string" && record.toAgentId.trim()) {
+      directive.toAgentId = record.toAgentId.trim();
+    }
+    if (typeof record.toAgentName === "string" && record.toAgentName.trim()) {
+      directive.toAgentName = record.toAgentName.trim();
+    }
+    if (!directive.toAgentId && !directive.toAgentName) return null;
+    return directive;
+  } catch {
+    return null;
+  }
 }
 
 function chunk(text: string, size = 24): { type: "text-delta"; text: string }[] {

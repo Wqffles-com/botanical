@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Store } from "../types.ts";
+import { attachAgentMessages } from "./agent-messages.ts";
 
 /**
  * TODO(packages/db): Postgres is not wired in this workspace yet.
@@ -21,9 +22,14 @@ import type { Store } from "../types.ts";
  *     — v0 rows are plain text. Tool-call parts can extend this table later.
  *   sessions(id, token_hash, created_at, expires_at)
  *     — store the sha256 of the bearer/cookie token, never the raw token
+ *   agent_messages(id, from_agent, to_agent, body, status, created_at, updated_at)
+ *     — implement Store.agentMessages (insert, get, listForAgent, deliverPending,
+ *       markRead, updateStatus). deliverPending must SKIP LOCKED.
  *
  * Chat delete should remove the chat and its messages in one transaction.
  * This module does not import a Postgres driver; packages/db owns the pool.
+ * If createStore() omits agentMessages, the server attaches the in-memory
+ * repository (see src/db/agent-messages.ts) rather than failing boot.
  */
 export const POSTGRES_NOT_WIRED =
   "DATABASE_URL is set but packages/db is not available or does not export createStore(). " +
@@ -50,7 +56,7 @@ export async function openPostgresStore(connectionString: string): Promise<Store
       'packages/db createStore() must return a Store with kind "postgres" and agents, chats, messages, and sessions repositories.',
     );
   }
-  return created;
+  return attachAgentMessages(created);
 }
 
 async function loadDbModule(): Promise<DbModule | null> {

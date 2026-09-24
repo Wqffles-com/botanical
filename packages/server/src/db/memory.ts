@@ -2,11 +2,14 @@ import { randomUUID } from "node:crypto";
 import { EXAMPLE_AGENTS, EXAMPLE_AGENTS_CREATED_AT } from "@botanical/core";
 import type {
   Agent,
+  AgentMessage,
+  AgentMessageStatus,
   AgentPatch,
   Chat,
   ChatPatch,
   Message,
   NewAgent,
+  NewAgentMessage,
   NewChat,
   NewMessage,
   Session,
@@ -21,6 +24,7 @@ export function createMemoryStore(options?: { seed?: boolean }): Store {
   const agents = new Map<string, Agent>();
   const chats = new Map<string, Chat>();
   const messages: Message[] = [];
+  const agentMessages: AgentMessage[] = [];
   const sessions = new Map<string, Session>();
   const sessionsByHash = new Map<string, string>();
 
@@ -95,7 +99,15 @@ export function createMemoryStore(options?: { seed?: boolean }): Store {
         return clone(next);
       },
       async delete(id) {
-        return agents.delete(id);
+        const removed = agents.delete(id);
+        if (!removed) return false;
+        for (let index = agentMessages.length - 1; index >= 0; index -= 1) {
+          const row = agentMessages[index];
+          if (row && (row.fromAgentId === id || row.toAgentId === id)) {
+            agentMessages.splice(index, 1);
+          }
+        }
+        return true;
       },
     },
     chats: {
@@ -168,6 +180,84 @@ export function createMemoryStore(options?: { seed?: boolean }): Store {
           }
         }
         return removed;
+      },
+    },
+    agentMessages: {
+      async insert(input: NewAgentMessage) {
+        const now = timestamp();
+        const row: AgentMessage = {
+          id: input.id ?? randomUUID(),
+          fromAgentId: input.fromAgentId,
+          toAgentId: input.toAgentId,
+          body: input.body,
+          status: "pending",
+          createdAt: now,
+          updatedAt: now,
+        };
+        if (input.fromChatId) row.fromChatId = input.fromChatId;
+        agentMessages.push(row);
+        return clone(row);
+      },
+      async get(id) {
+        const row = agentMessages.find((message) => message.id === id);
+        return row ? clone(row) : null;
+      },
+      async listForAgent(agentId, opts) {
+        const limit = opts?.limit ?? 100;
+        const filtered = agentMessages.filter((message) => {
+          if (message.toAgentId !== agentId) return false;
+          if (opts?.status && !opts.status.includes(message.status)) return false;
+          return true;
+        });
+        const ordered = [...filtered].sort((a, b) => {
+          const byTime = a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
+          return opts?.newestFirst ? -byTime : byTime;
+        });
+        return ordered.slice(0, limit).map(clone);
+      },
+      async deliverPending(opts) {
+        const limit = opts?.limit ?? 50;
+        const pending = agentMessages
+          .filter((message) => {
+            if (message.status !== "pending") return false;
+            if (opts?.toAgentId && message.toAgentId !== opts.toAgentId) return false;
+            return true;
+          })
+          .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+        const delivered: AgentMessage[] = [];
+        for (const row of pending) {
+          if (delivered.length >= limit) break;
+          const now = timestamp();
+          row.status = "delivered";
+          row.deliveredAt = now;
+          row.updatedAt = now;
+          delivered.push(clone(row));
+        }
+        return delivered;
+      },
+      async markRead(ids) {
+        const wanted = new Set(ids);
+        const updated: AgentMessage[] = [];
+        for (const row of agentMessages) {
+          if (!wanted.has(row.id) || row.status !== "delivered") continue;
+          const now = timestamp();
+          row.status = "read";
+          row.readAt = now;
+          row.updatedAt = now;
+          updated.push(clone(row));
+        }
+        return updated;
+      },
+      async updateStatus(id, status: AgentMessageStatus) {
+        const row = agentMessages.find((message) => message.id === id);
+        if (!row) return null;
+        if (row.status === status) return clone(row);
+        const now = timestamp();
+        row.status = status;
+        row.updatedAt = now;
+        if (status === "delivered") row.deliveredAt = now;
+        if (status === "read") row.readAt = now;
+        return clone(row);
       },
     },
     sessions: {

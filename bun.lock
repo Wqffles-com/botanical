@@ -71,6 +71,7 @@
       "name": "@botanical/server",
       "version": "0.1.0",
       "dependencies": {
+        "@botanical/agent-runtime": "workspace:*",
         "@botanical/core": "workspace:*",
         "@botanical/mcp": "workspace:*",
         "@botanical/providers": "workspace:*",
