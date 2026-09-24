@@ -117,6 +117,13 @@ describe("createStore", () => {
   test("uses memory when DATABASE_URL is unset", async () => {
     const store = await createStore(loadConfig(baseEnv()));
     expect(store.kind).toBe("memory");
+    const seeded = await store.agents.list();
+    expect(seeded.map((agent) => agent.name)).toEqual(["Gardener", "Builder", "Scout"]);
+    expect(seeded.map((agent) => [agent.icon, agent.color])).toEqual([
+      ["Sprout", "green"],
+      ["Code", "blue"],
+      ["Search", "amber"],
+    ]);
   });
 
   test("fails closed when DATABASE_URL is set and packages/db is absent", async () => {

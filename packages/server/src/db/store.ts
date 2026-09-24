@@ -11,7 +11,7 @@ export { createMemoryStore } from "./memory.ts";
  */
 export async function createStore(config: Pick<ServerConfig, "databaseUrl">): Promise<Store> {
   if (!config.databaseUrl) {
-    return createMemoryStore();
+    return createMemoryStore({ seed: true });
   }
   return openPostgresStore(config.databaseUrl);
 }

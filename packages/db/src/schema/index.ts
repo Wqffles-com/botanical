@@ -1,8 +1,8 @@
 export { agentMessages } from './agent-messages.ts';
 export { agents } from './agents.ts';
 export { chats } from './chats.ts';
-export { a2aStatusEnum, messageRoleEnum } from './enums.ts';
-export type { AgentMessageStatus, MessageRole } from './enums.ts';
+export { a2aStatusEnum, agentColorEnum, messageRoleEnum } from './enums.ts';
+export type { AgentColor, AgentMessageStatus, MessageRole } from './enums.ts';
 export { messages } from './messages.ts';
 export { modelProfiles } from './model-profiles.ts';
 export {

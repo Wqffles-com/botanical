@@ -1,3 +1,15 @@
+export {
+  AGENT_COLORS,
+  AGENT_ICON_PATTERN,
+  AGENT_NAME_MAX,
+  DEFAULT_AGENT_COLOR,
+  DEFAULT_AGENT_ICON,
+  EXAMPLE_AGENTS,
+  EXAMPLE_AGENTS_CREATED_AT,
+  isAgentColor,
+  isAgentIcon,
+} from "./agents";
+export type { AgentColor, ExampleAgent } from "./agents";
 export { BotanicalClient } from "./client";
 export type { BotanicalClientOptions } from "./client";
 export {
