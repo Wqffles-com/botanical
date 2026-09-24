@@ -1,6 +1,6 @@
 # Botanical MVP integration status
 
-Lead: m14 on `feat/v0-mvp`. Updated: 2026-09-24 10:12 UTC.
+Lead: m14 on `feat/v0-mvp`. Updated: 2026-09-24 10:20 UTC.
 
 Base commit: `54655b4` (same tree as `feat/v0-integrate`). Integration branch is checked out in the lead worktree.
 
@@ -10,7 +10,12 @@ None yet.
 
 ## Open PRs into `feat/v0-mvp`
 
-None. Swarm agents started about 10:01 UTC. No `feat/mvp-*` branches are on origin yet.
+None yet. Two branches are on origin, and both authors still have uncommitted follow-up work, so they are not merged:
+
+- `feat/mvp-server-runtime` at `cfdf9c6` — tool registry v1 (`createToolRegistry`, contributor contract for built-ins and MCP). One dirty file remains in that worktree.
+- `feat/mvp-postgres` at `a071eec` — server Store extended with agent icon/color, tool transcripts, profile metadata, and A2A message types. Schema edits are still uncommitted. This overlaps the uncommitted agent-identity API work, so merging it now would fork that contract.
+
+Other agents are editing locally and have not pushed.
 
 Expected branches, in merge order:
 
