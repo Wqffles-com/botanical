@@ -66,12 +66,10 @@ Personal server, same images for a later hosted service.
 
 ```bash
 cp .env.example .env
-docker compose up --build
+docker compose up --build -d
 ```
 
-Open http://localhost:8080. Sign in with the `BOTANICAL_PASSWORD` from `.env` (default `botanical`). Create an agent, pick the **Mock echo** profile (required — there is no default model), and send a message. The reply is prefixed `mock:` and includes a `file_list` of the server workspace.
-
-The API keeps chats in memory for this slice. Postgres still starts with Compose; wiring `packages/db` into the HTTP store is the next persistence step. `BOTANICAL_DEPLOYMENT_MODE` is `SELF_HOST` or `SAAS`. Multi-tenant billing is deferred. Details: [docs/DEPLOY.md](./docs/DEPLOY.md).
+Compose project name is `botanical-mvp`. Open http://localhost:3000 and sign in with `BOTANICAL_PASSCODE`. Pick a model profile before chatting — there is no default model. The API is on `127.0.0.1:8788` and Postgres on `127.0.0.1:5433`, so this stack does not take 8080 / 8787 / 5432. The server applies database migrations before it listens. Details: [docs/DEPLOY.md](./docs/DEPLOY.md).
 
 ## v0 MVP (locked)
 
