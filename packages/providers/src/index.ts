@@ -1,5 +1,23 @@
 export { collectChat, type CollectedChat } from "./collect.ts";
 export { DEFAULT_CAPABILITIES } from "./capabilities.ts";
+export {
+  ANTHROPIC_DEFAULT_MAX_TOKENS,
+  LEGACY_COMPAT_API_KEY_ENV,
+  LEGACY_COMPAT_BASE_URL_ENV,
+  OPENAI_COMPAT_API_KEY_ENV,
+  OPENAI_COMPAT_BASE_URL_ENV,
+  OPENAI_COMPAT_MODEL_ENV,
+  compatApiKeyEnv,
+  compatBaseUrl,
+  createConfiguredRegistry,
+  defaultMockProfile,
+  normalizeBaseUrl,
+  parseProfilesDocument,
+  providerConfigured,
+  readProfilesOverride,
+  selectProfiles,
+  type ListedProfile,
+} from "./catalog.ts";
 export { CANONICAL_API_KEY_ENVS, isApiKeyConfigured, resolveApiKey, type Env } from "./env.ts";
 export {
   MissingApiKeyError,
@@ -7,9 +25,26 @@ export {
   ProviderError,
   UnknownProfileError,
   UnknownProviderError,
+  isAbortError,
   type ProviderErrorCode,
 } from "./errors.ts";
 export { createMockProvider, type MockProvider } from "./mock.ts";
+export {
+  RuntimeProfileNotFoundError,
+  RuntimeProfileRequiredError,
+  createRuntimeBridge,
+  type RuntimeChatEvent,
+  type RuntimeChatMessage,
+  type RuntimeChatRequest,
+  type RuntimeContentPart,
+  type RuntimeLLMProvider,
+  type RuntimeModelCapabilities,
+  type RuntimeProfileResolver,
+  type RuntimeProfileSummary,
+  type RuntimeResolvedProfile,
+  type RuntimeToolCall,
+  type RuntimeToolDefinition,
+} from "./runtime.ts";
 export {
   PROVIDER_BASE_URLS,
   assertProfileId,

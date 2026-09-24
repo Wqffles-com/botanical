@@ -1,4 +1,13 @@
 import {
+  parseProfilesDocument,
+  ProviderError,
+  readProfilesOverride,
+  selectProfiles,
+  type ListedProfile,
+} from "@botanical/providers";
+
+import { createProviderHost, type ProviderFetch, type ProviderHost } from "./provider-host.ts";
+import {
   DEPLOYMENT_MODES,
   MODEL_PROVIDERS,
   type DeploymentMode,
@@ -38,7 +47,16 @@ export interface ServerConfig {
   trustProxy: boolean;
   databaseUrl?: string;
   profiles: readonly ModelProfile[];
+  /** Streaming registry. API keys are closed over from the server env and are not serialized. */
+  providers: ProviderHost;
   maxBodyBytes: number;
+}
+
+export interface LoadConfigOptions {
+  /** Replaces global fetch for provider calls. Tests pass a mock. */
+  fetch?: ProviderFetch;
+  /** Replaces disk reads for BOTANICAL_PROFILES_FILE. */
+  readFile?: (path: string) => string;
 }
 
 /**
@@ -49,7 +67,10 @@ export function defaultBrandName(mode: DeploymentMode): string {
   return mode === "SAAS" ? "Botanical Cloud" : "Botanical";
 }
 
-export function loadConfig(env: Record<string, string | undefined>): ServerConfig {
+export function loadConfig(
+  env: Record<string, string | undefined>,
+  options: LoadConfigOptions = {},
+): ServerConfig {
   const deploymentMode = parseDeploymentMode(env.BOTANICAL_DEPLOYMENT_MODE);
   const brandRaw = env.BOTANICAL_BRAND_NAME?.trim() ?? "";
   if (env.BOTANICAL_BRAND_NAME !== undefined && env.BOTANICAL_BRAND_NAME.trim() === "") {
@@ -74,6 +95,7 @@ export function loadConfig(env: Record<string, string | undefined>): ServerConfi
     ? { method: "hash", hash: passwordHash }
     : { method: "password", password: requiredPassword(password) };
   const databaseUrl = parseDatabaseUrl(env.DATABASE_URL);
+  const { profiles, providers } = loadProfiles(env, options);
 
   return {
     version: SERVER_VERSION,
@@ -92,7 +114,8 @@ export function loadConfig(env: Record<string, string | undefined>): ServerConfi
     corsOrigin: parseCorsOrigin(env.BOTANICAL_CORS_ORIGIN),
     trustProxy: parseBool(env.BOTANICAL_TRUST_PROXY, "BOTANICAL_TRUST_PROXY", false),
     ...(databaseUrl ? { databaseUrl } : {}),
-    profiles: parseProfiles(env.BOTANICAL_PROFILES),
+    profiles,
+    providers,
     maxBodyBytes: parsePositiveInt(env.BOTANICAL_MAX_BODY_BYTES, MAX_BODY_DEFAULT, {
       min: 1024,
       max: 5_000_000,
@@ -202,30 +225,67 @@ function parseDatabaseUrl(raw: string | undefined): string | undefined {
 
 const FORBIDDEN_PROFILE_KEYS = ["apiKey", "api_key", "token", "authorization", "password"] as const;
 
-function parseProfiles(raw: string | undefined): readonly ModelProfile[] {
-  const text = raw?.trim() ?? "";
-  if (!text) return Object.freeze([]);
-  let parsed: unknown;
+function loadProfiles(
+  env: Record<string, string | undefined>,
+  options: LoadConfigOptions,
+): { profiles: readonly ModelProfile[]; providers: ProviderHost } {
   try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new ConfigError("BOTANICAL_PROFILES must be a JSON array");
+    const raw = options.readFile
+      ? readProfilesOverride(env, options.readFile)
+      : readProfilesOverride(env);
+    const override = raw === undefined ? undefined : validateOverride(raw);
+    const selected = selectProfiles(override, env);
+    const profiles = Object.freeze(selected.map((profile) => Object.freeze(toModelProfile(profile))));
+    return { profiles, providers: createProviderHost(profiles, env, options.fetch) };
+  } catch (error) {
+    if (error instanceof ProviderError) throw new ConfigError(error.message);
+    throw error;
   }
-  if (!Array.isArray(parsed)) {
-    throw new ConfigError("BOTANICAL_PROFILES must be a JSON array");
-  }
+}
 
-  const profiles: ModelProfile[] = [];
+function validateOverride(raw: unknown): ListedProfile[] {
+  const drafts = parseProfilesDocument(raw);
+  const profiles: ListedProfile[] = [];
   const seen = new Set<string>();
-  for (let index = 0; index < parsed.length; index++) {
-    const profile = parseProfile(parsed[index], index);
+  for (let index = 0; index < drafts.length; index++) {
+    const draft = drafts[index];
+    if (!draft) continue;
+    const profile = parseProfile(draft, index);
     if (seen.has(profile.id)) {
       throw new ConfigError(`Duplicate model profile id ${JSON.stringify(profile.id)}`);
     }
     seen.add(profile.id);
-    profiles.push(Object.freeze(profile));
+    profiles.push(toListed(profile));
   }
-  return Object.freeze(profiles);
+  return profiles;
+}
+
+function toListed(profile: ModelProfile): ListedProfile {
+  const listed: ListedProfile = {
+    id: profile.id,
+    name: profile.name,
+    provider: profile.provider,
+    model: profile.model,
+    description: profile.description ?? null,
+  };
+  if (profile.baseUrl) listed.baseUrl = profile.baseUrl;
+  if (profile.maxTokens !== undefined) listed.maxTokens = profile.maxTokens;
+  if (profile.temperature !== undefined) listed.temperature = profile.temperature;
+  return listed;
+}
+
+function toModelProfile(profile: ListedProfile): ModelProfile {
+  const next: ModelProfile = {
+    id: profile.id,
+    name: profile.name,
+    provider: profile.provider,
+    model: profile.model,
+    description: profile.description,
+  };
+  if (profile.baseUrl) next.baseUrl = profile.baseUrl;
+  if (profile.maxTokens !== undefined) next.maxTokens = profile.maxTokens;
+  if (profile.temperature !== undefined) next.temperature = profile.temperature;
+  return next;
 }
 
 function parseProfile(value: unknown, index: number): ModelProfile {
@@ -267,11 +327,36 @@ function parseProfile(value: unknown, index: number): ModelProfile {
     name,
     provider: provider as ModelProvider,
     model,
+    description: readDescription(value.description, label),
   };
-  if (value.baseUrl !== undefined) {
+  if (value.baseUrl !== undefined && value.baseUrl !== "") {
     profile.baseUrl = parseBaseUrl(value.baseUrl, label);
   }
+  if (value.maxTokens !== undefined) profile.maxTokens = readMaxTokens(value.maxTokens, label);
+  if (value.temperature !== undefined) profile.temperature = readTemperature(value.temperature, label);
   return profile;
+}
+
+function readDescription(value: unknown, label: string): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string") throw new ConfigError(`${label}.description must be a string`);
+  const text = value.trim();
+  if (text.length > 240) throw new ConfigError(`${label}.description must be at most 240 characters`);
+  return text.length > 0 ? text : null;
+}
+
+function readMaxTokens(value: unknown, label: string): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 2_000_000) {
+    throw new ConfigError(`${label}.maxTokens must be an integer from 1 to 2000000`);
+  }
+  return value;
+}
+
+function readTemperature(value: unknown, label: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new ConfigError(`${label}.temperature must be a finite number`);
+  }
+  return value;
 }
 
 function parseBaseUrl(value: unknown, label: string): string {

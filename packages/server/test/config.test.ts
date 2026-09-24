@@ -61,6 +61,7 @@ describe("loadConfig", () => {
   test("accepts an openai-compat base URL and rejects embedded credentials", () => {
     const config = loadConfig(
       baseEnv({
+        OPENAI_COMPAT_API_KEY: "test-compat-key",
         BOTANICAL_PROFILES: JSON.stringify([
           {
             id: "local",
@@ -72,7 +73,10 @@ describe("loadConfig", () => {
         ]),
       }),
     );
-    expect(config.profiles[0]?.baseUrl).toBe("http://127.0.0.1:11434/v1");
+    expect(config.profiles.find((profile) => profile.id === "local")?.baseUrl).toBe(
+      "http://127.0.0.1:11434/v1",
+    );
+    expect(config.profiles.some((profile) => profile.id === "mock")).toBe(true);
 
     expect(() =>
       loadConfig(

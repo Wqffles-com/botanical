@@ -1,6 +1,7 @@
 import { createApp, type App } from "../src/app.ts";
 import { LoginRateLimiter } from "../src/auth/rate-limit.ts";
 import { loadConfig, type ServerConfig } from "../src/config.ts";
+import type { ProviderFetch } from "../src/provider-host.ts";
 import { createMemoryStore } from "../src/db/memory.ts";
 import type { Store } from "../src/types.ts";
 
@@ -21,15 +22,40 @@ export function baseEnv(overrides: Record<string, string> = {}): Record<string, 
   return {
     BOTANICAL_PASSWORD: PASSWORD,
     BOTANICAL_PROFILES: JSON.stringify(PROFILES),
+    XAI_API_KEY: "test-xai-key",
+    DEEPSEEK_API_KEY: "test-deepseek-key",
     ...overrides,
   };
 }
 
+/** OpenAI-style SSE so profile tests never call a vendor. */
+export function defaultProviderFetch(input: Request | URL | string, init?: RequestInit): Promise<Response> {
+  void input;
+  let model = "model";
+  if (typeof init?.body === "string") {
+    try {
+      const parsed = JSON.parse(init.body) as { model?: unknown };
+      if (typeof parsed.model === "string" && parsed.model.trim() !== "") model = parsed.model;
+    } catch {
+      // The provider client always sends JSON. A bad body still gets a harmless reply.
+    }
+  }
+  const text = `Reply from ${model}`;
+  const body = [
+    `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`,
+    `data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 3, completion_tokens: 2 } })}\n\n`,
+    "data: [DONE]\n\n",
+  ].join("");
+  return Promise.resolve(
+    new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } }),
+  );
+}
+
 export function setup(
   overrides: Record<string, string> = {},
-  options: { now?: () => Date; rateLimiter?: LoginRateLimiter } = {},
+  options: { now?: () => Date; rateLimiter?: LoginRateLimiter; fetch?: ProviderFetch } = {},
 ): TestApp {
-  const config = loadConfig(baseEnv(overrides));
+  const config = loadConfig(baseEnv(overrides), { fetch: options.fetch ?? defaultProviderFetch });
   const store = createMemoryStore();
   const app = createApp({
     config,

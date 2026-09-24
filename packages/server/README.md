@@ -9,7 +9,7 @@ Runtime is **Bun**. `SELF_HOST` and `SAAS` are the same server. The deployment m
 ```bash
 cd packages/server
 cp .env.example .env
-# set BOTANICAL_PASSWORD and BOTANICAL_PROFILES
+# set BOTANICAL_PASSWORD. Profiles come from provider API keys; mock is always listed.
 bun install
 bun src/serve.ts
 ```
@@ -27,7 +27,7 @@ docker run --rm -p 8787:8787 \
   botanical-server
 ```
 
-There is no default model. `BOTANICAL_PROFILES` lists the choices, and every chat names one of them.
+There is no default model. `GET /api/profiles` lists `mock` plus one profile for each provider key that is set. Every chat and every message names a `profileId`. `BOTANICAL_PROFILES` or `BOTANICAL_PROFILES_FILE` replaces the built-in model list.
 
 ## Auth
 
@@ -101,26 +101,19 @@ Repositories live in `src/types.ts` (`Store`: agents, chats, messages, sessions)
 
 ## Model profiles
 
-```json
-[
-  { "id": "grok", "name": "Grok", "provider": "xai", "model": "grok-4" },
-  {
-    "id": "local",
-    "name": "Local",
-    "provider": "openai-compat",
-    "model": "llama",
-    "baseUrl": "http://127.0.0.1:11434/v1"
-  }
-]
-```
+`GET /api/profiles` returns `defaultProfileId: null` and:
 
-Providers: `openai`, `anthropic`, `xai`, `deepseek`, `openrouter`, `openai-compat`.
+- `mock` always
+- one profile per configured key: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`
+- `openai-compat` when both `OPENAI_COMPAT_BASE_URL` and `OPENAI_COMPAT_API_KEY` are set (`CUSTOM_OPENAI_*` are legacy aliases)
 
-Provider keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`) stay in the server environment. Profile JSON rejects `apiKey`.
+Optional `profiles.json` (`BOTANICAL_PROFILES_FILE`) or inline `BOTANICAL_PROFILES` replaces that model list. Entries for providers without a key are omitted. See `profiles.example.json`. Profile JSON rejects `apiKey`.
+
+`POST /api/chats/:id/messages` requires `profileId`. `mock` echoes the user and calls `file_list`. Any other profile streams through `@botanical/providers`, normalized to the agent-runtime `LLMProvider` interface (`config.providers.runtime`). File-tool schemas on the agent allowlist are sent as function tools. The runtime tool loop (m06) executes tools; this route forwards `tool-call` events from the model.
 
 ## What's left
 
 - Postgres implementation in `packages/db` (this server already calls it when `DATABASE_URL` is set)
-- Real token streaming through `packages/providers` (the message route is a stub)
-- Tools, MCP, and agent-to-agent delivery
+- The agent-runtime tool loop should take `config.providers.runtime` as its `ProfileResolver`
+- MCP and agent-to-agent delivery on this message route
 - Shared schemas in `packages/core`, if that package becomes the source of these types

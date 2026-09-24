@@ -1,9 +1,17 @@
+import type { RuntimeChatMessage } from "@botanical/providers";
+
 import { ensureWorkspaceRoot, runMockTurn, type MockTurnResult } from "../chat/mock-turn.ts";
+import {
+  emptyTurn,
+  fileToolDefinitions,
+  providerToHttp,
+  streamProviderEvents,
+} from "../chat/provider-turn.ts";
 import { HttpError, isRecord, json, readJson } from "../http.ts";
 import { readRequestedProfileId, resolveProfile } from "../profiles.ts";
 import { authed, type Router } from "../router.ts";
-import { sseResponse, textDeltas, type SseEvent } from "../streaming.ts";
-import type { Chat, Message, ModelProfile } from "../types.ts";
+import { sseResponse, sseStream, textDeltas, type SseEvent } from "../streaming.ts";
+import type { Agent, Chat, Message, Store } from "../types.ts";
 import { LIMITS, readBoundedString, requireParam } from "../validate.ts";
 
 export function registerMessages(router: Router): void {
@@ -33,8 +41,8 @@ export function registerMessages(router: Router): void {
 
       const profile = resolveProfile(
         ctx.config,
-        readRequestedProfileId(body.profileId, false),
-        chat.profileId,
+        readRequestedProfileId(body.profileId, true),
+        undefined,
       );
       if (profile.id !== chat.profileId) {
         const updated = await ctx.store.chats.update(chat.id, { profileId: profile.id });
@@ -47,34 +55,129 @@ export function registerMessages(router: Router): void {
         role: "user",
         content,
       });
-      // Profiles other than `mock` stay on the explicit stub until those
-      // providers are called with server-side keys. `mock` runs the echo
-      // provider plus the built-in file_list tool. There is no default profile.
-      const mockTurn = profile.provider === "mock" ? await runMockTurn(content, ensureWorkspaceRoot()) : null;
-      const assistantText = mockTurn ? mockTurn.text : stubAssistantText(profile);
-      const assistantMessage = await ctx.store.messages.create({
-        chatId: chat.id,
-        role: "assistant",
-        content: assistantText,
-      });
 
-      const title = chat.title === "New chat" ? titleFromContent(content) : undefined;
-      await ctx.store.chats.update(chat.id, title ? { title } : {});
+      if (profile.provider === "mock") {
+        const mockTurn = await runMockTurn(content, ensureWorkspaceRoot());
+        const assistantMessage = await ctx.store.messages.create({
+          chatId: chat.id,
+          role: "assistant",
+          content: mockTurn.text,
+        });
+        await touchChat(ctx.store, chat, content);
+        if (!stream) {
+          return json(201, {
+            userMessage,
+            assistantMessage,
+            profileId: profile.id,
+            ...(mockTurn.toolCall ? { toolCall: mockTurn.toolCall } : {}),
+          });
+        }
+        return sseResponse(streamEvents(userMessage, assistantMessage, mockTurn.text, mockTurn));
+      }
+
+      let resolved;
+      try {
+        resolved = await ctx.config.providers.runtime.resolve(profile.id);
+      } catch (error) {
+        throw providerToHttp(error);
+      }
+      const agent = await ctx.store.agents.get(chat.agentId);
+      const history = await ctx.store.messages.listByChat(chat.id);
+      const providerMessages = toProviderMessages(agent, history);
+      const tools = fileToolDefinitions(agent?.toolIds ?? []);
 
       if (!stream) {
+        const acc = emptyTurn();
+        try {
+          for await (const event of streamProviderEvents(
+            resolved.provider,
+            resolved.model,
+            providerMessages,
+            tools,
+            ctx.request.signal,
+            acc,
+          )) {
+            void event;
+          }
+        } catch (error) {
+          throw providerToHttp(error);
+        }
+        const assistantMessage = await ctx.store.messages.create({
+          chatId: chat.id,
+          role: "assistant",
+          content: acc.text,
+        });
+        await touchChat(ctx.store, chat, content);
         return json(201, {
           userMessage,
           assistantMessage,
           profileId: profile.id,
-          ...(mockTurn?.toolCall ? { toolCall: mockTurn.toolCall } : {}),
+          ...(acc.toolCalls.length > 0 ? { toolCalls: acc.toolCalls } : {}),
+          ...(acc.usage ? { usage: acc.usage } : {}),
         });
       }
-      return sseResponse(streamEvents(userMessage, assistantMessage, assistantText, mockTurn));
+
+      return sseStream(
+        streamLiveTurn(ctx.store, chat, content, userMessage, resolved.provider, resolved.model, providerMessages, tools, ctx.request.signal),
+      );
     }),
   );
 }
 
-async function loadChat(store: { chats: { get(id: string): Promise<Chat | null> } }, id: string): Promise<Chat> {
+async function* streamLiveTurn(
+  store: Store,
+  chat: Chat,
+  content: string,
+  userMessage: Message,
+  provider: Parameters<typeof streamProviderEvents>[0],
+  model: string,
+  providerMessages: RuntimeChatMessage[],
+  tools: ReturnType<typeof fileToolDefinitions>,
+  signal: AbortSignal | undefined,
+): AsyncGenerator<SseEvent> {
+  yield { event: "message.created", data: { message: userMessage } };
+  const acc = emptyTurn();
+  try {
+    yield* streamProviderEvents(provider, model, providerMessages, tools, signal, acc);
+    const assistantMessage = await store.messages.create({
+      chatId: chat.id,
+      role: "assistant",
+      content: acc.text,
+    });
+    await touchChat(store, chat, content);
+    yield { event: "message.completed", data: { message: assistantMessage } };
+    yield { event: "done", data: {} };
+  } catch (error) {
+    const httpError = providerToHttp(error);
+    if (acc.text) {
+      const assistantMessage = await store.messages.create({
+        chatId: chat.id,
+        role: "assistant",
+        content: acc.text,
+      });
+      yield { event: "message.completed", data: { message: assistantMessage } };
+    }
+    yield { event: "error", data: { type: "error", error: httpError.message } };
+    yield { event: "done", data: {} };
+  }
+}
+
+function toProviderMessages(agent: Agent | null, history: readonly Message[]): RuntimeChatMessage[] {
+  const messages: RuntimeChatMessage[] = [];
+  const prompt = agent ? agent.systemPrompt.trim() : "";
+  if (prompt) messages.push({ role: "system", content: prompt });
+  for (const message of history) {
+    messages.push({ role: message.role, content: message.content });
+  }
+  return messages;
+}
+
+async function touchChat(store: Store, chat: Chat, content: string): Promise<void> {
+  const title = chat.title === "New chat" ? titleFromContent(content) : undefined;
+  await store.chats.update(chat.id, title ? { title } : {});
+}
+
+async function loadChat(store: Store, id: string): Promise<Chat> {
   const chat = await store.chats.get(id);
   if (!chat) throw new HttpError(404, "not_found", "Chat not found");
   return chat;
@@ -87,10 +190,6 @@ function wantsStream(request: Request, body: Record<string, unknown>): boolean {
   if (typeof body.stream === "boolean") return body.stream;
   const accept = request.headers.get("accept") ?? "";
   return accept.includes("text/event-stream");
-}
-
-function stubAssistantText(profile: ModelProfile): string {
-  return `Stub reply. Model streaming is not wired yet. Profile ${profile.id} (${profile.provider}/${profile.model}) was selected explicitly.`;
 }
 
 function titleFromContent(content: string): string {

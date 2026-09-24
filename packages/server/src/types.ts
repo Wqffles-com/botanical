@@ -29,7 +29,11 @@ export interface ModelProfile {
   name: string;
   provider: ModelProvider;
   model: string;
+  description?: string | null;
   baseUrl?: string;
+  /** Output cap forwarded to the provider. Anthropic requires one. */
+  maxTokens?: number;
+  temperature?: number;
 }
 
 export interface Agent {

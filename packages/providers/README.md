@@ -77,6 +77,29 @@ const providers = createRegistry({
 
 `mock.events` replays a script of `ChatEvent`s (a terminal `done` is added if you omit one). `createMockProvider()` records `calls` for assertions. The mock never reads the environment and never calls the network.
 
+## Server catalog
+
+`selectProfiles(override, env)` builds the list behind `GET /api/profiles`.
+
+- `mock` is always included.
+- With no override, one profile is added for each configured key: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`.
+- `openai-compat` is added only when both `OPENAI_COMPAT_BASE_URL` and `OPENAI_COMPAT_API_KEY` are set. `OPENAI_COMPAT_MODEL` sets that profile's model id. `CUSTOM_OPENAI_BASE_URL` and `CUSTOM_OPENAI_API_KEY` are legacy aliases used when the canonical name is unset.
+- `BOTANICAL_PROFILES_FILE` (a `profiles.json` document) replaces that built-in list. `BOTANICAL_PROFILES` is the inline form and is ignored when the file is set. Profiles whose provider key is missing are omitted. `defaultProfile` is rejected.
+- The document may be a profile array, `{ "profiles": [...] }`, or `{ "models": { "openai": ["gpt-4.1", "gpt-4.1-mini"] } }`.
+
+Nothing in that list is selected for the caller. `createRuntimeBridge(registry)` is the `ProfileResolver` shape from `packages/agent-runtime` (`resolve` / `list`, and `LLMProvider.complete`). Blank `profileId` throws `PROFILE_REQUIRED`. Unknown ids throw `PROFILE_NOT_FOUND`. `reasoning-delta` is omitted so the runtime loop can switch on `text-delta` and `tool-call`. `capabilities()` omits `reasoning`.
+
+```ts
+import { createConfiguredRegistry, createRuntimeBridge, selectProfiles } from "@botanical/providers";
+
+const profiles = selectProfiles(undefined, process.env);
+const registry = createConfiguredRegistry(profiles, { env: process.env });
+const resolver = createRuntimeBridge(registry);
+// deps.profiles in runAgentTurn
+```
+
+The HTTP server still runs the mock profile through the deterministic `file_list` turn. The bridge's mock provider only echoes.
+
 ## Develop
 
 ```sh
