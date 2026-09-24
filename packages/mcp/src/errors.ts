@@ -1,4 +1,7 @@
-/** Operator configuration is invalid. The server should fail boot. */
+/**
+ * Operator configuration is invalid. The loader throws.
+ * The HTTP server records the message and keeps serving.
+ */
 export class McpConfigError extends Error {
   constructor(message: string) {
     super(message);

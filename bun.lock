@@ -72,6 +72,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@botanical/core": "workspace:*",
+        "@botanical/mcp": "workspace:*",
         "@botanical/providers": "workspace:*",
         "@botanical/tools": "workspace:*",
       },

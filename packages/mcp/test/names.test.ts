@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { canonicalToolName, parseToolName, providerToolName } from "../src/names.js";
+import { canonicalToolName, parseToolName, providerToolName, registryToolName } from "../src/names.js";
 
 describe("tool names", () => {
   test("round-trips the architectural and provider forms", () => {
@@ -21,6 +21,18 @@ describe("tool names", () => {
   test("keeps dots and double underscores inside the remote tool name", () => {
     expect(parseToolName("mcp.docs.search.v2")?.toolName).toBe("search.v2");
     expect(parseToolName("mcp__docs__search__v2")?.toolName).toBe("search__v2");
+  });
+
+  test("round-trips the registry id used by the tools registry", () => {
+    expect(registryToolName("filesystem", "read_file")).toBe("mcp:filesystem:read_file");
+    expect(parseToolName("mcp:filesystem:read_file")).toEqual({
+      serverId: "filesystem",
+      toolName: "read_file",
+      form: "registry",
+    });
+    expect(parseToolName("mcp:docs:search:v2")?.toolName).toBe("search:v2");
+    expect(parseToolName("mcp:filesystem:")).toBeNull();
+    expect(parseToolName("mcp::read_file")).toBeNull();
   });
 
   test("rejects names that are not MCP tools", () => {

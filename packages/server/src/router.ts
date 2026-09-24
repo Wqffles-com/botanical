@@ -2,6 +2,7 @@ import type { ServerConfig } from "./config.ts";
 import { finish, HttpError, jsonError } from "./http.ts";
 import type { LoginRateLimiter } from "./auth/rate-limit.ts";
 import { resolveSession } from "./auth/session.ts";
+import type { ServerMcp } from "./mcp-host.ts";
 import type { Session, Store } from "./types.ts";
 
 export interface RequestContext {
@@ -14,6 +15,7 @@ export interface RequestContext {
   clientKey: string;
   now: Date;
   rateLimiter: LoginRateLimiter;
+  mcp: ServerMcp;
 }
 
 export type RouteHandler = (ctx: RequestContext) => Promise<Response> | Response;
@@ -99,6 +101,7 @@ export function createRouter(): Router & {
           clientKey: deps.clientKey,
           now,
           rateLimiter: deps.rateLimiter,
+          mcp: deps.mcp,
         });
         return finish(response, deps.config);
       } catch (err) {
@@ -118,6 +121,7 @@ export interface RouterDeps {
   clientKey: string;
   rateLimiter: LoginRateLimiter;
   now?: () => Date;
+  mcp: ServerMcp;
 }
 
 function compile(path: string): { paramNames: string[]; regex: RegExp } {

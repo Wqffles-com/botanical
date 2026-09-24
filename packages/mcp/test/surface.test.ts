@@ -8,6 +8,7 @@ function echoSource(calls: string[]): McpToolSource {
   const tool: McpToolInfo = {
     serverId: "docs",
     toolName: "echo",
+    registryName: "mcp:docs:echo",
     canonicalName: "mcp.docs.echo",
     providerName: "mcp__docs__echo",
     description: "Echo",

@@ -111,7 +111,8 @@ export class McpRuntime implements McpToolSource {
       if (candidate.serverId !== parsed.serverId) return false;
       return candidate.toolName === parsed.toolName
         || candidate.providerName === name
-        || candidate.canonicalName === name;
+        || candidate.canonicalName === name
+        || candidate.registryName === name;
     });
     if (!tool) return errorResult(`Unknown MCP tool "${name}".`);
     const connection = this.connections.find((candidate) => candidate.config.id === tool.serverId);

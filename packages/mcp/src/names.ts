@@ -1,10 +1,13 @@
 /**
- * Architectural tool id is `mcp.<server>.<tool>` (see docs/ARCHITECTURE.md).
+ * Three ids for one MCP tool:
  *
- * OpenAI and Anthropic reject `.` in tool names (`^[a-zA-Z0-9_-]+$`). The
- * model-facing encoding replaces those dots with `__`: `mcp__<server>__<tool>`.
- * Server ids cannot contain `__` or `.`, so both forms parse unambiguously
- * even when the remote tool name itself contains `__`.
+ * - Registry / allowlist id: `mcp:<server>:<tool>` (HTTP API and the tools registry).
+ * - Architectural id: `mcp.<server>.<tool>` (see docs/ARCHITECTURE.md).
+ * - Model-facing id: `mcp__<server>__<tool>`. OpenAI and Anthropic reject `.` and `:`
+ *   (`^[a-zA-Z0-9_-]+$`).
+ *
+ * Server ids cannot contain `__`, `.`, or `:`, so each form parses unambiguously
+ * even when the remote tool name itself contains those characters.
  */
 
 const SERVER_ID = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/;
@@ -22,6 +25,11 @@ export function assertServerId(id: string): void {
 
 export function isServerId(id: string): boolean {
   return SERVER_ID.test(id) && !id.includes("__");
+}
+
+/** Id stored in the tools registry and agent allowlists. */
+export function registryToolName(serverId: string, toolName: string): string {
+  return `mcp:${serverId}:${toolName}`;
 }
 
 export function canonicalToolName(serverId: string, toolName: string): string {
@@ -42,11 +50,23 @@ export function sanitizeToolName(toolName: string): string {
 export interface ParsedToolName {
   serverId: string;
   toolName: string;
-  form: "canonical" | "provider";
+  form: "registry" | "canonical" | "provider";
 }
 
-/** Accept the architectural dotted name or the provider-safe `__` encoding. */
+/**
+ * Accept the registry id (`mcp:<server>:<tool>`), the architectural dotted name,
+ * or the provider-safe `__` encoding.
+ */
 export function parseToolName(name: string): ParsedToolName | null {
+  if (name.startsWith("mcp:")) {
+    const rest = name.slice(4);
+    const colon = rest.indexOf(":");
+    if (colon <= 0 || colon === rest.length - 1) return null;
+    const serverId = rest.slice(0, colon);
+    const toolName = rest.slice(colon + 1);
+    if (!isServerId(serverId) || toolName.length === 0 || /\s/.test(toolName)) return null;
+    return { serverId, toolName, form: "registry" };
+  }
   if (name.startsWith("mcp.")) {
     const rest = name.slice(4);
     const dot = rest.indexOf(".");
