@@ -55,6 +55,34 @@ export function registerChats(router: Router): void {
   );
 
   router.add(
+    "PATCH",
+    "/api/chats/:id",
+    authed(async (ctx) => {
+      const id = requireParam(ctx.params, "id");
+      const existing = await ctx.store.chats.get(id);
+      if (!existing) throw new HttpError(404, "not_found", "Chat not found");
+      const body = await readJson(ctx.request, ctx.config);
+      if (!isRecord(body)) throw new HttpError(400, "invalid_body", "JSON object expected");
+      const patch: { title?: string; profileId?: string } = {};
+      if (body.title !== undefined) {
+        const title = readBoundedString(body.title, "title", { required: true, max: LIMITS.title });
+        if (!title) throw new HttpError(400, "invalid_body", "title is required");
+        patch.title = title;
+      }
+      if (body.profileId !== undefined) {
+        const profile = resolveProfile(ctx.config, readRequestedProfileId(body.profileId, true), undefined);
+        patch.profileId = profile.id;
+      }
+      if (patch.title === undefined && patch.profileId === undefined) {
+        return json(200, { chat: existing });
+      }
+      const chat = await ctx.store.chats.update(id, patch);
+      if (!chat) throw new HttpError(404, "not_found", "Chat not found");
+      return json(200, { chat });
+    }),
+  );
+
+  router.add(
     "DELETE",
     "/api/chats/:id",
     authed(async (ctx) => {

@@ -1,33 +1,20 @@
 # @botanical/web
 
-Vite + React client for Botanical v0 chat.
+Next.js App Router + shadcn/ui client for Botanical.
 
-The screen flow:
+Chat UI in this package:
 
-1. **Passcode** unlocks the server (`POST /auth/login`). A bearer token is stored in `localStorage` under `botanical.session.v1` and sent as `Authorization`. Cookie sessions work too (`credentials: "include"`). Reload calls `GET /auth/me` and restores the shell. Logout clears the saved token.
-2. **New chat** asks for exactly one agent (radio) and one model profile. The profile control starts empty — Botanical does not pre-select a model. Start stays disabled until both are chosen.
-3. **Thread** streams `POST /chats/:id/messages`. The composer stays shut until that chat has an explicit profile. The agent is fixed for the life of the chat.
+- `/chats/new` — pick exactly one agent and a **required** model profile (no default). Start stays disabled until both are chosen.
+- `/chats/[id]` — one agent per thread, SSE streaming via `@botanical/core`, markdown with code blocks, collapsible tool call/result cards, stop button.
+- Sidebar — chats grouped by owning agent, with rename and delete.
+- Composer — Enter sends, Shift+Enter inserts a newline. Disabled until a profile is picked. `profile_required` is shown as a banner.
 
-The HTTP contract lives in [`packages/core`](../core/README.md). This package only renders it.
-
-## Run
-
-```bash
-cd packages/core && bun install
-cd ../web && bun install
-bun run dev
-```
-
-The dev server listens on `http://127.0.0.1:5173` and proxies `/api/*` to `BOTANICAL_SERVER_URL` (default `http://127.0.0.1:8787`). Paths stay under `/api`, matching the v0 server. Set `VITE_API_BASE` to an absolute origin to skip the proxy (`http://127.0.0.1:8787`).
-
-`feat/v0-web-design` owns the Tailwind shell (login, profile gate, agents, chats, settings badge). This package wires the same flows against `@botanical/core` and borrows that branch's dark leaf palette. Prefer its components over `bc-*` styles when the branches merge, and keep `src/state` plus the core client.
+`BOTANICAL_API_URL` (default `http://localhost:8787`) is rewritten from `/api/*` so cookies stay same-origin.
 
 ```bash
+cd packages/web
+bun install
+bun run dev        # http://127.0.0.1:3104
 bun run test
 bun run typecheck
-bun run build
 ```
-
-## Design system
-
-Layout and color sit in `src/styles/tokens.css` and `src/styles/app.css` under the `bc-*` class names. If `feat/v0-web-design` lands a design system, replace those tokens and keep `src/state` plus `@botanical/core` as the API wiring. Screens match the v0 shell: login, profile picker, agent list/editor, chat list, streaming thread, and a self-host / hosted badge.

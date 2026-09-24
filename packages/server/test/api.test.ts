@@ -316,6 +316,55 @@ describe("agents, chats, messages, profiles", () => {
     expect((await readJson<{ error: { code: string } }>(noProfiles)).error.code).toBe("no_profiles_configured");
   });
 
+  test("chats can be renamed and re-profiled over PATCH", async () => {
+    const { app } = setup();
+    const { token } = await login(app);
+    const agent = await createAgent(app, token);
+    const created = await postJson(
+      app,
+      "/api/chats",
+      { agentId: agent.id, profileId: "grok", title: "Plot notes" },
+      bearer(token),
+    );
+    const chatId = (await readJson<{ chat: { id: string } }>(created)).chat.id;
+
+    const renamed = await app.fetch(
+      new Request(`http://localhost/api/chats/${chatId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", ...bearer(token) },
+        body: JSON.stringify({ title: "Soil log" }),
+      }),
+    );
+    expect(renamed.status).toBe(200);
+    expect((await readJson<{ chat: { title: string; profileId: string } }>(renamed)).chat).toMatchObject({
+      title: "Soil log",
+      profileId: "grok",
+    });
+
+    const switched = await app.fetch(
+      new Request(`http://localhost/api/chats/${chatId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", ...bearer(token) },
+        body: JSON.stringify({ profileId: "fast" }),
+      }),
+    );
+    expect(switched.status).toBe(200);
+    expect((await readJson<{ chat: { profileId: string; title: string } }>(switched)).chat).toMatchObject({
+      profileId: "fast",
+      title: "Soil log",
+    });
+
+    const missingProfile = await app.fetch(
+      new Request(`http://localhost/api/chats/${chatId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", ...bearer(token) },
+        body: JSON.stringify({ profileId: "" }),
+      }),
+    );
+    expect(missingProfile.status).toBe(422);
+    expect((await readJson<{ error: { code: string } }>(missingProfile)).error.code).toBe("profile_required");
+  });
+
   test("messages persist, stream, switch profile, and title the chat", async () => {
     const { app } = setup();
     const { token } = await login(app);

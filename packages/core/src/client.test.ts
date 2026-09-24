@@ -70,8 +70,22 @@ function startStub() {
           },
         });
       }
+      if (url.pathname === "/api/chats/chat-1" && request.method === "GET") {
+        return Response.json({
+          chat: {
+            id: "chat-1",
+            agent_id: "agent-1",
+            profile_id: "grok",
+            title: "Soil",
+            created_at: "2026-09-23T00:00:00.000Z",
+          },
+        });
+      }
       if (url.pathname === "/api/chats/chat-1" && request.method === "PATCH") {
         return new Response(null, { status: 405 });
+      }
+      if (url.pathname === "/api/chats/chat-1" && request.method === "DELETE") {
+        return new Response(null, { status: 204 });
       }
       if (url.pathname === "/api/chats/chat-1/messages" && request.method === "POST") {
         const input = body as { profileId?: string; content?: string };
@@ -132,6 +146,13 @@ describe("BotanicalClient", () => {
       const chat = await client.createChat({ agentId: agent.id, profileId: "grok", title: "Soil" });
       expect(chat).toMatchObject({ id: "chat-1", agentId: "agent-1", profileId: "grok", title: "Soil" });
       expect(await client.updateChat(chat.id, { profileId: "grok" })).toBeNull();
+      expect(await client.getChat(chat.id)).toMatchObject({
+        id: "chat-1",
+        agentId: "agent-1",
+        profileId: "grok",
+        title: "Soil",
+      });
+      await client.deleteChat(chat.id);
 
       const events = [];
       for await (const event of client.streamMessage(chat.id, { content: "Hello", profileId: "grok" })) {

@@ -120,6 +120,15 @@ export class BotanicalClient {
     return unwrapList(body, ["chats"]).map(normalizeChat);
   }
 
+  async getChat(id: string): Promise<Chat> {
+    const body = await this.requestJson(API.chat(id));
+    return normalizeChat(body);
+  }
+
+  async deleteChat(id: string): Promise<void> {
+    await this.requestJson(API.chat(id), { method: "DELETE" });
+  }
+
   async createChat(input: CreateChatInput): Promise<Chat> {
     const agentId = requireAgentId(input.agentId);
     const profileId = requireProfileId(input.profileId);
