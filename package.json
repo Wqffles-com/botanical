@@ -19,7 +19,9 @@
     "build": "bun run --if-present --filter '*' build",
     "typecheck": "bun run --if-present --filter '*' typecheck",
     "test": "bun run --if-present --filter '*' test",
-    "db:migrate": "bun run --filter @botanical/db migrate"
+    "db:migrate": "bun run --filter @botanical/db migrate",
+    "e2e": "node scripts/e2e/run.mjs",
+    "e2e:self-test": "node scripts/e2e/run.mjs --self-test"
   },
   "devDependencies": {
     "typescript": "^7.0.2"

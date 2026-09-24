@@ -1,8 +1,11 @@
 # Testing Botanical v0
 
-Smoke coverage for the hosted server path: liveness, passcode auth, agent create, and chat create. The default run answers the chat turn with an in-process mock provider, so it needs no model API key and no Postgres.
+Two layers:
 
-The harness lives at the repo root (`scripts/smoke/`) so it can run before `packages/server` is merged, and can target Compose or the server package once they exist.
+- **Browser end-to-end** (`packages/e2e`) walks the MVP UI: passcode login, agent icon and color, a required model profile, a streamed mock reply with a tool card, reload, the agent inbox, and settings tabs. See [Browser end-to-end](#browser-end-to-end).
+- **API smoke** (`scripts/smoke/`) checks liveness, passcode auth, agent create, and chat create. The default run answers the chat turn with an in-process mock provider, so it needs no model API key and no Postgres.
+
+The smoke harness lives at the repo root (`scripts/smoke/`) so it can run before `packages/server` is merged, and can target Compose or the server package once they exist.
 
 ## Quick start
 
@@ -161,8 +164,78 @@ Once the workspace `package.json` exists, a root script named `smoke` should run
 
 ## Out of scope for this harness
 
-Web UI flows, tool execution, MCP, agent-to-agent delivery, and billing. Those belong with the packages that implement them. This harness is the API golden path a CI job can run with no secrets:
+Browser flows (login, agent identity, streaming chat, tool cards, inbox, and settings) live in the Playwright suite. Billing stays out of both harnesses. This smoke harness is the API golden path a CI job can run with no secrets:
 
 ```bash
 node --test scripts/smoke/harness.test.mjs && node scripts/smoke/run.mjs
 ```
+
+## Browser end-to-end
+
+Playwright suite in `packages/e2e`. It drives a running web app at `BASE_URL` (default `http://localhost:3000`) and does not boot Docker. The MVP stack publishes the web app on port 3000. Passcode comes from `BOTANICAL_PASSCODE`, then `BOTANICAL_PASSWORD`, then `E2E_PASSCODE`, and otherwise `botanical`.
+
+From the repo root, after `bun install`:
+
+```bash
+export BASE_URL=http://localhost:3000
+export BOTANICAL_PASSCODE=botanical
+node scripts/e2e/run.mjs
+```
+
+`bun run e2e` is the same entry. The runner installs Chromium on the first launch when the Playwright browser cache is empty, refuses to start when `BASE_URL` is down, and exits with Playwright's status.
+
+A harness self-check starts a local fixture that implements the same routes and labels, then tears it down. It does not talk to the real server:
+
+```bash
+node scripts/e2e/run.mjs --self-test
+```
+
+Extra Playwright arguments are forwarded (`node scripts/e2e/run.mjs --headed`).
+
+### What the golden path covers
+
+| Step | Route | Pass condition |
+|------|--------|----------------|
+| Auth guard | `/agents`, `/inbox`, `/settings` signed out | Land on `/login` |
+| Bad passcode | `/login` | Stay on `/login` and show an error |
+| Login | `/login` | Leave `/login` and see the agent sidebar |
+| Create agent | `/agents/new` | Name, lucide icon, and color are saved |
+| Sidebar and picker | sidebar, `/agents` | That agent is listed with the same icon and color |
+| New chat | `/chats/:id` | A chat opens for that agent before a profile is chosen |
+| Profile required | `/chats/:id` | Send or the composer stays disabled, the profile control is empty, and the page asks for a profile |
+| Mock profile | `/chats/:id` | Choosing Mock enables the composer |
+| Send | `/chats/:id` | The user text appears, the assistant text includes `mock:`, and a `file_list` tool card is visible |
+| Reload | same chat URL | The user text, `mock:` reply, tool card, and sidebar agent are still there |
+| Inbox | `/inbox` | A note from one agent to another shows the body |
+| Settings | `/settings` | Tabs Profiles, Tools, MCP, and Deployment each show their panel. Profiles includes Mock. Deployment shows Self-host or SaaS |
+
+The mock profile's demo turn calls `file_list` (arguments include `path`) and echoes the user text as `mock:…`. That is the card the suite looks for.
+
+### Hooks the UI should expose
+
+Roles and labels are enough for most steps. Icon and color need a stable hook because a colored square has no accessible name by default:
+
+| Surface | Hook |
+|---------|------|
+| Passcode | Label `Passcode`, or `data-testid="passcode"` |
+| Icon picker | Button `Choose icon` (or a name containing `icon`) opening a dialog, listbox, or popover with a search box and an option named with the lucide icon (`Sprout`) |
+| Color | `radio` or `button` named with the AgentColor (`violet`) |
+| Avatar | `data-icon="Sprout"` and `data-color="violet"` on the avatar next to the display name. An `svg.lucide-sprout` plus a color token (`data-color`, `data-agent-color`, a class containing the color, or an aria-label containing it) is also accepted |
+| Sidebar | shadcn `data-sidebar="sidebar"` or an `aside` |
+| Profile | Label `Model profile`, or `data-testid="profile-select"`. Empty until the user picks. Mock option text contains `mock` |
+| Composer | Label `Message`, or `data-testid="composer"`. Send button named `Send`, or `data-testid="send"` |
+| Tool card | `data-testid="tool-call"` (or `tool-call-card` / `data-tool-name`) containing `file_list`. A button or `summary` named `file_list` also counts |
+| Inbox | Labels `From`, `To`, and `Message` |
+| Settings | `role="tab"` named Profiles, Tools, MCP, Deployment, each with a `tabpanel` of that name |
+
+Agent colors are `red`, `orange`, `amber`, `green`, `teal`, `cyan`, `blue`, `violet`, `pink`, `gray`. The suite creates a violet Sprout agent and an amber Search agent so the default green Bot avatar cannot satisfy the check.
+
+### Environment
+
+| Variable | Role |
+|----------|------|
+| `BASE_URL` | Web origin. Default `http://localhost:3000`. |
+| `BOTANICAL_PASSCODE`, `BOTANICAL_PASSWORD`, or `E2E_PASSCODE` | Typed into the login form. Default `botanical`. |
+| `CI` | When set, one retry and `test.only` fails the run. |
+
+The suite runs one Chromium worker at a desktop viewport. It leaves the stack running. Failure screenshots and traces land in `packages/e2e/test-results/`.
