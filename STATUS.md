@@ -1,6 +1,6 @@
 # Botanical MVP integration status
 
-Lead: m14 on `feat/v0-mvp`. Updated: 2026-09-24 10:03 UTC.
+Lead: m14 on `feat/v0-mvp`. Updated: 2026-09-24 10:12 UTC.
 
 Base commit: `54655b4` (same tree as `feat/v0-integrate`). Integration branch is checked out in the lead worktree.
 
@@ -33,6 +33,18 @@ Expected branches, in merge order:
 - Providers, built-in tools, MCP, and A2A are not connected to the HTTP API.
 - No `packages/e2e`. The `botanical-mvp` stack (web `3000`, server `8788`, postgres `5433`) is not running.
 
+## Typecheck baseline
+
+`bun run typecheck` on `1175f78` is red before any MVP pull request. Passing packages: `@botanical/db`, `@botanical/mcp`, `@botanical/providers`, `@botanical/tools`, `@botanical/web-design`. Failing packages are config gaps, not new MVP regressions:
+
+- `@botanical/core` — `src/deployment/*` imports `.ts` paths and Node globals, but `tsconfig.json` sets `"types": []` and does not allow `.ts` import extensions.
+- `@botanical/agent-runtime` and `@botanical/agent-server` — `tsconfig` lib is ES2022 only, so `AbortSignal`, `crypto`, timers, and `bun:test` are missing.
+- `@botanical/server` — `ReadableStream` from `stream/web` vs `node:stream/web` when it typechecks the provider package.
+- `@botanical/tools-web` — `RequestInit.cache` is not in the ES2022 lib.
+- `@botanical/tools-shell` — `ChildProcess.once` is missing without Node types.
+
+These get fixed as the owning packages land, or as glue after the merge if a package stays red.
+
 ## Next
 
-Poll for `feat/mvp-*` pull requests, merge in the order above, and keep typecheck and tests green. Bring the MVP stack up only after the server, persistence, and web pieces have landed.
+Poll for `feat/mvp-*` pull requests, merge in the order above, and get typecheck and tests green on the integrated tree. Bring the MVP stack up only after the server, persistence, and web pieces have landed. `packages/web` is being replaced locally on `feat/mvp-next-foundation` and has not been pushed.
