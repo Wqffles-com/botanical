@@ -150,23 +150,133 @@ function parseJson(text: string, label: string): unknown {
 }
 
 function parseServers(value: unknown, label: string): McpServerConfig[] {
-  const list = Array.isArray(value)
-    ? value
-    : isRecord(value) && Array.isArray(value.servers)
-      ? value.servers
-      : undefined;
-  if (!list) {
-    throw new McpConfigError(`${label} must be a JSON array of servers or {"servers": [...]} .`);
+  if (Array.isArray(value)) {
+    return dedupeServers(
+      value.map((entry, index) => parseServer(entry, `${label}[${index}]`)),
+      label,
+    );
   }
+  if (!isRecord(value)) {
+    throw new McpConfigError(
+      `${label} must be {"mcpServers": {...}}, {"servers": [...]}, or a JSON array of servers.`,
+    );
+  }
+  const hasServers = Object.prototype.hasOwnProperty.call(value, "servers");
+  const hasClaude = Object.prototype.hasOwnProperty.call(value, "mcpServers");
+  if (!hasServers && !hasClaude) {
+    throw new McpConfigError(
+      `${label} must be {"mcpServers": {...}}, {"servers": [...]}, or a JSON array of servers.`,
+    );
+  }
+
+  const collected: McpServerConfig[] = [];
+  if (hasServers) {
+    if (!Array.isArray(value.servers)) {
+      throw new McpConfigError(`${label}.servers must be an array.`);
+    }
+    value.servers.forEach((entry, index) => {
+      collected.push(parseServer(entry, `${label}.servers[${index}]`));
+    });
+  }
+  if (hasClaude) {
+    collected.push(...parseClaudeServers(value.mcpServers, `${label}.mcpServers`));
+  }
+  return dedupeServers(collected, label);
+}
+
+/**
+ * Claude Desktop config: `{ "mcpServers": { "<id>": { "command", "args" } | { "type", "url" } } }`.
+ * `type` / `transport` may be stdio, http, sse, or streamable-http. Omitted type
+ * means stdio when `command` is set, and streamable HTTP when only `url` is set.
+ */
+function parseClaudeServers(value: unknown, label: string): McpServerConfig[] {
+  if (!isRecord(value)) {
+    throw new McpConfigError(`${label} must be an object keyed by server id.`);
+  }
+  return Object.entries(value).map(([id, entry]) => parseClaudeServer(id, entry, `${label}.${id}`));
+}
+
+function parseClaudeServer(id: string, value: unknown, label: string): McpServerConfig {
+  if (!isRecord(value)) throw new McpConfigError(`${label} must be an object.`);
+  const transport = inferClaudeTransport(value, label);
+  const enabled = readClaudeEnabled(value, label);
+  const normalized: Record<string, unknown> = {
+    id,
+    transport,
+    ...(enabled !== undefined ? { enabled } : {}),
+  };
+  if (value.timeoutMs !== undefined) normalized.timeoutMs = value.timeoutMs;
+  if (value.connectTimeoutMs !== undefined) normalized.connectTimeoutMs = value.connectTimeoutMs;
+
+  if (transport === "stdio") {
+    if (typeof value.command !== "string") {
+      throw new McpConfigError(`${label}.command is required for stdio.`);
+    }
+    normalized.command = value.command;
+    if (value.args !== undefined) {
+      if (!Array.isArray(value.args)) throw new McpConfigError(`${label}.args must be an array of strings.`);
+      normalized.args = value.args;
+    }
+    if (value.env !== undefined) normalized.env = value.env;
+    if (value.cwd !== undefined) normalized.cwd = value.cwd;
+  } else {
+    if (typeof value.url !== "string") {
+      throw new McpConfigError(`${label}.url is required for ${transport}.`);
+    }
+    normalized.url = value.url;
+    if (value.headers !== undefined) normalized.headers = value.headers;
+    if (transport === "http" && value.sseFallback !== undefined) normalized.sseFallback = value.sseFallback;
+  }
+  return parseServer(normalized, label);
+}
+
+function inferClaudeTransport(value: Record<string, unknown>, label: string): "stdio" | "http" | "sse" {
+  const raw = value.type ?? value.transport;
+  if (typeof raw === "string" && raw.trim() !== "") {
+    try {
+      return normalizeTransport(raw, label);
+    } catch (error) {
+      if (value.type !== undefined && value.transport === undefined) {
+        throw new McpConfigError(
+          `${label}.type must be "stdio", "http", "sse", or "streamable-http". Received "${raw}".`,
+        );
+      }
+      throw error;
+    }
+  }
+  if (raw !== undefined) {
+    throw new McpConfigError(`${label}.type must be "stdio", "http", or "sse".`);
+  }
+  const hasCommand = typeof value.command === "string" && value.command.trim() !== "";
+  const hasUrl = typeof value.url === "string" && value.url.trim() !== "";
+  if (hasCommand && hasUrl) {
+    throw new McpConfigError(`${label} sets both command and url. Set type to "stdio", "http", or "sse".`);
+  }
+  if (hasCommand) return "stdio";
+  if (hasUrl) return "http";
+  throw new McpConfigError(`${label} needs a command for stdio or a url for http/sse.`);
+}
+
+function readClaudeEnabled(value: Record<string, unknown>, label: string): boolean | undefined {
+  const hasEnabled = value.enabled !== undefined;
+  const hasDisabled = value.disabled !== undefined;
+  if (hasEnabled && hasDisabled) {
+    throw new McpConfigError(`${label} cannot set both enabled and disabled.`);
+  }
+  if (hasEnabled) return requiredBoolean(value.enabled, `${label}.enabled`);
+  if (hasDisabled) return !requiredBoolean(value.disabled, `${label}.disabled`);
+  return undefined;
+}
+
+function dedupeServers(servers: McpServerConfig[], label: string): McpServerConfig[] {
   const seen = new Set<string>();
-  return list.map((entry, index) => {
-    const server = parseServer(entry, `${label} servers[${index}]`);
+  for (const server of servers) {
     if (seen.has(server.id)) {
       throw new McpConfigError(`Duplicate MCP server id "${server.id}" in ${label}.`);
     }
     seen.add(server.id);
-    return server;
-  });
+  }
+  return servers;
 }
 
 function parseServer(value: unknown, label: string): McpServerConfig {

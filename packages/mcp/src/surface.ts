@@ -159,7 +159,12 @@ function validateBuiltins(builtins: BuiltinTool[]): BuiltinTool[] {
     if (!BUILTIN_NAME.test(tool.name)) {
       throw new Error(`Built-in tool name "${tool.name}" must match ${BUILTIN_NAME}.`);
     }
-    if (tool.name.startsWith("mcp.") || tool.name.startsWith("mcp__") || tool.name === "mcp") {
+    if (
+      tool.name.startsWith("mcp.")
+      || tool.name.startsWith("mcp:")
+      || tool.name.startsWith("mcp__")
+      || tool.name === "mcp"
+    ) {
       throw new Error(`Built-in tool "${tool.name}" uses the reserved MCP prefix.`);
     }
     if (seen.has(tool.name)) throw new Error(`Duplicate built-in tool "${tool.name}".`);

@@ -7,7 +7,7 @@ import { McpServerError } from "./errors.js";
 import type { RawToolResult } from "./format.js";
 import { formatToolResult } from "./format.js";
 import type { McpLogger } from "./logger.js";
-import { canonicalToolName, providerToolName, PROVIDER_TOOL_NAME_MAX } from "./names.js";
+import { canonicalToolName, providerToolName, registryToolName, PROVIDER_TOOL_NAME_MAX } from "./names.js";
 import type { AgentToolResult, JsonObject, McpServerConfig, McpServerStatus, McpToolInfo } from "./types.js";
 
 const CLIENT_INFO = { name: "botanical", version: "0.1.0" };
@@ -308,6 +308,7 @@ function indexTools(serverId: string, tools: ListedTool[], logger: McpLogger): M
     byName.set(tool.name, {
       serverId,
       toolName: tool.name,
+      registryName: registryToolName(serverId, tool.name),
       canonicalName: canonicalToolName(serverId, tool.name),
       providerName,
       description: tool.description?.trim() || tool.title?.trim() || tool.name,

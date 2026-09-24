@@ -8,36 +8,32 @@ Botanical is the client. MCP servers are untrusted code the operator chose to ru
 
 JSON file, or the `BOTANICAL_MCP_SERVERS` environment variable (same JSON). The env var wins when both are set.
 
+The operator file is Claude Desktop's `mcpServers` object. A `command` is stdio. A `url` is streamable HTTP unless `type` is `sse`. `type` may also be `stdio`, `http`, or `streamable-http`. `disabled: true` skips that server. The older `{ "servers": [{ "id", "transport", ... }] }` array still loads.
+
 Search order when `BOTANICAL_MCP_CONFIG` is unset:
 
 1. `config/mcp.json`
 2. `mcp.json`
 3. `botanical.mcp.json`
 
-Paths are relative to the server process working directory. An explicit path that is missing fails boot. A missing default file means no MCP servers.
+Paths are relative to the server process working directory. An explicit path that is missing makes `loadMcpConfig` throw. The HTTP server catches that, records `configError` on `GET /api/mcp/servers`, and still starts. A missing default file means no MCP servers.
+
+`config/mcp.example.json` runs the in-repo echo fixture (no network, no writes). Point `BOTANICAL_MCP_CONFIG` at it and start the server from the repo root:
 
 ```json
 {
-  "servers": [
-    {
-      "id": "filesystem",
-      "transport": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"]
-    },
-    {
-      "id": "docs",
-      "transport": "http",
-      "url": "https://mcp.example.com/mcp",
-      "headers": { "Authorization": "Bearer ${DOCS_MCP_TOKEN}" }
+  "mcpServers": {
+    "echo": {
+      "command": "bun",
+      "args": ["packages/mcp/test/fixtures/stdio-server.ts"]
     }
-  ]
+  }
 }
 ```
 
-`transport` is `stdio`, `http` (streamable HTTP), or `sse` (legacy HTTP+SSE). `streamable-http` is accepted as an alias of `http`. Set `sseFallback: true` on an `http` server to retry that same URL over SSE.
+A remote server sets `url` instead of `command`. `type` defaults to streamable HTTP. Use `"type": "sse"` for the legacy HTTP+SSE transport, or `"type": "streamable-http"` as an alias of `http`. Set `sseFallback: true` on an `http` server to retry that same URL over SSE. Headers and commands accept `${VAR}` placeholders.
 
-`${VAR}` placeholders in commands, args, env values, urls, and headers expand from the server environment. `${VAR:-default}` supplies a default. An unset variable with no default fails boot. The error names the variable and does not print other secrets.
+`${VAR}` placeholders in commands, args, env values, urls, and headers expand from the server environment. `${VAR:-default}` supplies a default. An unset variable with no default makes `loadMcpConfig` throw. The error names the variable and does not print other secrets. The HTTP server records that error and keeps serving.
 
 | Variable | Role |
 |---|---|
@@ -85,7 +81,7 @@ const result = await tools.execute(toolCall.name, toolCall.arguments, {
 await mcp.close();
 ```
 
-`definitions()` uses provider-safe names: `mcp__<server>__<tool>`. The architectural id `mcp.<server>.<tool>` is on `catalog()` as `canonicalName`. `execute` accepts either form. OpenAI and Anthropic reject `.` in tool names, so the safe form is what the model should see. Pass `providerSafeNames: false` to advertise the dotted id instead.
+The HTTP API and the tools registry use `mcp:<server>:<tool>`. `definitions()` uses provider-safe names: `mcp__<server>__<tool>`. The architectural id `mcp.<server>.<tool>` is on `catalog()` as `canonicalName`. `execute` accepts all three forms. OpenAI and Anthropic reject `.` and `:` in tool names, so the safe form is what the model should see. Pass `providerSafeNames: false` to advertise the dotted id instead.
 
 When `modelSupportsTools` is false, the surface advertises nothing and `warnings()` explains that tools and MCP are off for that profile.
 

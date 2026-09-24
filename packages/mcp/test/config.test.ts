@@ -136,4 +136,79 @@ describe("loadMcpConfig", () => {
       env: { BOTANICAL_MCP_SERVERS: JSON.stringify([{ id: "files", transport: "http", url: "file:///tmp/x" }]) },
     })).toThrow(/http or https/);
   });
+
+  test("reads Claude Desktop mcpServers for stdio, streamable HTTP, and SSE", () => {
+    const cwd = dir();
+    writeFileSync(join(cwd, "mcp.json"), JSON.stringify({
+      mcpServers: {
+        echo: {
+          command: "bun",
+          args: ["packages/mcp/test/fixtures/stdio-server.ts"],
+          env: { FIXTURE: "${FIXTURE_FLAG:-on}" },
+        },
+        docs: {
+          type: "streamable-http",
+          url: "https://example.test/mcp",
+          headers: { Authorization: "Bearer ${DOCS_MCP_TOKEN}" },
+        },
+        legacy: {
+          type: "sse",
+          url: "http://127.0.0.1:9/sse",
+        },
+        paused: {
+          command: "bun",
+          args: ["noop.ts"],
+          disabled: true,
+        },
+      },
+    }));
+
+    const loaded = loadMcpConfig({
+      cwd,
+      env: { DOCS_MCP_TOKEN: "sekret" },
+    });
+    expect(loaded.servers.map((server) => server.id)).toEqual(["echo", "docs", "legacy", "paused"]);
+
+    const echo = loaded.servers[0];
+    if (echo?.transport !== "stdio") throw new Error("expected stdio");
+    expect(echo.command).toBe("bun");
+    expect(echo.args).toEqual(["packages/mcp/test/fixtures/stdio-server.ts"]);
+    expect(echo.env).toEqual({ FIXTURE: "on" });
+
+    const docs = loaded.servers[1];
+    if (docs?.transport !== "http") throw new Error("expected streamable http");
+    expect(docs.url).toBe("https://example.test/mcp");
+    expect(docs.headers?.Authorization).toBe("Bearer sekret");
+
+    expect(loaded.servers[2]?.transport).toBe("sse");
+    expect(loaded.servers[3]?.enabled).toBe(false);
+  });
+
+  test("a url without type is streamable HTTP", () => {
+    const loaded = loadMcpConfig({
+      cwd: dir(),
+      env: {
+        BOTANICAL_MCP_SERVERS: JSON.stringify({
+          mcpServers: { remote: { url: "https://example.test/mcp" } },
+        }),
+      },
+    });
+    expect(loaded.servers[0]).toMatchObject({ id: "remote", transport: "http", url: "https://example.test/mcp" });
+  });
+
+  test("rejects a Claude entry that is neither stdio nor remote", () => {
+    expect(() => loadMcpConfig({
+      cwd: dir(),
+      env: { BOTANICAL_MCP_SERVERS: JSON.stringify({ mcpServers: { empty: {} } }) },
+    })).toThrow(/command for stdio or a url/);
+
+    expect(() => loadMcpConfig({
+      cwd: dir(),
+      env: {
+        BOTANICAL_MCP_SERVERS: JSON.stringify({
+          mcpServers: { both: { command: "bun", url: "https://example.test/mcp" } },
+        }),
+      },
+    })).toThrow(/both command and url/);
+  });
 });

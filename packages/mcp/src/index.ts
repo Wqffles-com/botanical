@@ -6,6 +6,7 @@ export {
   isServerId,
   parseToolName,
   providerToolName,
+  registryToolName,
   PROVIDER_TOOL_NAME_MAX,
   type ParsedToolName,
 } from "./names.js";

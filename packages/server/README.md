@@ -67,6 +67,7 @@ Error shape: `{ "error": { "code": "...", "message": "..." } }`.
 | GET | `/api/chats/:id/messages` | yes | |
 | POST | `/api/chats/:id/messages` | yes | Persists a user turn and a stub assistant turn |
 | GET | `/api/profiles` | yes | `defaultProfileId` is always `null` |
+| GET | `/api/mcp/servers` | yes | Configured MCP servers, tool ids, and connect errors |
 
 `POST /api/chats/:id/messages` body is `{ "content": "...", "profileId"?: "...", "stream"?: boolean }`.
 
@@ -76,6 +77,12 @@ Error shape: `{ "error": { "code": "...", "message": "..." } }`.
 - Sending a different configured `profileId` switches the chat. Unknown ids return 422. Nothing is chosen for you.
 
 The assistant text is a stub. Provider streaming is not connected yet.
+
+## MCP
+
+`BOTANICAL_MCP_CONFIG` is a path to a Claude Desktop `mcpServers` JSON file. On boot the server connects each entry (stdio, streamable HTTP, or SSE) and registers the tools that came up. Ids look like `mcp:echo:echo`. One dead server is reported on `GET /api/mcp/servers` and does not drop the others. A missing or invalid file is a `configError` on that route; the API still starts.
+
+See `config/mcp.example.json` for a local echo fixture. `BOTANICAL_MCP_DISABLED=true` connects nothing.
 
 A chat's agent does not change after create. The first message replaces the title `"New chat"` with a short clip of that message.
 

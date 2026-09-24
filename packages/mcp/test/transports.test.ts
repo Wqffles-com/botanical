@@ -36,9 +36,15 @@ describe("MCP transports", () => {
         "mcp.calc.fail",
         "mcp.calc.probe_env",
       ]);
+      expect(mcp.tools().map((tool) => tool.registryName).sort()).toEqual([
+        "mcp:calc:add",
+        "mcp:calc:echo",
+        "mcp:calc:fail",
+        "mcp:calc:probe_env",
+      ]);
       expect(mcp.promptAddendum()).toMatch(/Fixture server/);
 
-      const echoed = await mcp.call("mcp.calc.echo", { message: "fern" });
+      const echoed = await mcp.call("mcp:calc:echo", { message: "fern" });
       expect(echoed.ok).toBe(true);
       expect(echoed.content).toBe("echo:fern");
 

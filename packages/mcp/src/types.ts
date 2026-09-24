@@ -94,6 +94,8 @@ export interface McpToolInfo {
   serverId: string;
   /** Remote tool name, unchanged. */
   toolName: string;
+  /** Registry and allowlist id: `mcp:<server>:<tool>`. */
+  registryName: string;
   /** Architectural id: `mcp.<server>.<tool>`. */
   canonicalName: string;
   /** Model-facing id: `mcp__<server>__<tool>`. */
