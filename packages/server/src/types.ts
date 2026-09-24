@@ -1,8 +1,11 @@
+import type { AgentColor } from "@botanical/core";
+
 /**
  * HTTP-layer domain types.
  *
- * TODO(packages/core): move shared agent, chat, message, and profile schemas
- * into packages/core when that package exists, and keep these routes aligned.
+ * Agent identity (name, icon, color, prompt, tools, defaultProfileId) matches
+ * @botanical/core. This store still uses systemPrompt and toolIds; routes
+ * accept prompt/tools as aliases and return both names.
  *
  * TODO(packages/db): the Store interfaces below are the persistence contract.
  * packages/db should export `createStore({ connectionString })` returning a
@@ -35,26 +38,38 @@ export interface ModelProfile {
 export interface Agent {
   id: string;
   name: string;
+  icon: string;
+  color: AgentColor;
   description: string;
   systemPrompt: string;
   toolIds: string[];
+  /** Suggestion only. Chats still require an explicit profile. */
+  defaultProfileId: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface NewAgent {
   name: string;
+  icon: string;
+  color: AgentColor;
   description: string;
   systemPrompt: string;
   toolIds: string[];
+  defaultProfileId: string | null;
 }
 
 export interface AgentPatch {
   name?: string;
+  icon?: string;
+  color?: AgentColor;
   description?: string;
   systemPrompt?: string;
   toolIds?: string[];
+  defaultProfileId?: string | null;
 }
+
+export type { AgentColor };
 
 /** One chat is owned by exactly one agent. agentId is immutable after create. */
 export interface Chat {

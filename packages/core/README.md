@@ -42,7 +42,7 @@ A chat has **one** `agentId` (string, not a list).
 |--------|------|----------------|
 | `GET` | `/api/profiles` | `{ profiles, defaultProfileId: null }` |
 | `GET` | `/api/agents` | `{ agents }` |
-| `POST` | `/api/agents` | `{ name, description, systemPrompt, toolIds }` — `systemPrompt` is required |
+| `POST` | `/api/agents` | `{ name, icon?, color?, description?, prompt, tools?, defaultProfileId? }` — `prompt` is required. `systemPrompt` and `toolIds` are accepted aliases. `icon` defaults to `Bot`, `color` to `green`. |
 | `GET` | `/api/agents/:id` | `{ agent }` |
 | `PATCH` | `/api/agents/:id` | partial agent |
 | `DELETE` | `/api/agents/:id` | `204` |
@@ -56,7 +56,9 @@ List responses may be a bare array or `{ profiles|agents|chats|messages|items|da
 
 Objects may be bare or wrapped as `{ profile|agent|chat|message|data: {} }`.
 
-The client accepts camelCase and snake_case on **responses** (`profile_id`, `system_prompt`, `tool_ids`, `created_at`). Requests use camelCase.
+The client accepts camelCase and snake_case on **responses** (`profile_id`, `system_prompt`, `tool_ids`, `default_profile_id`, `created_at`). Requests use camelCase.
+
+Agent identity: `name` (1–40 characters), `icon` (Lucide name, default `Bot`), `color` (`red` `orange` `amber` `green` `teal` `cyan` `blue` `violet` `pink` `gray`, default `green`), `description`, `prompt`, `tools` (tool ids), and optional `defaultProfileId`. `defaultProfileId` is only a suggestion. Chats still require an explicit profile. `systemPrompt` is the same string as `prompt`; `toolIds` is the same list as `tools`. Missing or unknown `icon` / `color` on a response normalize to `Bot` / `green`.
 
 ### Shapes
 

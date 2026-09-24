@@ -1,3 +1,10 @@
+import {
+  DEFAULT_AGENT_COLOR,
+  DEFAULT_AGENT_ICON,
+  isAgentColor,
+  isAgentIcon,
+  type AgentColor,
+} from "./agents";
 import { BotanicalApiError } from "./errors";
 import type {
   Agent,
@@ -121,15 +128,38 @@ export function normalizeProfile(body: unknown): ModelProfile {
 export function normalizeAgent(body: unknown): Agent {
   const record = unwrapEntity(body, ["agent"]);
   const createdAt = stringField(record, ["createdAt", "created_at"]);
+  const systemPrompt = stringField(record, ["systemPrompt", "system_prompt", "prompt"]);
+  const toolIds = normalizeToolIds(record.toolIds ?? record.tool_ids ?? record.tools);
   return {
     id: requireRecordId(record, "Agent"),
     name: stringField(record, ["name"], "Agent"),
+    icon: normalizeIcon(record.icon),
+    color: normalizeColor(record.color),
     description: stringField(record, ["description"]),
-    systemPrompt: stringField(record, ["systemPrompt", "system_prompt", "prompt"]),
-    toolIds: normalizeToolIds(record.toolIds ?? record.tool_ids ?? record.tools),
+    systemPrompt,
+    prompt: systemPrompt,
+    toolIds,
+    tools: toolIds,
+    defaultProfileId: normalizeDefaultProfileId(record.defaultProfileId ?? record.default_profile_id),
     createdAt,
     updatedAt: stringField(record, ["updatedAt", "updated_at"], createdAt),
   };
+}
+
+function normalizeIcon(value: unknown): string {
+  if (typeof value === "string" && isAgentIcon(value.trim())) return value.trim();
+  return DEFAULT_AGENT_ICON;
+}
+
+function normalizeColor(value: unknown): AgentColor {
+  if (isAgentColor(value)) return value;
+  return DEFAULT_AGENT_COLOR;
+}
+
+function normalizeDefaultProfileId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  return text || null;
 }
 
 export function normalizeChat(body: unknown): Chat {

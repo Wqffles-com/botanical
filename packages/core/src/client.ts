@@ -1,4 +1,13 @@
 import {
+  AGENT_COLORS,
+  AGENT_NAME_MAX,
+  DEFAULT_AGENT_COLOR,
+  DEFAULT_AGENT_ICON,
+  isAgentColor,
+  isAgentIcon,
+  type AgentColor,
+} from "./agents";
+import {
   BotanicalApiError,
   errorMessage,
   requireAgentId,
@@ -87,26 +96,47 @@ export class BotanicalClient {
   }
 
   async createAgent(input: CreateAgentInput): Promise<Agent> {
-    const name = input.name.trim();
-    const systemPrompt = input.systemPrompt?.trim() ?? "";
-    if (!name) throw new BotanicalApiError("Name the agent before saving it.", { status: 400 });
+    const name = readAgentName(input.name);
+    const systemPrompt = readAgentPrompt(input);
     if (!systemPrompt) throw new BotanicalApiError("Write a prompt for the agent.", { status: 400 });
+    const toolIds = readAgentTools(input);
     const body = await this.requestJson(API.agents, {
       method: "POST",
       body: JSON.stringify({
         name,
+        icon: readAgentIcon(input.icon),
+        color: readAgentColor(input.color),
         description: input.description?.trim() ?? "",
+        prompt: systemPrompt,
         systemPrompt,
-        toolIds: input.toolIds ?? [],
+        tools: toolIds,
+        toolIds,
+        defaultProfileId: readDefaultProfileId(input.defaultProfileId),
       }),
     });
     return normalizeAgent(body);
   }
 
   async updateAgent(id: string, input: UpdateAgentInput): Promise<Agent> {
+    const patch: Record<string, unknown> = {};
+    if (input.name !== undefined) patch.name = readAgentName(input.name);
+    if (input.description !== undefined) patch.description = input.description.trim();
+    if (input.icon !== undefined) patch.icon = readAgentIcon(input.icon);
+    if (input.color !== undefined) patch.color = readAgentColor(input.color);
+    if (input.systemPrompt !== undefined || input.prompt !== undefined) {
+      const systemPrompt = readAgentPrompt(input);
+      patch.prompt = systemPrompt;
+      patch.systemPrompt = systemPrompt;
+    }
+    if (input.toolIds !== undefined || input.tools !== undefined) {
+      const toolIds = readAgentTools(input);
+      patch.tools = toolIds;
+      patch.toolIds = toolIds;
+    }
+    if (input.defaultProfileId !== undefined) patch.defaultProfileId = readDefaultProfileId(input.defaultProfileId);
     const body = await this.requestJson(API.agent(id), {
       method: "PATCH",
-      body: JSON.stringify(input),
+      body: JSON.stringify(patch),
     });
     return normalizeAgent(body);
   }
@@ -205,7 +235,8 @@ export class BotanicalClient {
       yield { type: "done" };
       return;
     }
-    yield* readChatStream(response.body, contentType);
+    // Server tsc pulls this file in with Bun's stream types, which disagree with DOM ReadableStream.
+    yield* readChatStream(response.body as ReadableStream<Uint8Array>, contentType);
   }
 
   private url(path: string): string {
@@ -247,4 +278,56 @@ function isJsonDocument(contentType: string): boolean {
   if (!ct.includes("application/json")) return false;
   if (ct.includes("ndjson") || ct.includes("jsonl") || ct.includes("stream")) return false;
   return true;
+}
+
+function readAgentName(value: string): string {
+  const name = value.trim();
+  if (!name) throw new BotanicalApiError("Name the agent before saving it.", { status: 400 });
+  if (name.length > AGENT_NAME_MAX) {
+    throw new BotanicalApiError(`Name the agent in ${AGENT_NAME_MAX} characters or fewer.`, { status: 400 });
+  }
+  return name;
+}
+
+function readAgentPrompt(input: { systemPrompt?: string; prompt?: string }): string {
+  const hasSystem = input.systemPrompt !== undefined;
+  const hasPrompt = input.prompt !== undefined;
+  const systemText = input.systemPrompt?.trim() ?? "";
+  const promptText = input.prompt?.trim() ?? "";
+  if (hasSystem && hasPrompt && systemText !== promptText) {
+    throw new BotanicalApiError("prompt and systemPrompt must match.", { status: 400 });
+  }
+  return hasSystem ? systemText : promptText;
+}
+
+function readAgentTools(input: { toolIds?: string[]; tools?: string[] }): string[] {
+  if (input.toolIds !== undefined && input.tools !== undefined) {
+    const same =
+      input.toolIds.length === input.tools.length && input.toolIds.every((id, index) => id === input.tools?.[index]);
+    if (!same) throw new BotanicalApiError("tools and toolIds must match.", { status: 400 });
+  }
+  return [...(input.toolIds ?? input.tools ?? [])];
+}
+
+function readAgentIcon(value: string | undefined): string {
+  const icon = value === undefined ? DEFAULT_AGENT_ICON : value.trim();
+  if (!isAgentIcon(icon)) {
+    throw new BotanicalApiError("Icon must be a Lucide name such as Bot or Sprout.", { status: 400 });
+  }
+  return icon;
+}
+
+function readAgentColor(value: AgentColor | undefined): AgentColor {
+  if (value === undefined) return DEFAULT_AGENT_COLOR;
+  if (!isAgentColor(value)) {
+    throw new BotanicalApiError(`Color must be one of: ${AGENT_COLORS.join(", ")}.`, { status: 400 });
+  }
+  return value;
+}
+
+function readDefaultProfileId(value: string | null | undefined): string | null {
+  if (value === undefined || value === null) return null;
+  const text = value.trim();
+  if (!text) throw new BotanicalApiError("defaultProfileId must be a profile id or null.", { status: 400 });
+  return text;
 }
