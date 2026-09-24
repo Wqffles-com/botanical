@@ -160,3 +160,20 @@
 ::selection {
   background: color-mix(in oklab, var(--primary) 35%, transparent);
 }
+
+@keyframes caret-pulse {
+  0%, 100% { opacity: 1; transform: scaleY(1); }
+  50% { opacity: 0.35; transform: scaleY(0.55); }
+}
+
+.stream-caret {
+  display: inline-block;
+  width: 3px;
+  height: 14px;
+  margin-left: 2px;
+  border-radius: 2px;
+  background: var(--primary);
+  vertical-align: -2px;
+  transform-origin: bottom;
+  animation: caret-pulse 900ms ease-in-out infinite;
+}

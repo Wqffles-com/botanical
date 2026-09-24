@@ -222,7 +222,7 @@ function AgentNavItem({
       {active ? (
         <SidebarMenuSub>
           <SidebarMenuSubItem>
-            <SidebarMenuSubButton render={<Link href={`/agents/${agent.id}?compose=1`} />}>
+            <SidebarMenuSubButton render={<Link href={`/chats/new?agentId=${encodeURIComponent(agent.id)}`} />}>
               <Plus />
               <span>New chat</span>
             </SidebarMenuSubButton>

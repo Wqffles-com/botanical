@@ -154,6 +154,18 @@ export class BotanicalClient {
     return unwrapList(body, ["chats"]).map(normalizeChat);
   }
 
+  async getChat(id: string): Promise<Chat> {
+    const chatId = id.trim();
+    if (!chatId) throw new BotanicalApiError("Chat is missing an id.", { status: 400 });
+    return normalizeChat(await this.requestJson(API.chat(chatId)));
+  }
+
+  async deleteChat(id: string): Promise<void> {
+    const chatId = id.trim();
+    if (!chatId) throw new BotanicalApiError("Chat is missing an id.", { status: 400 });
+    await this.requestJson(API.chat(chatId), { method: "DELETE" });
+  }
+
   async createChat(input: CreateChatInput): Promise<Chat> {
     const agentId = requireAgentId(input.agentId);
     const profileId = requireProfileId(input.profileId);

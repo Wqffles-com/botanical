@@ -1,3 +1,5 @@
+import type { ModelProfile } from "@botanical/core";
+
 export function relativeTime(iso: string, now = Date.now()): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
@@ -13,6 +15,23 @@ export function relativeTime(iso: string, now = Date.now()): string {
     month: "short",
     day: "numeric",
   });
+}
+
+export function profileLabel(profile: ModelProfile): string {
+  const detail = [profile.provider, profile.model].filter(Boolean).join(" / ");
+  return detail ? `${profile.name} · ${detail}` : profile.name;
+}
+
+export function formatJson(value: unknown, limit = 0): string {
+  if (value == null || value === "") return "";
+  let text: string;
+  try {
+    text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  } catch {
+    return "";
+  }
+  if (limit > 0 && text.length > limit) return `${text.slice(0, limit)}…`;
+  return text;
 }
 
 export function initials(name: string): string {

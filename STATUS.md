@@ -11,7 +11,8 @@ Lead: m14 on `feat/v0-mvp`. Updated: 2026-09-24 (server-runtime merge).
 - #21 Postgres HTTP store. `DATABASE_URL` migrates on boot and uses `packages/db` `createStore`. Migration `0001_agent_identity` stays. `0002_mvp_store` adds sessions and `model_profiles.public_id`. Live Postgres integration tests are skipped unless `BOTANICAL_TEST_DATABASE_URL` is set.
 - #22 Next.js App Router + shadcn replaces the Vite client in `packages/web`.
 - #29 Agent identity UI: picker, icon and color form, avatars in the sidebar and chat.
-- #28 Login, settings, and A2A inbox pages. Web tests 20 pass, typecheck green.
+- #28 Login, settings, and A2A inbox pages.
+- #27 Chat UI is integrated without a branch merge: required profile, SSE streaming, markdown, and tool-call cards. Agent icon, color, and name stay on the header and messages. `PATCH /api/chats/:id` sets title and profile. Web + server tests 88 pass, 1 postgres boot skipped.
 
 `bun test` for `@botanical/core`, `@botanical/server`, and `@botanical/db` after the Postgres merge: 99 pass, 2 skipped, 0 fail. `@botanical/server` typecheck is green.
 
@@ -21,9 +22,9 @@ Lead: m14 on `feat/v0-mvp`. Updated: 2026-09-24 (server-runtime merge).
 - #24 Built-in file, shell, web, and agent-message tools (`feat/mvp-tools`).
 - #25 MVP Compose stack (`feat/mvp-devops`).
 - #26 Playwright e2e (`feat/mvp-e2e`).
-- #27 Next.js chat UI (`feat/mvp-chat-ui`).
 
-Merge order from here: pages, chat, providers, tools, devops, e2e.
+
+Merge order from here: providers, tools, devops, e2e.
 
 ## What works
 
@@ -37,7 +38,7 @@ Merge order from here: pages, chat, providers, tools, devops, e2e.
 
 ## What is missing for the MVP
 
-- Identity picker, login, settings, and the A2A inbox are in the Next app. Chat streaming UI (#27) is not merged yet.
+- Identity picker, login, settings, A2A inbox, and chat streaming (profile required, tool cards) are in the Next app.
 - Shell and web tool packages are dependencies. They register only when they export `createToolContributor` (#24).
 - No `packages/e2e` on this branch yet. The `botanical-mvp` stack (web `3000`, server `8788`, postgres `5433`) is not running.
 
@@ -52,7 +53,7 @@ Merge order from here: pages, chat, providers, tools, devops, e2e.
 
 ## Next
 
-Merge #27 chat UI, then providers, tools, devops, and e2e.
+Merge providers, tools, devops, and e2e. Then bring up botanical-mvp and open the PR into main.
 
 ## Merged since the runtime note
 
