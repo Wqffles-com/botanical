@@ -107,7 +107,7 @@ export function createToolRegistry(initial: readonly ToolContributor[] = []): To
       return invoke(match.contributor, toolId, args, ctx);
     },
     toToolSources(enrich) {
-      return [...contributors.values()].map((contributor) => contributorSource(contributor, enrich));
+      return [...contributors.keys()].map((id) => contributorSource(contributors, id, enrich));
     },
   };
 }
@@ -291,12 +291,15 @@ export function contributorFromMcpRuntime(
 }
 
 function contributorSource(
-  contributor: ToolContributor,
+  contributors: ReadonlyMap<string, ToolContributor>,
+  id: string,
   enrich?: (ctx: ToolCallContext) => ToolCallContext,
 ): ToolSource {
   return {
-    id: contributor.id,
+    id,
     async listTools() {
+      const contributor = contributors.get(id);
+      if (!contributor) return [];
       const tools = await contributor.listTools();
       return tools.map((tool) => ({
         name: tool.id,
@@ -306,6 +309,8 @@ function contributorSource(
       }));
     },
     async call(name, args, ctx) {
+      const contributor = contributors.get(id);
+      if (!contributor) return { output: `Tool source "${id}" is not registered`, isError: true };
       const next = enrich ? enrich(ctx) : ctx;
       const result = await invoke(contributor, name, args, next);
       return { output: result.content, isError: result.isError === true };

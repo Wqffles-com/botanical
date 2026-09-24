@@ -2,6 +2,7 @@
 import { createApp } from "./app.ts";
 import { ConfigError, loadConfig, type ServerConfig } from "./config.ts";
 import { createStore } from "./db/store.ts";
+import { createDefaultToolRegistry, registerPackageContributors } from "./tools/catalog.ts";
 
 function clientKeyFrom(request: Request, address: string | null, config: ServerConfig): string {
   if (config.trustProxy) {
@@ -14,7 +15,12 @@ function clientKeyFrom(request: Request, address: string | null, config: ServerC
 async function main(): Promise<void> {
   const config = loadConfig(process.env);
   const store = await createStore(config);
-  const app = createApp({ config, store });
+  const toolRegistry = createDefaultToolRegistry();
+  const contributors = await registerPackageContributors(toolRegistry);
+  const app = createApp({ config, store, toolRegistry, env: process.env });
+  if (contributors.length > 0) {
+    console.log(`[botanical] tool contributors: ${contributors.join(", ")}`);
+  }
   const server = Bun.serve({
     hostname: config.host,
     port: config.port,

@@ -25,6 +25,21 @@ describe("parseSseFrame", () => {
     });
   });
 
+  test("accepts delta, tool_call, and tool_result aliases", () => {
+    expect(parseSseFrame('event: delta\ndata: {"text":"Hi"}')).toEqual({ type: "text-delta", text: "Hi" });
+    expect(parseSseFrame('event: tool_call\ndata: {"id":"c1","name":"file_list","arguments":{"path":"."}}')).toEqual({
+      type: "tool-call",
+      id: "c1",
+      name: "file_list",
+      arguments: { path: "." },
+    });
+    expect(parseSseFrame('event: tool_result\ndata: {"id":"c1","content":"notes.txt"}')).toEqual({
+      type: "tool-result",
+      id: "c1",
+      content: "notes.txt",
+    });
+  });
+
   test("joins a JSON payload split across data lines and ignores comments", () => {
     expect(parseSseFrame(': keep-alive\ndata: {"text":\ndata: "Hello"}')).toEqual({
       type: "text-delta",

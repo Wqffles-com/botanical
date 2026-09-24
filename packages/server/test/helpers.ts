@@ -1,3 +1,4 @@
+import type { ProfileResolver, ToolRegistry } from "@botanical/agent-runtime";
 import { createApp, type App } from "../src/app.ts";
 import { LoginRateLimiter } from "../src/auth/rate-limit.ts";
 import { loadConfig, type ServerConfig } from "../src/config.ts";
@@ -27,15 +28,24 @@ export function baseEnv(overrides: Record<string, string> = {}): Record<string, 
 
 export function setup(
   overrides: Record<string, string> = {},
-  options: { now?: () => Date; rateLimiter?: LoginRateLimiter } = {},
+  options: {
+    now?: () => Date;
+    rateLimiter?: LoginRateLimiter;
+    toolRegistry?: ToolRegistry;
+    profiles?: ProfileResolver;
+  } = {},
 ): TestApp {
-  const config = loadConfig(baseEnv(overrides));
+  const env = baseEnv(overrides);
+  const config = loadConfig(env);
   const store = createMemoryStore();
   const app = createApp({
     config,
     store,
+    env,
     now: options.now,
     rateLimiter: options.rateLimiter,
+    ...(options.toolRegistry ? { toolRegistry: options.toolRegistry } : {}),
+    ...(options.profiles ? { profiles: options.profiles } : {}),
   });
   return { app, config, store };
 }

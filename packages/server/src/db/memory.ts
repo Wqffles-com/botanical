@@ -132,6 +132,10 @@ export function createMemoryStore(): Store {
           content: input.content,
           createdAt: timestamp(),
         };
+        if (input.toolCalls) message.toolCalls = clone(input.toolCalls);
+        if (input.toolCallId) message.toolCallId = input.toolCallId;
+        if (input.name) message.name = input.name;
+        if (input.profileId) message.profileId = input.profileId;
         messages.push(message);
         return clone(message);
       },

@@ -17,8 +17,8 @@ import type { Store } from "../types.ts";
  *   agents(id, name, description, system_prompt, tool_ids jsonb, created_at, updated_at)
  *   chats(id, agent_id, profile_id, title, created_at, updated_at)
  *     — one owning agent per chat; do not update agent_id
- *   messages(id, chat_id, role, content, created_at)
- *     — v0 rows are plain text. Tool-call parts can extend this table later.
+ *   messages(id, chat_id, role, content, tool_calls, tool_call_id, name, profile_id, created_at)
+ *     — tool rows set tool_call_id; assistant rows may set tool_calls.
  *   sessions(id, token_hash, created_at, expires_at)
  *     — store the sha256 of the bearer/cookie token, never the raw token
  *

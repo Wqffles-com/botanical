@@ -293,6 +293,7 @@ export function coerceStreamEvent(parsed: unknown, eventName = ""): ChatStreamEv
       return { type: "text-delta", text: stringField(record, ["text", "delta", "content"]) };
     case "tool-call":
     case "tool.call":
+    case "tool_call":
       return {
         type: "tool-call",
         id: stringField(record, ["id", "toolCallId", "tool_call_id"]),
@@ -301,6 +302,7 @@ export function coerceStreamEvent(parsed: unknown, eventName = ""): ChatStreamEv
       };
     case "tool-result":
     case "tool.result":
+    case "tool_result":
       return {
         type: "tool-result",
         id: stringField(record, ["id", "toolCallId", "tool_call_id"]),

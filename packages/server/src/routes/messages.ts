@@ -1,12 +1,13 @@
-import { ensureWorkspaceRoot, runMockTurn, type MockTurnResult } from "../chat/mock-turn.ts";
+import { prepareTurn, type RuntimeDeps } from "@botanical/agent-runtime";
 import { HttpError, isRecord, json, readJson } from "../http.ts";
 import { readRequestedProfileId, resolveProfile } from "../profiles.ts";
+import { collectChatTurn, streamChatTurn, turnFailure } from "../runtime/turn.ts";
 import { authed, type Router } from "../router.ts";
-import { sseResponse, textDeltas, type SseEvent } from "../streaming.ts";
-import type { Chat, Message, ModelProfile } from "../types.ts";
+import { sseStream } from "../streaming.ts";
+import type { Chat } from "../types.ts";
 import { LIMITS, readBoundedString, requireParam } from "../validate.ts";
 
-export function registerMessages(router: Router): void {
+export function registerMessages(router: Router, runtime: RuntimeDeps): void {
   router.add(
     "GET",
     "/api/chats/:id/messages",
@@ -42,34 +43,25 @@ export function registerMessages(router: Router): void {
         chat = updated;
       }
 
-      const userMessage = await ctx.store.messages.create({
-        chatId: chat.id,
-        role: "user",
-        content,
-      });
-      // Profiles other than `mock` stay on the explicit stub until those
-      // providers are called with server-side keys. `mock` runs the echo
-      // provider plus the built-in file_list tool. There is no default profile.
-      const mockTurn = profile.provider === "mock" ? await runMockTurn(content, ensureWorkspaceRoot()) : null;
-      const assistantText = mockTurn ? mockTurn.text : stubAssistantText(profile);
-      const assistantMessage = await ctx.store.messages.create({
-        chatId: chat.id,
-        role: "assistant",
-        content: assistantText,
-      });
+      try {
+        await prepareTurn(runtime, { chatId: chat.id, content, profileId: profile.id, signal: ctx.request.signal });
+      } catch (error) {
+        throw turnFailure(error);
+      }
 
-      const title = chat.title === "New chat" ? titleFromContent(content) : undefined;
-      await ctx.store.chats.update(chat.id, title ? { title } : {});
-
+      const turn = { chat, content, profile, signal: ctx.request.signal };
       if (!stream) {
+        const result = await collectChatTurn(ctx.store, runtime, turn);
         return json(201, {
-          userMessage,
-          assistantMessage,
-          profileId: profile.id,
-          ...(mockTurn?.toolCall ? { toolCall: mockTurn.toolCall } : {}),
+          userMessage: result.userMessage,
+          assistantMessage: result.assistantMessage,
+          profileId: result.profileId,
+          ...(result.toolCall ? { toolCall: result.toolCall } : {}),
+          ...(result.toolResult !== undefined ? { toolResult: result.toolResult } : {}),
+          ...(result.error ? { error: result.error } : {}),
         });
       }
-      return sseResponse(streamEvents(userMessage, assistantMessage, assistantText, mockTurn));
+      return sseStream(streamChatTurn(ctx.store, runtime, turn));
     }),
   );
 }
@@ -87,49 +79,4 @@ function wantsStream(request: Request, body: Record<string, unknown>): boolean {
   if (typeof body.stream === "boolean") return body.stream;
   const accept = request.headers.get("accept") ?? "";
   return accept.includes("text/event-stream");
-}
-
-function stubAssistantText(profile: ModelProfile): string {
-  return `Stub reply. Model streaming is not wired yet. Profile ${profile.id} (${profile.provider}/${profile.model}) was selected explicitly.`;
-}
-
-function titleFromContent(content: string): string {
-  const oneLine = content.trim().replace(/\s+/g, " ");
-  if (oneLine.length <= 80) return oneLine;
-  return `${oneLine.slice(0, 77)}...`;
-}
-
-function streamEvents(
-  userMessage: Message,
-  assistantMessage: Message,
-  assistantText: string,
-  mockTurn: MockTurnResult | null,
-): SseEvent[] {
-  const toolEvents: SseEvent[] = [];
-  if (mockTurn?.toolCall) {
-    toolEvents.push({
-      event: "tool-call",
-      data: {
-        type: "tool-call",
-        id: mockTurn.toolCall.id,
-        name: mockTurn.toolCall.name,
-        arguments: mockTurn.toolCall.arguments,
-      },
-    });
-    toolEvents.push({
-      event: "tool-result",
-      data: {
-        type: "tool-result",
-        id: mockTurn.toolCall.id,
-        content: mockTurn.toolResult ?? "",
-      },
-    });
-  }
-  return [
-    { event: "message.created", data: { message: userMessage } },
-    ...toolEvents,
-    ...textDeltas(assistantText).map((text) => ({ event: "text-delta", data: { text } })),
-    { event: "message.completed", data: { message: assistantMessage } },
-    { event: "done", data: {} },
-  ];
 }

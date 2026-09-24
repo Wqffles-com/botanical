@@ -15,16 +15,6 @@
         "zod": "^3.24.2",
       },
     },
-    "packages/agent-server": {
-      "name": "@botanical/agent-server",
-      "version": "0.0.1",
-      "dependencies": {
-        "@botanical/agent-runtime": "workspace:*",
-        "hono": "^4.7.4",
-        "postgres": "^3.4.5",
-        "zod": "^3.24.2",
-      },
-    },
     "packages/core": {
       "name": "@botanical/core",
       "version": "0.0.1",
@@ -71,8 +61,12 @@
       "name": "@botanical/server",
       "version": "0.1.0",
       "dependencies": {
+        "@botanical/agent-runtime": "workspace:*",
+        "@botanical/mcp": "workspace:*",
         "@botanical/providers": "workspace:*",
         "@botanical/tools": "workspace:*",
+        "@botanical/tools-shell": "workspace:*",
+        "@botanical/tools-web": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "^1.2.0",
@@ -187,8 +181,6 @@
     "@babel/types": ["@babel/types@7.29.8", "", { "dependencies": { "@babel/helper-string-parser": "^7.29.7", "@babel/helper-validator-identifier": "^7.29.7" } }, "sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg=="],
 
     "@botanical/agent-runtime": ["@botanical/agent-runtime@workspace:packages/agent-runtime"],
-
-    "@botanical/agent-server": ["@botanical/agent-server@workspace:packages/agent-server"],
 
     "@botanical/core": ["@botanical/core@workspace:packages/core"],
 

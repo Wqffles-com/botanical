@@ -10,6 +10,7 @@ export const API = {
   logout: "/api/auth/logout",
   me: "/api/auth/me",
   profiles: "/api/profiles",
+  tools: "/api/tools",
   agents: "/api/agents",
   agent: (id: string) => `/api/agents/${encodeURIComponent(id)}`,
   chats: "/api/chats",

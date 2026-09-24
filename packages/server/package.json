@@ -18,8 +18,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@botanical/agent-runtime": "workspace:*",
+    "@botanical/mcp": "workspace:*",
     "@botanical/providers": "workspace:*",
-    "@botanical/tools": "workspace:*"
+    "@botanical/tools": "workspace:*",
+    "@botanical/tools-shell": "workspace:*",
+    "@botanical/tools-web": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "^1.2.0",
