@@ -53,7 +53,7 @@ services:
       BOTANICAL_SESSION_SECRET_FILE: ${BOTANICAL_SESSION_SECRET_FILE:-}
       BOTANICAL_PUBLIC_ORIGIN: ${BOTANICAL_PUBLIC_ORIGIN:-http://localhost:8080}
       BOTANICAL_VERSION: ${BOTANICAL_VERSION:-0.0.0-dev}
-      BOTANICAL_WORKSPACE: /data
+      BOTANICAL_WORKSPACE: /data/workspace
       BOTANICAL_PROFILES: '[{"id":"mock","name":"Mock echo","provider":"mock","model":"echo"}]'
       BOTANICAL_FORCE_BOOTSTRAP: ${BOTANICAL_FORCE_BOOTSTRAP:-0}
       COOKIE_SECURE: ${COOKIE_SECURE:-auto}
@@ -84,7 +84,7 @@ services:
     ports:
       - "127.0.0.1:${SERVER_PORT:-8787}:8787"
     volumes:
-      - botanical_workspace:/data
+      - botanical_workspace:/data/workspace
     healthcheck:
       test:
         [

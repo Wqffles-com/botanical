@@ -142,7 +142,7 @@ Leave Postgres on `127.0.0.1` and do not publish `5432` in a cloud security grou
 
 ## Data, backups, upgrades
 
-Named volumes: `botanical_pg` (database) and `botanical_workspace` (file-tool workspace, mounted at `/data`).
+Named volumes: `botanical_pg` (database) and `botanical_workspace` (file and shell jail, mounted at `/data/workspace`, `BOTANICAL_WORKSPACE`).
 
 ```sh
 docker compose exec postgres pg_dump -U botanical -d botanical > botanical.sql

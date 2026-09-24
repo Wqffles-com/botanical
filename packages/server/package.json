@@ -19,7 +19,9 @@
   },
   "dependencies": {
     "@botanical/providers": "workspace:*",
-    "@botanical/tools": "workspace:*"
+    "@botanical/tools": "workspace:*",
+    "@botanical/tools-shell": "workspace:*",
+    "@botanical/tools-web": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "^1.2.0",

@@ -67,6 +67,7 @@ Error shape: `{ "error": { "code": "...", "message": "..." } }`.
 | GET | `/api/chats/:id/messages` | yes | |
 | POST | `/api/chats/:id/messages` | yes | Persists a user turn and a stub assistant turn |
 | GET | `/api/profiles` | yes | `defaultProfileId` is always `null` |
+| GET | `/api/tools` | yes | Built-in tools plus any MCP tools registered on the same registry. Each entry has `source` (`builtin` or `mcp`), a JSON Schema `parameters` object, `risk`, and `requiresApproval` |
 
 `POST /api/chats/:id/messages` body is `{ "content": "...", "profileId"?: "...", "stream"?: boolean }`.
 
@@ -76,6 +77,20 @@ Error shape: `{ "error": { "code": "...", "message": "..." } }`.
 - Sending a different configured `profileId` switches the chat. Unknown ids return 422. Nothing is chosen for you.
 
 The assistant text is a stub. Provider streaming is not connected yet.
+
+## Built-in tools
+
+`GET /api/tools` lists the tools registered for agent allowlists:
+
+| Id | Risk | Approval |
+| --- | --- | --- |
+| `file_read`, `file_list` | read | no |
+| `file_write` | write | yes |
+| `shell`, `code_exec` | execute | yes |
+| `web_search`, `web_fetch` | network | no |
+| `send_agent_message` | write | no |
+
+File and shell calls stay inside `BOTANICAL_WORKSPACE` (default `./data/workspace`; Compose mounts a volume at `/data/workspace`). Each call is aborted at a wall-clock cap and its text is truncated (`BOTANICAL_TOOL_MAX_OUTPUT_CHARS`, default 32000). Packages export `createToolContributor` for m06's registry (`builtin.files`, `builtin.shell`, `builtin.web`). `send_agent_message` (`builtin.a2a`) calls the A2A service (`agentMessages` on `createApp`, or `agentServiceFromBus`). Until that service is wired the tool returns an error and does not pretend to deliver. The sender id always comes from the running turn. Pass `toAgentId` or `toAgentName`.
 
 A chat's agent does not change after create. The first message replaces the title `"New chat"` with a short clip of that message.
 
