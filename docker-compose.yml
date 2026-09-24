@@ -54,7 +54,9 @@ services:
       BOTANICAL_PUBLIC_ORIGIN: ${BOTANICAL_PUBLIC_ORIGIN:-http://localhost:8080}
       BOTANICAL_VERSION: ${BOTANICAL_VERSION:-0.0.0-dev}
       BOTANICAL_WORKSPACE: /data
-      BOTANICAL_PROFILES: '[{"id":"mock","name":"Mock echo","provider":"mock","model":"echo"}]'
+      # Empty uses discovery: mock, plus one profile per provider key that is set.
+      BOTANICAL_PROFILES: ${BOTANICAL_PROFILES:-}
+      BOTANICAL_PROFILES_FILE: ${BOTANICAL_PROFILES_FILE:-}
       BOTANICAL_FORCE_BOOTSTRAP: ${BOTANICAL_FORCE_BOOTSTRAP:-0}
       COOKIE_SECURE: ${COOKIE_SECURE:-auto}
       # Set: the server migrates on boot and persists in Postgres.
@@ -77,6 +79,9 @@ services:
       XAI_API_KEY: ${XAI_API_KEY:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENAI_COMPAT_BASE_URL: ${OPENAI_COMPAT_BASE_URL:-}
+      OPENAI_COMPAT_API_KEY: ${OPENAI_COMPAT_API_KEY:-}
+      OPENAI_COMPAT_MODEL: ${OPENAI_COMPAT_MODEL:-}
       CUSTOM_OPENAI_BASE_URL: ${CUSTOM_OPENAI_BASE_URL:-}
       CUSTOM_OPENAI_API_KEY: ${CUSTOM_OPENAI_API_KEY:-}
       TAVILY_API_KEY: ${TAVILY_API_KEY:-}

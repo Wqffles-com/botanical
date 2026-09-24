@@ -1,0 +1,8 @@
+{
+  "profiles": [
+    { "id": "fast", "name": "DeepSeek chat", "provider": "deepseek", "model": "deepseek-chat" },
+    { "id": "reason", "name": "Claude Sonnet", "provider": "anthropic", "model": "claude-sonnet-4-5", "maxTokens": 8192 },
+    { "id": "grok", "name": "Grok", "provider": "xai", "model": "grok-4" },
+    { "id": "local", "name": "Local", "provider": "openai-compat", "model": "llama3.1", "baseUrl": "http://127.0.0.1:11434/v1" }
+  ]
+}

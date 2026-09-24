@@ -30,7 +30,7 @@ export function resolveProfile(
     throw new HttpError(
       422,
       "no_profiles_configured",
-      "No model profiles are configured. Set BOTANICAL_PROFILES. There is no default model.",
+      "No model profiles are configured. There is no default model.",
     );
   }
   const id = requested ?? fallbackId;

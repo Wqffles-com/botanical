@@ -90,7 +90,7 @@ export async function* streamChatCompletions(
   let usage: { inputTokens: number; outputTokens: number } | undefined;
 
   try {
-    for await (const message of readSse(response.body, signal)) {
+    for await (const message of readSse(response.body as unknown as ReadableStream<Uint8Array>, signal)) {
       const data = message.data.trim();
       if (data === "[DONE]") break;
       const json = parseJsonObject(data);

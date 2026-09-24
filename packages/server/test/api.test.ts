@@ -303,7 +303,11 @@ describe("agents, chats, messages, profiles", () => {
     expect(chat.profileId).toBe("grok");
     expect(chat.title).toBe("Plot notes");
 
-    const empty = setup({ BOTANICAL_PROFILES: "" });
+    const empty = setup({
+      BOTANICAL_PROFILES: "",
+      XAI_API_KEY: "",
+      DEEPSEEK_API_KEY: "",
+    });
     const emptyToken = (await login(empty.app)).token;
     const emptyAgent = await createAgent(empty.app, emptyToken);
     const noProfiles = await postJson(
@@ -313,7 +317,7 @@ describe("agents, chats, messages, profiles", () => {
       bearer(emptyToken),
     );
     expect(noProfiles.status).toBe(422);
-    expect((await readJson<{ error: { code: string } }>(noProfiles)).error.code).toBe("no_profiles_configured");
+    expect((await readJson<{ error: { code: string } }>(noProfiles)).error.code).toBe("unknown_profile");
   });
 
   test("chats can be renamed and re-profiled over PATCH without dropping the agent", async () => {
@@ -387,10 +391,19 @@ describe("agents, chats, messages, profiles", () => {
     );
     expect(listed.chats.map((chat) => chat.id)).toEqual([chatId]);
 
+    const missingOnMessage = await postJson(
+      app,
+      `/api/chats/${chatId}/messages`,
+      { content: "no profile", stream: false },
+      bearer(token),
+    );
+    expect(missingOnMessage.status).toBe(422);
+    expect((await readJson<{ error: { code: string } }>(missingOnMessage)).error.code).toBe("profile_required");
+
     const posted = await postJson(
       app,
       `/api/chats/${chatId}/messages`,
-      { content: "Hello from the garden", stream: false },
+      { content: "Hello from the garden", profileId: "grok", stream: false },
       bearer(token),
     );
     expect(posted.status).toBe(201);
@@ -402,10 +415,8 @@ describe("agents, chats, messages, profiles", () => {
     }>(posted);
     expect(saved.userMessage.role).toBe("user");
     expect(saved.userMessage.content).toBe("Hello from the garden");
-    expect(saved.assistantMessage).toBeNull();
+    expect(saved.assistantMessage?.content).toContain("Reply from grok-4");
     expect(saved.profileId).toBe("grok");
-    expect(saved.error.code).toBe("missing_api_key");
-    expect(saved.error.message).toContain("XAI_API_KEY");
 
     const titled = await readJson<{ chat: { title: string; agentId: string } }>(
       await app.fetch(new Request(`http://localhost/api/chats/${chatId}`, { headers: bearer(token) })),
@@ -428,15 +439,14 @@ describe("agents, chats, messages, profiles", () => {
     expect(streamed.headers.get("content-type")).toContain("text/event-stream");
     const events = await streamed.text();
     expect(events).toContain("event: message.created");
-    expect(events).toContain("event: error");
+    expect(events).toContain("event: text-delta");
     expect(events).toContain("event: done");
-    expect(events).toContain("XAI_API_KEY");
-    expect(events).not.toContain("event: text-delta");
+    expect(events).toContain("Reply from grok-4");
 
     const messages = await readJson<{ messages: { role: string }[] }>(
       await app.fetch(new Request(`http://localhost/api/chats/${otherId}/messages`, { headers: bearer(token) })),
     );
-    expect(messages.messages.map((message) => message.role)).toEqual(["user"]);
+    expect(messages.messages.map((message) => message.role)).toEqual(["user", "assistant"]);
 
     const switched = await readJson<{ chat: { profileId: string; title: string } }>(
       await app.fetch(new Request(`http://localhost/api/chats/${otherId}`, { headers: bearer(token) })),
@@ -463,7 +473,7 @@ describe("agents, chats, messages, profiles", () => {
       defaultProfileId: null;
     }>(response);
     expect(body.defaultProfileId).toBeNull();
-    expect(body.profiles.map((profile) => profile.id)).toEqual(["grok", "fast"]);
+    expect(body.profiles.map((profile) => profile.id)).toEqual(["mock", "grok", "fast"]);
     expect(JSON.stringify(body)).not.toContain("apiKey");
     expect(JSON.stringify(body)).not.toContain("sk-");
   });

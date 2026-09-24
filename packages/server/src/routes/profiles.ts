@@ -7,7 +7,15 @@ export function registerProfiles(router: Router): void {
     "/api/profiles",
     authed((ctx) => {
       return json(200, {
-        profiles: ctx.config.profiles.map((profile) => ({ ...profile })),
+        profiles: ctx.config.profiles.map((profile) => ({
+          id: profile.id,
+          name: profile.name,
+          provider: profile.provider,
+          model: profile.model,
+          description: profile.description ?? null,
+          ...(profile.baseUrl ? { baseUrl: profile.baseUrl } : {}),
+          ...(profile.maxTokens !== undefined ? { maxTokens: profile.maxTokens } : {}),
+        })),
         defaultProfileId: null,
       });
     }),

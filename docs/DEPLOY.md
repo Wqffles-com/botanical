@@ -109,7 +109,8 @@ Copy from [.env.example](../.env.example). Do not commit `.env`.
 | `XAI_API_KEY` | no | Grok |
 | `DEEPSEEK_API_KEY` | no | DeepSeek |
 | `OPENROUTER_API_KEY` | no | OpenRouter |
-| `CUSTOM_OPENAI_BASE_URL` / `CUSTOM_OPENAI_API_KEY` | no | Any OpenAI-compatible endpoint |
+| `OPENAI_COMPAT_BASE_URL` / `OPENAI_COMPAT_API_KEY` | no | OpenAI-compatible host. Both are required before that profile is listed. `OPENAI_COMPAT_MODEL` sets its model id |
+| `CUSTOM_OPENAI_BASE_URL` / `CUSTOM_OPENAI_API_KEY` | no | Legacy aliases of `OPENAI_COMPAT_*`, used only when the canonical name is unset |
 | `TAVILY_API_KEY` / `BRAVE_SEARCH_API_KEY` | no | Built-in web search, when that tool ships |
 
 Postgres passwords in the URL must be URL-encoded (`@` → `%40`). Keep `POSTGRES_PASSWORD` and the password inside `DATABASE_URL` the same when you use the bundled database. The server logs a warning (not the password) if they differ, and if `DATABASE_URL` points at `localhost` from inside the container.

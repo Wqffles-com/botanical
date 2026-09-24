@@ -34,7 +34,7 @@ export function registerMessages(router: Router, runtime: RuntimeDeps): void {
 
       const profile = resolveProfile(
         ctx.config,
-        readRequestedProfileId(body.profileId, false),
+        readRequestedProfileId(body.profileId, true),
         chat.profileId,
       );
       if (profile.id !== chat.profileId) {

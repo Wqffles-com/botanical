@@ -62,10 +62,11 @@ function messagesSinceLastUser(messages: readonly ChatMessage[]): readonly ChatM
 
 export function createServerProfileResolver(config: ServerConfig, env: Env): ProfileResolver {
   const byId = new Map(config.profiles.map((profile) => [profile.id, profile]));
-  const providers = new Map<string, RuntimeProvider>();
+  const bridged = config.providers?.runtime;
 
   return {
     async list() {
+      if (bridged) return bridged.list();
       return config.profiles.map((profile) => ({
         id: profile.id,
         providerId: profile.provider,
@@ -74,16 +75,20 @@ export function createServerProfileResolver(config: ServerConfig, env: Env): Pro
     },
     async resolve(profileId) {
       const profile = byId.get(profileId);
-      if (!profile) throw new ProfileNotFoundError(profileId);
-      let provider = providers.get(profile.id);
-      if (!provider) {
-        provider = createProfileProvider(profile, env);
-        providers.set(profile.id, provider);
+      if (profile?.provider === "mock") {
+        return {
+          profileId: profile.id,
+          providerId: profile.provider,
+          provider: mockProvider(profile),
+          model: profile.model,
+        };
       }
+      if (bridged) return bridged.resolve(profileId);
+      if (!profile) throw new ProfileNotFoundError(profileId);
       return {
         profileId: profile.id,
         providerId: profile.provider,
-        provider,
+        provider: createProfileProvider(profile, env),
         model: profile.model,
       };
     },

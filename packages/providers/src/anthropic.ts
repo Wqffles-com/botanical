@@ -138,7 +138,7 @@ export async function* streamAnthropicMessages(
   let sawUsage = false;
 
   try {
-    for await (const message of readSse(response.body, signal)) {
+    for await (const message of readSse(response.body as unknown as ReadableStream<Uint8Array>, signal)) {
       const json = parseJsonObject(message.data.trim());
       if (!json) continue;
       const type = typeof json.type === "string" ? json.type : message.event;
