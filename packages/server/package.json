@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@botanical/agent-runtime": "workspace:*",
     "@botanical/providers": "workspace:*",
     "@botanical/tools": "workspace:*"
   },

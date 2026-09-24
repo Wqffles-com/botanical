@@ -1,3 +1,5 @@
+import { createSendAgentMessageTool } from "../a2a/tool.ts";
+import type { A2AService } from "../a2a/service.ts";
 import { ensureWorkspaceRoot, runMockTurn, type MockTurnResult } from "../chat/mock-turn.ts";
 import { HttpError, isRecord, json, readJson } from "../http.ts";
 import { readRequestedProfileId, resolveProfile } from "../profiles.ts";
@@ -6,7 +8,7 @@ import { sseResponse, textDeltas, type SseEvent } from "../streaming.ts";
 import type { Chat, Message, ModelProfile } from "../types.ts";
 import { LIMITS, readBoundedString, requireParam } from "../validate.ts";
 
-export function registerMessages(router: Router): void {
+export function registerMessages(router: Router, a2a: A2AService): void {
   router.add(
     "GET",
     "/api/chats/:id/messages",
@@ -50,7 +52,14 @@ export function registerMessages(router: Router): void {
       // Profiles other than `mock` stay on the explicit stub until those
       // providers are called with server-side keys. `mock` runs the echo
       // provider plus the built-in file_list tool. There is no default profile.
-      const mockTurn = profile.provider === "mock" ? await runMockTurn(content, ensureWorkspaceRoot()) : null;
+      const mockTurn =
+        profile.provider === "mock"
+          ? await runMockTurn(content, ensureWorkspaceRoot(), {
+              extraTools: [createSendAgentMessageTool(a2a)],
+              agentId: chat.agentId,
+              chatId: chat.id,
+            })
+          : null;
       const assistantText = mockTurn ? mockTurn.text : stubAssistantText(profile);
       const assistantMessage = await ctx.store.messages.create({
         chatId: chat.id,

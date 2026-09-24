@@ -109,6 +109,40 @@ export interface SendMessageInput {
   profileId: string;
 }
 
+/** Async agent-to-agent mail. Status moves pending → delivered → read, or failed. */
+export const AGENT_MESSAGE_STATUSES = ["pending", "delivered", "read", "failed"] as const;
+export type AgentMessageStatus = (typeof AGENT_MESSAGE_STATUSES)[number];
+
+/**
+ * Title of the recipient's dedicated inbox thread.
+ * Autorun (`BOTANICAL_A2A_AUTORUN`) appends received mail there and takes one turn.
+ */
+export const INBOX_CHAT_TITLE = "Inbox";
+
+export interface AgentMessage {
+  id: string;
+  fromAgentId: string;
+  toAgentId: string;
+  body: string;
+  status: AgentMessageStatus;
+  createdAt: string;
+  updatedAt?: string;
+  deliveredAt?: string;
+  readAt?: string;
+  fromChatId?: string;
+  error?: string;
+}
+
+export interface SendAgentMessageInput {
+  fromAgentId: string;
+  toAgentId: string;
+  body: string;
+}
+
+export interface UpdateAgentMessageInput {
+  status: AgentMessageStatus;
+}
+
 export type ChatStreamEvent =
   | { type: "message-start"; messageId: string; role?: MessageRole }
   | { type: "text-delta"; text: string }

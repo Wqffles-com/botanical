@@ -20,6 +20,12 @@ describe("loadConfig", () => {
     expect(config.deploymentMode).toBe("SELF_HOST");
     expect(config.brandName).toBe("Botanical");
     expect(config.databaseUrl).toBeUndefined();
+    expect(config.a2aAutorun).toBe(false);
+  });
+
+  test("A2A autorun is opt-in", () => {
+    expect(loadConfig(baseEnv({ BOTANICAL_A2A_AUTORUN: "true" })).a2aAutorun).toBe(true);
+    expect(() => loadConfig(baseEnv({ BOTANICAL_A2A_AUTORUN: "yes" }))).toThrow(/BOTANICAL_A2A_AUTORUN/);
   });
 
   test("saas mode changes the default brand only", () => {

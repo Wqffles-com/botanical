@@ -39,6 +39,11 @@ export interface ServerConfig {
   databaseUrl?: string;
   profiles: readonly ModelProfile[];
   maxBodyBytes: number;
+  /**
+   * When true, delivering an agent message starts a background turn in the
+   * recipient's dedicated "Inbox" chat. Default false.
+   */
+  a2aAutorun: boolean;
 }
 
 /**
@@ -98,6 +103,7 @@ export function loadConfig(env: Record<string, string | undefined>): ServerConfi
       max: 5_000_000,
       name: "BOTANICAL_MAX_BODY_BYTES",
     }),
+    a2aAutorun: parseBool(env.BOTANICAL_A2A_AUTORUN, "BOTANICAL_A2A_AUTORUN", false),
   };
 }
 

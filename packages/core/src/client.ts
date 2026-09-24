@@ -8,6 +8,7 @@ import {
 import {
   eventsFromFinalMessage,
   normalizeAgent,
+  normalizeAgentMessage,
   normalizeChat,
   normalizeHealth,
   normalizeLogin,
@@ -20,6 +21,7 @@ import { API } from "./paths";
 import { readChatStream } from "./sse";
 import type {
   Agent,
+  AgentMessage,
   Chat,
   ChatMessage,
   ChatStreamEvent,
@@ -29,8 +31,10 @@ import type {
   LoginResult,
   Me,
   ModelProfile,
+  SendAgentMessageInput,
   SendMessageInput,
   UpdateAgentInput,
+  UpdateAgentMessageInput,
   UpdateChatInput,
 } from "./types";
 
@@ -164,6 +168,38 @@ export class BotanicalClient {
       }
       throw error;
     }
+  }
+
+  async listAgentMessages(agentId: string): Promise<AgentMessage[]> {
+    const id = agentId.trim();
+    if (!id) throw new BotanicalApiError("Choose an agent.", { status: 400 });
+    const body = await this.requestJson(`${API.agentMessages}?agentId=${encodeURIComponent(id)}`);
+    return unwrapList(body, ["messages", "agentMessages"]).map(normalizeAgentMessage);
+  }
+
+  async sendAgentMessage(input: SendAgentMessageInput): Promise<AgentMessage> {
+    const fromAgentId = input.fromAgentId.trim();
+    const toAgentId = input.toAgentId.trim();
+    const body = input.body.trim();
+    if (!fromAgentId || !toAgentId) {
+      throw new BotanicalApiError("Choose both agents.", { status: 400 });
+    }
+    if (!body) throw new BotanicalApiError("Write a message before sending.", { status: 400 });
+    const payload = await this.requestJson(API.agentMessages, {
+      method: "POST",
+      body: JSON.stringify({ fromAgentId, toAgentId, body }),
+    });
+    return normalizeAgentMessage(payload);
+  }
+
+  async updateAgentMessage(id: string, input: UpdateAgentMessageInput): Promise<AgentMessage> {
+    const messageId = id.trim();
+    if (!messageId) throw new BotanicalApiError("Agent message is missing an id.", { status: 400 });
+    const payload = await this.requestJson(API.agentMessage(messageId), {
+      method: "PATCH",
+      body: JSON.stringify({ status: input.status }),
+    });
+    return normalizeAgentMessage(payload);
   }
 
   async listMessages(chatId: string): Promise<ChatMessage[]> {

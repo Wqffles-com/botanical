@@ -66,6 +66,9 @@ Error shape: `{ "error": { "code": "...", "message": "..." } }`.
 | DELETE | `/api/chats/:id` | yes | Deletes the chat and its messages |
 | GET | `/api/chats/:id/messages` | yes | |
 | POST | `/api/chats/:id/messages` | yes | Persists a user turn and a stub assistant turn |
+| GET | `/api/agent-messages?agentId=` | yes | Inbox for that agent. Optional `status` and `limit` |
+| POST | `/api/agent-messages` | yes | `{ fromAgentId, toAgentId, body }` then delivers |
+| PATCH | `/api/agent-messages/:id` | yes | `{ status }` — pending, delivered, read, or failed |
 | GET | `/api/profiles` | yes | `defaultProfileId` is always `null` |
 
 `POST /api/chats/:id/messages` body is `{ "content": "...", "profileId"?: "...", "stream"?: boolean }`.
@@ -75,7 +78,17 @@ Error shape: `{ "error": { "code": "...", "message": "..." } }`.
 - Omitting `profileId` uses the profile stored on the chat (the one chosen at create, or the last explicit switch).
 - Sending a different configured `profileId` switches the chat. Unknown ids return 422. Nothing is chosen for you.
 
-The assistant text is a stub. Provider streaming is not connected yet.
+The assistant text is a stub except for the `mock` profile, which runs the echo provider and `file_list`. Provider streaming for other profiles is not connected yet.
+
+## Agent-to-agent messages
+
+`POST /api/agent-messages` stores a row and marks it `delivered`. `GET /api/agent-messages?agentId=` lists that agent's inbox, newest first. `PATCH /api/agent-messages/:id` moves status forward (`pending` → `delivered` or `failed`, `delivered` → `read` or `failed`).
+
+Messages live in `store.agentMessages`. With `DATABASE_URL` unset that repository is in memory. When packages/db returns the same methods, those rows persist in Postgres `agent_messages`.
+
+Set `BOTANICAL_A2A_AUTORUN=true` to run one background turn for the recipient in a chat titled `Inbox`. The turn records the mail and an acknowledgement. It does not call tools. The profile is the inbox chat's profile, the agent's `defaultProfileId` when that field exists and is configured, or the profile on the recipient's newest other chat. There is still no silent global default: with no explicit profile the message stays `delivered` and no chat is created.
+
+During a turn the built-in `send_agent_message` tool sends mail. The sender is the chat's agent. On the mock profile, a user message of the form `send_agent_message {"toAgentId":"…","body":"…"}` invokes it.
 
 A chat's agent does not change after create. The first message replaces the title `"New chat"` with a short clip of that message.
 
