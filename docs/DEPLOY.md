@@ -138,6 +138,29 @@ The file accepts the current `servers` array and a Claude Desktop-style `mcpServ
 
 Do not commit tokens. Prefer `BOTANICAL_MCP_CONFIG_FILE` pointing at a file outside git, or `${ENV}` placeholders that the MCP loader expands from the server environment.
 
+### Subscription CLIs (opt-in)
+
+The default Compose file does not mount coding-agent binaries. To run Grok Build, Claude Code, or Codex as a model profile, add the override:
+
+```sh
+# .env
+BOTANICAL_GROK_BIN=/absolute/path/to/grok
+BOTANICAL_CLI_HOME=/absolute/path/to/cli-home
+BOTANICAL_CLI_PROFILES=grok-build
+
+docker compose -f docker-compose.yml -f docker-compose.cli.yml up -d
+```
+
+`BOTANICAL_GROK_BIN` is mounted read-only at `/usr/local/bin/grok`. `BOTANICAL_CLI_HOME` is mounted at `/home/botanical` and becomes `HOME`, so `~/.grok/auth.json` is `${BOTANICAL_CLI_HOME}/.grok/auth.json`. The API user must be able to write that directory. The server image is Alpine; use a statically linked `grok` binary.
+
+`BOTANICAL_CLI_PROFILES` accepts `grok-build`, `claude-code`, and `codex`. A full `BOTANICAL_PROFILES` entry can set `kind`, `cli`, `label`, `model`, `bin`, and `timeoutMs`. `model` is forwarded only when present. CLI profiles are never the default model. They stay on `GET /api/profiles` when the binary is missing, with `available: false` and `unavailableReason`.
+
+These CLIs run their own tools inside the workspace jail (`/data/agents/<agent id>`). Botanical tools are not passed in. Claude and Codex need the same style of read-only binary mount plus credentials under the CLI home (`~/.claude` or `~/.codex`). See `docker-compose.cli.yml`.
+
+If the Docker daemon runs on another host (for example `DOCKER_HOST=tcp://...`), host bind mounts point at the daemon's filesystem, not yours. Use named volumes instead: mount one at `/opt/cli` (read-only, prepend it to `PATH`) and one at `/home/botanical`, then seed them with `docker cp` from a throwaway container and `chown -R 100:101` the home volume (the image's `botanical` user).
+
+The CLI's OAuth refresh may rotate the token in the copied `auth.json`. Treat the server's CLI login as its own login; prefer a dedicated sign-in for the server over copying the `auth.json` a desktop CLI is actively using, so a refresh on one side does not log the other out.
+
 ## TLS
 
 The web port speaks HTTP. On a VPS, publish the UI only to loopback and terminate TLS in front:

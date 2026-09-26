@@ -34,6 +34,9 @@ export function createProviderHost(
 }
 
 function toListed(profile: ModelProfile): ListedProfile {
+  if (profile.provider === "cli" || profile.kind === "cli") {
+    throw new Error(`CLI profile ${profile.id} is not an API provider`);
+  }
   const listed: ListedProfile = {
     id: profile.id,
     name: profile.name,

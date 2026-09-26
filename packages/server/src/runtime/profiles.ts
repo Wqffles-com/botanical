@@ -6,8 +6,10 @@ import {
 } from "@botanical/agent-runtime";
 import {
   ProviderError,
+  checkCliAvailability,
   createMockProvider,
   createRegistry,
+  runCli,
   type ChatEvent,
   type ChatMessage,
   type ChatRequest,
@@ -75,6 +77,14 @@ export function createServerProfileResolver(config: ServerConfig, env: Env): Pro
     },
     async resolve(profileId) {
       const profile = byId.get(profileId);
+      if (profile && (profile.kind === "cli" || profile.provider === "cli")) {
+        return {
+          profileId: profile.id,
+          providerId: "cli",
+          provider: cliProvider(profile),
+          model: profile.model,
+        };
+      }
       if (profile?.provider === "mock") {
         return {
           profileId: profile.id,
@@ -91,6 +101,57 @@ export function createServerProfileResolver(config: ServerConfig, env: Env): Pro
         provider: createProfileProvider(profile, env),
         model: profile.model,
       };
+    },
+  };
+}
+
+/**
+ * Subscription CLIs run their own tools. Botanical's tool list is ignored.
+ * Text comes back as the same text-delta events the chat loop already streams.
+ */
+function cliProvider(profile: ModelProfile): RuntimeProvider {
+  return {
+    id: profile.id,
+    capabilities() {
+      return {
+        tools: false,
+        parallelTools: false,
+        vision: false,
+        maxContext: 200_000,
+        streaming: true,
+      };
+    },
+    async *complete(request) {
+      if (!profile.cli) {
+        yield { type: "error", error: new Error(`Profile ${profile.id} is missing a CLI name`) };
+        return;
+      }
+      const status = await checkCliAvailability({
+        cli: profile.cli,
+        ...(profile.bin ? { bin: profile.bin } : {}),
+      });
+      if (!status.available || !status.bin) {
+        yield {
+          type: "error",
+          error: new Error(status.unavailableReason ?? `CLI profile ${profile.id} is unavailable`),
+        };
+        return;
+      }
+      const cwd = request.cwd?.trim() || process.cwd();
+      yield* runCli({
+        cli: profile.cli,
+        bin: status.bin,
+        cwd,
+        messages: request.messages.map((message) => ({
+          role: message.role,
+          content: message.content,
+          ...(message.name ? { name: message.name } : {}),
+        })),
+        timeoutMs: profile.timeoutMs ?? 600_000,
+        ...(profile.passModel && profile.model ? { model: profile.model } : {}),
+        ...(request.signal ? { signal: request.signal } : {}),
+        env: process.env,
+      });
     },
   };
 }

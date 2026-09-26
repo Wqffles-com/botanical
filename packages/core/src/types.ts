@@ -31,6 +31,58 @@ export interface ModelProfile {
   provider: string;
   model: string;
   description: string | null;
+  /** `api` for vendor profiles, `cli` for a subscription coding-agent binary. */
+  kind?: "api" | "cli";
+  /** False when a CLI binary is missing or not logged in. Listed API profiles are available. */
+  available?: boolean;
+  unavailableReason?: string | null;
+  /** Set on CLI profiles: `grok`, `claude`, or `codex`. */
+  cli?: string | null;
+}
+
+export interface RolePermissions {
+  capabilities: string[];
+  mcp: Array<{ server: string; tools?: string[] }>;
+}
+
+export interface AgentRoleRef {
+  id: string;
+  name: string;
+  builtin: boolean;
+  permissions: RolePermissions;
+}
+
+/**
+ * Union of the agent's roles. `unrestricted` means the agent has no roles and
+ * tools are gated only by its allowlist (the pre-roles behavior).
+ */
+export interface EffectivePermissions {
+  unrestricted: boolean;
+  capabilities: string[];
+  mcp: Array<{ server: string; tools?: string[] }>;
+  roleNames: string[];
+}
+
+export type MemoryScope = "shared" | "agent";
+
+export interface MemoryRecord {
+  id: string;
+  scope: MemoryScope;
+  agentId: string | null;
+  content: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RoleRecord {
+  id: string;
+  name: string;
+  description: string;
+  permissions: RolePermissions;
+  builtin: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Agent {
@@ -54,6 +106,11 @@ export interface Agent {
    * Null when the agent has no suggestion.
    */
   defaultProfileId: string | null;
+  /** Agent that created this one, or null when the operator did. */
+  createdByAgentId: string | null;
+  roleIds: string[];
+  roles: AgentRoleRef[];
+  effectivePermissions: EffectivePermissions;
   createdAt: string;
   updatedAt: string;
 }
@@ -70,6 +127,7 @@ export interface CreateAgentInput {
   /** Alias of toolIds. If both are set they must match. */
   tools?: string[];
   defaultProfileId?: string | null;
+  roleIds?: string[];
 }
 
 export interface UpdateAgentInput {
@@ -82,6 +140,7 @@ export interface UpdateAgentInput {
   toolIds?: string[];
   tools?: string[];
   defaultProfileId?: string | null;
+  roleIds?: string[];
 }
 
 /**

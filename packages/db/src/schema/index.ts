@@ -1,6 +1,8 @@
 export { agentMessages } from './agent-messages.ts';
+export { agentRoles, roles } from './roles.ts';
 export { agents } from './agents.ts';
 export { chats } from './chats.ts';
+export { memories } from './memories.ts';
 export { a2aStatusEnum, agentColorEnum, messageRoleEnum } from './enums.ts';
 export type { AgentColor, AgentMessageStatus, MessageRole } from './enums.ts';
 export { messages } from './messages.ts';
@@ -23,8 +25,10 @@ export { usageEvents } from './usage-events.ts';
 export { users } from './users.ts';
 
 import { agentMessages } from './agent-messages.ts';
+import { agentRoles, roles } from './roles.ts';
 import { agents } from './agents.ts';
 import { chats } from './chats.ts';
+import { memories } from './memories.ts';
 import { messages } from './messages.ts';
 import { modelProfiles } from './model-profiles.ts';
 import { secretRefs } from './secret-refs.ts';
@@ -59,3 +63,6 @@ export type UsageEvent = typeof usageEvents.$inferSelect;
 export type NewUsageEvent = typeof usageEvents.$inferInsert;
 export type ToolAudit = typeof toolAudit.$inferSelect;
 export type NewToolAudit = typeof toolAudit.$inferInsert;
+export type RoleRow = typeof roles.$inferSelect;
+export type MemoryRow = typeof memories.$inferSelect;
+export type AgentRoleRow = typeof agentRoles.$inferSelect;

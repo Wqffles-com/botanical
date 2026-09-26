@@ -30,6 +30,8 @@ export const agents = pgTable(
     color: agentColorEnum('color').notNull().default('green'),
     /** Public profile id. A suggestion only; chats still require an explicit pick. */
     defaultProfileId: text('default_profile_id'),
+    /** Set when another agent created this row. Null for operator-created agents. */
+    createdByAgentId: uuid('created_by_agent_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

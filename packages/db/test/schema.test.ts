@@ -49,10 +49,13 @@ describe('v0 postgres schema', () => {
     const tableNames = tables.rows.map((row) => row.table_name).sort();
     expect(tableNames).toEqual([
       'agent_messages',
+      'agent_roles',
       'agents',
       'chats',
+      'memories',
       'messages',
       'model_profiles',
+      'roles',
       'secret_refs',
       'sessions',
       'settings',
@@ -332,6 +335,29 @@ describe('v0 postgres schema', () => {
     await finishMigrations((script) => client.exec(script));
     const modes = await db.select().from(settings).where(eq(settings.key, 'deployment.mode'));
     expect(modes).toHaveLength(1);
+
+    await client.close();
+  });
+
+  test('mvp2 migration adds memories, roles, and created_by_agent_id without breaking existing agents', async () => {
+    const { client, db } = await openDb();
+    const columns = await client.query<{ column_name: string; is_nullable: string }>(
+      `select column_name, is_nullable from information_schema.columns
+       where table_schema = 'public' and table_name = 'agents' and column_name = 'created_by_agent_id'`,
+    );
+    expect(columns.rows).toEqual([{ column_name: 'created_by_agent_id', is_nullable: 'YES' }]);
+
+    const seeded = await client.query<{ name: string }>(`select name from roles order by name`);
+    expect(seeded.rows.map((row) => row.name)).toEqual(['Coder', 'Orchestrator', 'Reviewer']);
+
+    const [owner] = await db.insert(users).values({ displayName: 'Owner' }).returning();
+    if (!owner) throw new Error('expected owner');
+    const [agent] = await db
+      .insert(agents)
+      .values({ userId: owner.id, name: 'Legacy', prompt: 'Still here.' })
+      .returning();
+    if (!agent) throw new Error('expected agent');
+    expect(agent.createdByAgentId).toBeNull();
 
     await client.close();
   });

@@ -55,6 +55,34 @@ export {
 } from "./a2a";
 export { assertChatAgentBinding, rejectAgentRebind } from "./binding";
 export { buildSystemPrompt } from "./prompt";
+export { renderMemorySection, selectMemories, type MemorySnippet } from "./memories";
+export {
+  BUILTIN_ROLE_IDS,
+  BUILTIN_ROLES,
+  CAPABILITIES,
+  PermissionsError,
+  capabilityForTool,
+  capabilityPermitted,
+  denied,
+  effectivePermissions,
+  escalationError,
+  grantCeiling,
+  impliedPermissions,
+  isCapability,
+  mcpPermitted,
+  parseRolePermissions,
+  toolAccess,
+  type AgentRoleGrant,
+  type BuiltinRoleDefinition,
+  type Capability,
+  type EffectivePermissions,
+  type GrantRequest,
+  type McpGrant,
+  type RolePermissions,
+  type ToolAccess,
+  type ToolAccessSubject,
+  type ToolAccessTarget,
+} from "./permissions";
 export {
   staticProfileResolver,
   type ProfileResolver,

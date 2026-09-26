@@ -61,6 +61,10 @@ describe("chatsByAgent", () => {
     toolIds: [],
     tools: [],
     defaultProfileId: null,
+    createdByAgentId: null,
+    roleIds: [],
+    roles: [],
+    effectivePermissions: { unrestricted: true, capabilities: [], mcp: [], roleNames: [] },
     createdAt: "2026-09-23T00:00:00.000Z",
     updatedAt: "2026-09-23T00:00:00.000Z",
   };

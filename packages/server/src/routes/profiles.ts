@@ -1,23 +1,51 @@
-import { json } from "../http.ts";
+import { checkCliAvailability } from "@botanical/providers";
+
+import { HttpError, json } from "../http.ts";
 import { authed, type Router } from "../router.ts";
+import type { ModelProfile } from "../types.ts";
 
 export function registerProfiles(router: Router): void {
   router.add(
     "GET",
     "/api/profiles",
-    authed((ctx) => {
-      return json(200, {
-        profiles: ctx.config.profiles.map((profile) => ({
-          id: profile.id,
-          name: profile.name,
-          provider: profile.provider,
-          model: profile.model,
-          description: profile.description ?? null,
-          ...(profile.baseUrl ? { baseUrl: profile.baseUrl } : {}),
-          ...(profile.maxTokens !== undefined ? { maxTokens: profile.maxTokens } : {}),
-        })),
-        defaultProfileId: null,
-      });
+    authed(async (ctx) => {
+      const profiles = [];
+      for (const profile of ctx.config.profiles) {
+        profiles.push(await presentProfile(profile));
+      }
+      return json(200, { profiles, defaultProfileId: null });
     }),
   );
+}
+
+export async function presentProfile(profile: ModelProfile) {
+  const kind = profile.kind ?? (profile.provider === "cli" ? "cli" : "api");
+  let available = true;
+  let unavailableReason: string | undefined;
+  if (kind === "cli" && profile.cli) {
+    const status = await checkCliAvailability({ cli: profile.cli, ...(profile.bin ? { bin: profile.bin } : {}) });
+    available = status.available;
+    unavailableReason = status.unavailableReason;
+  }
+  return {
+    id: profile.id,
+    name: profile.name,
+    provider: profile.provider,
+    model: profile.model,
+    description: profile.description ?? null,
+    kind,
+    available,
+    ...(available ? {} : { unavailableReason: unavailableReason ?? "CLI profile is unavailable" }),
+    ...(profile.cli ? { cli: profile.cli } : {}),
+    ...(profile.baseUrl ? { baseUrl: profile.baseUrl } : {}),
+    ...(profile.maxTokens !== undefined ? { maxTokens: profile.maxTokens } : {}),
+  };
+}
+
+export async function assertCliProfileReady(profile: ModelProfile): Promise<void> {
+  if ((profile.kind ?? (profile.provider === "cli" ? "cli" : "api")) !== "cli" || !profile.cli) return;
+  const status = await checkCliAvailability({ cli: profile.cli, ...(profile.bin ? { bin: profile.bin } : {}) });
+  if (!status.available) {
+    throw new HttpError(422, "profile_unavailable", status.unavailableReason ?? "CLI profile is unavailable");
+  }
 }

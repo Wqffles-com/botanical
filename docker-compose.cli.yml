@@ -1,0 +1,28 @@
+# Opt-in subscription CLIs. This file does not change `docker compose up` by itself.
+# Use it only when you want the API container to run grok / claude / codex:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.cli.yml up -d
+#
+# Required in `.env` for the grok mount below:
+#   BOTANICAL_GROK_BIN=/absolute/path/to/grok     # statically linked binary
+#   BOTANICAL_CLI_HOME=/absolute/path/to/cli-home # writable; holds .grok/auth.json
+#
+# The API process drops to the unprivileged `botanical` user. The CLI home
+# directory must be writable by that user (chown it to the image uid, or chmod
+# it so the container can write session files). The binary mount is read-only.
+#
+# HOME is the CLI config directory, not /tmp. Botanical tools are not sent to
+# these CLIs; each CLI uses its own tools inside the workspace volume (/data).
+#
+# Add claude or codex the same way: another read-only binary mount, and include
+# the id in BOTANICAL_CLI_PROFILES (grok-build,claude-code,codex).
+
+services:
+  server:
+    environment:
+      HOME: /home/botanical
+      BOTANICAL_CLI_HOME: /home/botanical
+      BOTANICAL_CLI_PROFILES: ${BOTANICAL_CLI_PROFILES:-grok-build}
+    volumes:
+      - ${BOTANICAL_GROK_BIN:?set BOTANICAL_GROK_BIN to the host grok binary}:/usr/local/bin/grok:ro
+      - ${BOTANICAL_CLI_HOME:?set BOTANICAL_CLI_HOME to a writable CLI config directory}:/home/botanical

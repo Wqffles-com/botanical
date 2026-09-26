@@ -38,3 +38,9 @@ export type ToolAuditStatus = (typeof TOOL_AUDIT_STATUSES)[number];
 
 export const DEPLOYMENT_MODES = ['self_host', 'saas'] as const;
 export type DeploymentMode = (typeof DEPLOYMENT_MODES)[number];
+
+/** JSON stored on `roles.permissions`. Capability strings are validated in the server. */
+export type StoredRolePermissions = {
+  capabilities: string[];
+  mcp: Array<{ server: string; tools?: string[] }>;
+};

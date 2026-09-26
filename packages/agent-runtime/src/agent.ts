@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ID_RE } from "./ids";
+import type { AgentRoleGrant } from "./permissions";
 
 export const idSchema = z.string().regex(ID_RE, "id must be 1–80 chars of letters, digits, _ or -");
 
@@ -50,4 +51,11 @@ export interface AgentRecord {
   a2aEnabled: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Set when another agent created this one. Absent for user-created agents. */
+  createdByAgentId?: string | null;
+  /**
+   * Assigned roles. Absent or empty means allowlist-only (pre-roles behavior).
+   * When present, dispatch requires the union of these permissions as well.
+   */
+  roles?: AgentRoleGrant[];
 }

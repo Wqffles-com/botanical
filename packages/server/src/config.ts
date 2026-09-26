@@ -1,8 +1,12 @@
 import {
+  mergeCliProfiles,
+  parseCliProfileShortcut,
   parseProfilesDocument,
   ProviderError,
   readProfilesOverride,
   selectProfiles,
+  splitProfileDocument,
+  type CliProfileSpec,
   type ListedProfile,
 } from "@botanical/providers";
 
@@ -239,10 +243,21 @@ function loadProfiles(
     const raw = options.readFile
       ? readProfilesOverride(env, options.readFile)
       : readProfilesOverride(env);
-    const override = raw === undefined ? undefined : validateOverride(raw);
+    const split = raw === undefined ? { api: undefined, cli: [] as CliProfileSpec[] } : splitProfileDocument(raw);
+    const cli = mergeCliProfiles(split.cli, parseCliProfileShortcut(env.BOTANICAL_CLI_PROFILES));
+    const override = split.api === undefined ? undefined : validateOverride(split.api);
     const selected = selectProfiles(override, env);
-    const profiles = Object.freeze(selected.map((profile) => Object.freeze(toModelProfile(profile))));
-    return { profiles, providers: createProviderHost(profiles, env, options.fetch) };
+    const apiProfiles = selected.map((profile) => toModelProfile(profile));
+    const cliProfiles = cli.map((spec) => toCliProfile(spec));
+    const ids = new Set<string>();
+    for (const profile of [...apiProfiles, ...cliProfiles]) {
+      if (ids.has(profile.id)) {
+        throw new ConfigError(`Duplicate model profile id ${JSON.stringify(profile.id)}`);
+      }
+      ids.add(profile.id);
+    }
+    const profiles = Object.freeze([...apiProfiles, ...cliProfiles].map((profile) => Object.freeze(profile)));
+    return { profiles, providers: createProviderHost(apiProfiles, env, options.fetch) };
   } catch (error) {
     if (error instanceof ProviderError) throw new ConfigError(error.message);
     throw error;
@@ -267,6 +282,9 @@ function validateOverride(raw: unknown): ListedProfile[] {
 }
 
 function toListed(profile: ModelProfile): ListedProfile {
+  if (profile.provider === "cli") {
+    throw new ConfigError(`CLI profile ${profile.id} cannot be stored as an API profile`);
+  }
   const listed: ListedProfile = {
     id: profile.id,
     name: profile.name,
@@ -280,6 +298,22 @@ function toListed(profile: ModelProfile): ListedProfile {
   return listed;
 }
 
+function toCliProfile(spec: CliProfileSpec): ModelProfile {
+  const profile: ModelProfile = {
+    id: spec.id,
+    name: spec.label,
+    provider: "cli",
+    model: spec.model ?? spec.cli,
+    description: spec.description,
+    kind: "cli",
+    cli: spec.cli,
+    timeoutMs: spec.timeoutMs,
+    passModel: Boolean(spec.model),
+  };
+  if (spec.bin) profile.bin = spec.bin;
+  return profile;
+}
+
 function toModelProfile(profile: ListedProfile): ModelProfile {
   const next: ModelProfile = {
     id: profile.id,
@@ -287,6 +321,7 @@ function toModelProfile(profile: ListedProfile): ModelProfile {
     provider: profile.provider,
     model: profile.model,
     description: profile.description,
+    kind: "api",
   };
   if (profile.baseUrl) next.baseUrl = profile.baseUrl;
   if (profile.maxTokens !== undefined) next.maxTokens = profile.maxTokens;

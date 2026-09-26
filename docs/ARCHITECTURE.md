@@ -127,6 +127,7 @@ Profile can change between steps if the user requests a switch or a policy escal
 - **Web search / fetch** — search + HTTP fetch with size limits
 - **Shell / code exec** — gated; approvals / allowlists
 - **File read / write** — workspace-scoped paths only
+- **Memory and agent admin (MVP2)** — `memory_*`, `agent_create`, `agent_list`. With roles, a tool runs only when the allowlist matches and the role union permits its capability. Agents with no roles stay allowlist-only. See [DECISIONS.md](./DECISIONS.md).
 
 ### Opt-in (not core)
 
@@ -206,6 +207,7 @@ interface LLMProvider {
 | `deepseek` | OpenAI-compat; reasoning models may need special handling for “think” channels |
 | `openrouter` | OpenAI-compat + `HTTP-Referer` / `X-Title` + optional provider routing |
 | `openai-compat` | Generic: `baseURL`, `apiKey`, `defaultHeaders` — covers local and unknown hosts |
+| `cli` | Subscription coding CLIs (`grok`, `claude`, `codex`) spawned headless. They use their own tools. Botanical streams stdout back as `text-delta`. |
 
 ### Config sketch (server-side)
 
@@ -296,6 +298,10 @@ Reference deploy is Docker Compose ([DEPLOY.md](./DEPLOY.md)): Postgres, server,
 | Config | YAML + env | Operator-edited |
 | Usage | Postgres | Aggregations per profile/day |
 | Tool audit | Postgres or JSONL | Redact secrets |
+| Memories | Postgres | `shared` or per-agent; tags; injected into the system prompt |
+| Roles | Postgres | Capability union plus MCP allow list; `agent_roles` join |
+
+`agents.created_by_agent_id` is set when `agent_create` persists an agent and stays null for operator-created agents.
 
 ---
 

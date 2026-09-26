@@ -1,7 +1,10 @@
+import { effectivePermissions, isCapability } from "@botanical/agent-runtime";
+
 import { HttpError, json, noContent, readJson } from "../http.ts";
 import { authed, type Router } from "../router.ts";
 import type { Agent } from "../types.ts";
 import { parseCreateAgent, parseUpdateAgent, requireParam } from "../validate.ts";
+import { resolveRoleIds } from "./roles.ts";
 
 export function registerAgents(router: Router): void {
   router.add(
@@ -18,7 +21,9 @@ export function registerAgents(router: Router): void {
     "/api/agents",
     authed(async (ctx) => {
       const body = await readJson(ctx.request, ctx.config);
-      const agent = await ctx.store.agents.create(parseCreateAgent(body));
+      const input = parseCreateAgent(body);
+      if (input.roleIds) input.roleIds = await resolveRoleIds(ctx.store, input.roleIds);
+      const agent = await ctx.store.agents.create(input);
       return json(201, { agent: presentAgent(agent) });
     }),
   );
@@ -39,7 +44,9 @@ export function registerAgents(router: Router): void {
     authed(async (ctx) => {
       const id = requireParam(ctx.params, "id");
       const body = await readJson(ctx.request, ctx.config);
-      const agent = await ctx.store.agents.update(id, parseUpdateAgent(body));
+      const patch = parseUpdateAgent(body);
+      if (patch.roleIds) patch.roleIds = await resolveRoleIds(ctx.store, patch.roleIds);
+      const agent = await ctx.store.agents.update(id, patch);
       if (!agent) throw new HttpError(404, "not_found", "Agent not found");
       return json(200, { agent: presentAgent(agent) });
     }),
@@ -80,6 +87,24 @@ function presentAgent(agent: Agent) {
     tools: toolIds,
     toolIds,
     defaultProfileId: agent.defaultProfileId,
+    createdByAgentId: agent.createdByAgentId,
+    roleIds: [...agent.roleIds],
+    roles: agent.roles.map((role) => ({
+      id: role.id,
+      name: role.name,
+      builtin: role.builtin,
+      permissions: role.permissions,
+    })),
+    effectivePermissions: effectivePermissions(
+      agent.roles.map((role) => ({
+        id: role.id,
+        name: role.name,
+        permissions: {
+          capabilities: role.permissions.capabilities.filter(isCapability),
+          mcp: role.permissions.mcp,
+        },
+      })),
+    ),
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
   };
