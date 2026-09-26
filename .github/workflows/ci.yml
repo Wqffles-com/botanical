@@ -44,6 +44,11 @@ jobs:
             echo "::endgroup::"
           done
 
+      # The shell tool jails commands with unprivileged `unshare`. Ubuntu 24.04
+      # runners block user namespaces through AppArmor by default.
+      - name: Allow unprivileged user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       # e2e needs a running stack, so it is not part of CI.
       - name: Unit tests
         run: |
