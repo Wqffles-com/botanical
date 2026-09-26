@@ -44,10 +44,13 @@ jobs:
             echo "::endgroup::"
           done
 
-      # The shell tool jails commands with unprivileged `unshare`. Ubuntu 24.04
-      # runners block user namespaces through AppArmor by default.
-      - name: Allow unprivileged user namespaces
-        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      # The shell tools jail commands with unprivileged `unshare`, a read-only
+      # /usr, and a fixed PATH. Ubuntu 24.04 runners block user namespaces
+      # through AppArmor, and setup-bun installs bun under $HOME.
+      - name: Prepare the shell sandbox
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          sudo install -m 0755 "$(command -v bun)" /usr/local/bin/bun
 
       # e2e needs a running stack, so it is not part of CI.
       - name: Unit tests
