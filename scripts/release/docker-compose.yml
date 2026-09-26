@@ -1,0 +1,27 @@
+# Postgres for a Botanical release zip. The API and web run on the host via ./start.sh.
+#   docker compose up -d
+# Host port 5433 matches DATABASE_URL in .env.example.
+name: botanical-release
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-botanical}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-botanical}
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - botanical_pg:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  botanical_pg:

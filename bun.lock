@@ -14,6 +14,9 @@
       "dependencies": {
         "zod": "^3.24.2",
       },
+      "devDependencies": {
+        "@types/bun": "^1.4.2",
+      },
     },
     "packages/core": {
       "name": "@botanical/core",
