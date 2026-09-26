@@ -1,0 +1,27 @@
+{
+  "name": "@botanical/tools-web",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Built-in Botanical tools: shared tool interface, web_search, and web_fetch.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./web": "./src/web/index.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@botanical/tools": "workspace:*",
+    "linkedom": "^0.18.13"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  }
+}

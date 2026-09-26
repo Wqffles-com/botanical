@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Botanical</title>
+    <meta name="robots" content="noindex" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <main>
+      <p class="mark">Botanical</p>
+      <h1>Deploy status</h1>
+      <p class="lede">
+        Self-host placeholder. The product web client replaces this page when
+        <code>packages/web</code> is built into the image.
+      </p>
+      <section id="status" aria-live="polite">
+        <p>Checking the server…</p>
+      </section>
+      <section class="gate">
+        <h2>Passcode</h2>
+        <form id="login">
+          <label for="passcode">Server passcode</label>
+          <div class="row">
+            <input id="passcode" name="passcode" type="password" autocomplete="current-password" required minlength="8" />
+            <button type="submit">Unlock</button>
+          </div>
+        </form>
+        <p id="auth" role="status"></p>
+        <button id="logout" type="button" hidden>Log out</button>
+      </section>
+      <noscript>
+        <p>JavaScript is off. <code>GET /api/meta</code> still reports mode and provider flags.</p>
+      </noscript>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

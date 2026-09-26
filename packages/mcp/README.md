@@ -1,0 +1,94 @@
+# @botanical/mcp
+
+MCP **client** for the Botanical server. It connects to operator-configured MCP servers and puts their tools on the same agent tool surface as the built-ins.
+
+Botanical is the client. MCP servers are untrusted code the operator chose to run.
+
+## Configure
+
+JSON file, or the `BOTANICAL_MCP_SERVERS` environment variable (same JSON). The env var wins when both are set.
+
+The operator file is Claude Desktop's `mcpServers` object. A `command` is stdio. A `url` is streamable HTTP unless `type` is `sse`. `type` may also be `stdio`, `http`, or `streamable-http`. `disabled: true` skips that server. The older `{ "servers": [{ "id", "transport", ... }] }` array still loads.
+
+Search order when `BOTANICAL_MCP_CONFIG` is unset:
+
+1. `config/mcp.json`
+2. `mcp.json`
+3. `botanical.mcp.json`
+
+Paths are relative to the server process working directory. An explicit path that is missing makes `loadMcpConfig` throw. The HTTP server catches that, records `configError` on `GET /api/mcp/servers`, and still starts. A missing default file means no MCP servers.
+
+`config/mcp.example.json` runs the in-repo echo fixture (no network, no writes). Point `BOTANICAL_MCP_CONFIG` at it and start the server from the repo root:
+
+```json
+{
+  "mcpServers": {
+    "echo": {
+      "command": "bun",
+      "args": ["packages/mcp/test/fixtures/stdio-server.ts"]
+    }
+  }
+}
+```
+
+A remote server sets `url` instead of `command`. `type` defaults to streamable HTTP. Use `"type": "sse"` for the legacy HTTP+SSE transport, or `"type": "streamable-http"` as an alias of `http`. Set `sseFallback: true` on an `http` server to retry that same URL over SSE. Headers and commands accept `${VAR}` placeholders.
+
+`${VAR}` placeholders in commands, args, env values, urls, and headers expand from the server environment. `${VAR:-default}` supplies a default. An unset variable with no default makes `loadMcpConfig` throw. The error names the variable and does not print other secrets. The HTTP server records that error and keeps serving.
+
+| Variable | Role |
+|---|---|
+| `BOTANICAL_MCP_CONFIG` | Path to the JSON file |
+| `BOTANICAL_MCP_SERVERS` | Inline JSON. Overrides the file's server list |
+| `BOTANICAL_MCP_DISABLED` | `1` / `true` / `yes` / `on` connects nothing |
+| `BOTANICAL_MCP_CONNECT_TIMEOUT_MS` | Initialize timeout (default 15000) |
+| `BOTANICAL_MCP_TOOL_TIMEOUT_MS` | Tool call timeout (default 60000) |
+
+stdio children are spawned with **no shell**. They inherit a short safe environment (`PATH`, `HOME`, and similar), plus the server's `env` block. Model API keys in the parent process are not copied.
+
+## Agent runtime
+
+```ts
+import { createAgentToolSurface, startMcp, type BuiltinTool } from "@botanical/mcp";
+
+const mcp = await startMcp();
+
+const builtins: BuiltinTool[] = [
+  {
+    name: "web_search",
+    description: "Search the web",
+    parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+    async execute(args) {
+      return `results for ${String(args.query)}`;
+    },
+  },
+];
+
+const tools = createAgentToolSurface({
+  builtins,
+  mcp,
+  modelSupportsTools: profile.capabilities.tools,
+});
+
+// ChatRequest.tools
+const definitions = tools.definitions();
+
+// One tool call from the model
+const result = await tools.execute(toolCall.name, toolCall.arguments, {
+  signal,
+  approve: async (request) => policy.allow(request),
+});
+
+await mcp.close();
+```
+
+The HTTP API and the tools registry use `mcp:<server>:<tool>`. `definitions()` uses provider-safe names: `mcp__<server>__<tool>`. The architectural id `mcp.<server>.<tool>` is on `catalog()` as `canonicalName`. `execute` accepts all three forms. OpenAI and Anthropic reject `.` and `:` in tool names, so the safe form is what the model should see. Pass `providerSafeNames: false` to advertise the dotted id instead.
+
+When `modelSupportsTools` is false, the surface advertises nothing and `warnings()` explains that tools and MCP are off for that profile.
+
+A server that fails to connect is skipped. The others still contribute tools. `mcp.status()` and `tools.warnings()` report the failure.
+
+`mcp.promptAddendum()` returns server `instructions` from the MCP handshake, for the runtime to append to the system prompt.
+
+## Limits
+
+v0 calls tools. Resources, prompts, OAuth, and sampling are not exposed. Tool results are text for the model; image and audio payloads are not inlined. Result text is capped at 100k characters.

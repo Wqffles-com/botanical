@@ -1,0 +1,18 @@
+{
+  "name": "@botanical/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Playwright end-to-end suite for the Botanical MVP web app.",
+  "scripts": {
+    "test": "node ../../scripts/e2e/run.mjs",
+    "test:self": "node ../../scripts/e2e/run.mjs --self-test",
+    "test:list": "playwright test --list",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^22.15.30",
+    "typescript": "^5.8.3"
+  }
+}

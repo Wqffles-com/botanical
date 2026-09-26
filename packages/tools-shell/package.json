@@ -1,0 +1,23 @@
+{
+  "name": "@botanical/tools-shell",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Botanical built-in tools. v0 ships sandboxed shell and code execution.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun --format esm",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@botanical/tools": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "typescript": "^5.8.0"
+  }
+}

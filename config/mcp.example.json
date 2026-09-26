@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "echo": {
+      "command": "bun",
+      "args": ["packages/mcp/test/fixtures/stdio-server.ts"]
+    }
+  }
+}

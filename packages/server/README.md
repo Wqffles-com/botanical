@@ -1,0 +1,171 @@
+# @botanical/server
+
+HTTP API for Botanical v0: password or passcode auth, agents, chats, messages, model profiles, tools, MCP, and agent-to-agent mail.
+
+Runtime is **Bun**. `SELF_HOST` and `SAAS` are the same server. The deployment mode is a flag plus branding. It does not change auth, routes, or storage.
+
+## Run
+
+```bash
+cd packages/server
+cp .env.example .env
+# set BOTANICAL_PASSWORD. Profiles come from provider API keys; mock is always listed.
+bun install
+bun src/serve.ts
+```
+
+`bun test` covers the API without Postgres. `bun run typecheck` runs `tsc`.
+
+Docker, from this directory:
+
+```bash
+docker build -t botanical-server .
+docker run --rm -p 8787:8787 \
+  -e BOTANICAL_PASSWORD=change-me \
+  -e BOTANICAL_COOKIE_SECURE=false \
+  -e BOTANICAL_PROFILES='[{"id":"grok","name":"Grok","provider":"xai","model":"grok-4"}]' \
+  botanical-server
+```
+
+There is no default model. `GET /api/profiles` lists `mock` plus one profile for each provider key that is set. Every chat and every message names a `profileId`. `BOTANICAL_PROFILES` or `BOTANICAL_PROFILES_FILE` replaces the built-in model list.
+
+An agent's `defaultProfileId` is only a suggestion for the picker. It does not select a profile for a chat.
+
+With no `DATABASE_URL`, the memory store starts with three example agents: Gardener (Sprout, green), Builder (Code, blue), and Scout (Search, amber). Postgres gets the same rows from `packages/db` migrations. `icon` is a Lucide name and defaults to `Bot`. `color` is one of `red`, `orange`, `amber`, `green`, `teal`, `cyan`, `blue`, `violet`, `pink`, `gray`, and defaults to `green`. Responses include both `prompt` / `systemPrompt` and `tools` / `toolIds`.
+
+## Auth
+
+One operator. `POST /api/auth/login` accepts `{ "password": "..." }` or `{ "passcode": "..." }`.
+
+The JSON body returns `token`. The same value is set as an `HttpOnly` cookie, `botanical_session`. Call the API with either:
+
+- `Authorization: Bearer <token>`
+- the cookie (`credentials: "include"` from a browser)
+
+Bearer is preferred when both are sent. Logout deletes that session only. A second client stays signed in.
+
+Set `BOTANICAL_PASSWORD_HASH` to an argon2 hash from `Bun.password.hash` on a real deploy. If both the hash and `BOTANICAL_PASSWORD` are set, the hash is what login checks.
+
+Failed logins are limited per client address (20 failures / 15 minutes).
+
+## Routes
+
+Error shape: `{ "error": { "code": "...", "message": "..." } }`.
+
+| Method | Path | Auth | Notes |
+|--------|------|------|--------|
+| GET | `/api/health` | no | `deploymentMode`, `brand`, `persistence` |
+| GET | `/` | no | Pointer to health |
+| POST | `/api/auth/login` | no | Cookie and bearer token |
+| POST | `/api/auth/logout` | session | 204, clears the cookie |
+| GET | `/api/auth/me` | yes | Operator, brand, session expiry |
+| GET | `/api/agents` | yes | |
+| POST | `/api/agents` | yes | `name` (1–40), `prompt` (alias `systemPrompt`), optional `icon` (default `Bot`), `color` (default `green`), `description`, `tools` (alias `toolIds`), `defaultProfileId` |
+| GET | `/api/agents/:id` | yes | |
+| PATCH | `/api/agents/:id` | yes | |
+| DELETE | `/api/agents/:id` | yes | 409 `agent_in_use` when the agent owns chats |
+| GET | `/api/chats` | yes | Optional `?agentId=` |
+| POST | `/api/chats` | yes | `agentId`, `profileId`, optional `title`. One agent per chat |
+| GET | `/api/chats/:id` | yes | |
+| DELETE | `/api/chats/:id` | yes | Deletes the chat and its messages |
+| GET | `/api/chats/:id/messages` | yes | |
+| POST | `/api/chats/:id/messages` | yes | Runs the agent loop for the chat's agent |
+| GET | `/api/agent-messages?agentId=` | yes | Inbox for that agent. Optional `status` and `limit` |
+| POST | `/api/agent-messages` | yes | `{ fromAgentId, toAgentId, body }` then delivers |
+| PATCH | `/api/agent-messages/:id` | yes | `{ status }` — pending, delivered, read, or failed |
+| GET | `/api/profiles` | yes | `defaultProfileId` is always `null` |
+| GET | `/api/tools` | yes | Built-in file, shell, web, and agent-message tools, plus MCP tools. Each entry has `source` |
+| GET | `/api/mcp/servers` | yes | Configured MCP servers, tool ids, and connect errors |
+
+`POST /api/chats/:id/messages` body is `{ "content": "...", "profileId"?: "...", "stream"?: boolean }`.
+
+The turn runs through `@botanical/agent-runtime`. The agent's `systemPrompt` is the system message. Only tools on the agent's `toolIds` allowlist are offered. The model and tools alternate until the model stops.
+
+- `stream: false` returns JSON `{ userMessage, assistantMessage, profileId }`. A tool turn also includes `toolCall` and `toolResult`. A provider failure (for example a missing server API key) is `error: { code, message }` and `assistantMessage` may be null. The user message is still stored.
+- `stream: true`, or `Accept: text/event-stream`, returns server-sent events: `message.created`, `text-delta`, `tool-call`, `tool-result`, `error`, `message.completed`, `done`. Payloads use the core stream types (`text-delta`, `tool-call`, `tool-result`, `error`, `done`).
+- Omitting `profileId` uses the profile stored on the chat (the one chosen at create, or the last explicit switch).
+- Sending a different configured `profileId` switches the chat. Unknown ids return 422. Nothing is chosen for you.
+- The `mock` provider calls `file_list` when that id is on the allowlist, then echoes the user text and the tool output. A user message of the form `send_agent_message {"toAgentId":"…","body":"…"}` calls that tool when it is on the allowlist. It does not use the network.
+
+`GET /api/tools` returns `{ tools: [{ id, name, description, parameters, source, serverId? }] }`. `source` is `builtin` or `mcp`. File tools are registered as `builtin.files`. Shell, web, and MCP packages plug in by exporting `createToolContributor` from `@botanical/tools-shell`, `@botanical/tools-web`, and `@botanical/mcp` (see `@botanical/agent-runtime` tool registry v1). The server loads those factories at startup. MCP servers connected from `BOTANICAL_MCP_CONFIG` are also listed, with ids `mcp:<server>:<tool>`.
+
+## Agent-to-agent messages
+
+`POST /api/agent-messages` stores a row and marks it `delivered`. `GET /api/agent-messages?agentId=` lists that agent's inbox, newest first. `PATCH /api/agent-messages/:id` moves status forward (`pending` → `delivered` or `failed`, `delivered` → `read` or `failed`).
+
+Messages live in `store.agentMessages`. With `DATABASE_URL` unset that repository is in memory. When packages/db returns the same methods, those rows persist in Postgres `agent_messages`.
+
+Set `BOTANICAL_A2A_AUTORUN=true` to run one background turn for the recipient in a chat titled `Inbox`. The turn records the mail and an acknowledgement. It does not call tools. The profile is the inbox chat's profile, the agent's `defaultProfileId` when that field exists and is configured, or the profile on the recipient's newest other chat. There is still no silent global default: with no explicit profile the message stays `delivered` and no chat is created.
+
+During a turn the built-in `send_agent_message` tool sends mail when that id is on the agent's allowlist. The sender is the chat's agent.
+
+## MCP
+
+`BOTANICAL_MCP_CONFIG` is a path to a Claude Desktop `mcpServers` JSON file. On boot the server connects each entry (stdio, streamable HTTP, or SSE) and registers the tools that came up. Ids look like `mcp:echo:echo`. One dead server is reported on `GET /api/mcp/servers` and does not drop the others. A missing or invalid file is a `configError` on that route; the API still starts.
+
+See `config/mcp.example.json` for a local echo fixture. `BOTANICAL_MCP_DISABLED=true` connects nothing.
+
+## Built-in tools
+
+`GET /api/tools` lists the tools registered for agent allowlists:
+
+| Id | Risk | Approval |
+| --- | --- | --- |
+| `file_read`, `file_list` | read | no |
+| `file_write` | write | yes |
+| `shell`, `code_exec` | execute | yes |
+| `web_search`, `web_fetch` | network | no |
+| `send_agent_message` | write | no |
+
+File and shell calls stay inside `BOTANICAL_WORKSPACE` (default `./data/workspace`; Compose mounts a volume at `/data/workspace`). Each call is aborted at a wall-clock cap and its text is truncated (`BOTANICAL_TOOL_MAX_OUTPUT_CHARS`, default 32000). Packages export `createToolContributor` for m06's registry (`builtin.files`, `builtin.shell`, `builtin.web`). `send_agent_message` (`builtin.a2a`) calls the A2A service (`agentMessages` on `createApp`, or `agentServiceFromBus`). Until that service is wired the tool returns an error and does not pretend to deliver. The sender id always comes from the running turn. Pass `toAgentId` or `toAgentName`.
+
+A chat's agent does not change after create. The first message replaces the title `"New chat"` with a short clip of that message.
+
+## Deployment mode
+
+| `BOTANICAL_DEPLOYMENT_MODE` | Default brand |
+|-----------------------------|---------------|
+| `SELF_HOST` | Botanical |
+| `SAAS` | Botanical Cloud |
+
+`BOTANICAL_BRAND_NAME` overrides either default. Health and `GET /api/auth/me` return the mode and brand so a web client can label itself. Product behavior stays the same in both modes. SaaS multi-user accounts are not part of v0.
+
+`BOTANICAL_CORS_ORIGIN` is one browser origin, for example `http://localhost:5173`.
+
+## Persistence
+
+Repositories live in `src/types.ts`:
+
+| Repository | Contents |
+| --- | --- |
+| `agents` | `name` (1–40), Lucide `icon` (default `Bot`), `color` (default `green`), `description`, `systemPrompt`, `toolIds`, optional `defaultProfileId` |
+| `chats` | One owning agent, explicit `profileId`, title |
+| `messages` | Transcript rows, including `toolCalls` and tool-result `toolCallId` |
+| `profiles` | Model profile metadata. No API keys |
+| `agentMessages` | Agent-to-agent inbox (`pending`, `delivered`, `read`, `failed`). The runtime bus uses `insert`, `deliverPending`, and `markRead` on the same rows. |
+| `sessions` | SHA-256 token hash, never the raw token |
+
+- `DATABASE_URL` unset: in-memory store. Dev and tests. A restart drops data.
+- `DATABASE_URL` set: the server loads `packages/db` and calls `createStore({ connectionString })`. The result must be a `Store` with `kind: "postgres"`, including `profiles`, `agentMessages`, and `close()`. If the package is missing or the export is incomplete, the process exits. It does not fall back to memory.
+
+Session rows store a SHA-256 of the token, not the token itself. Model API keys are not a database column and are not accepted on any route.
+
+## Model profiles
+
+`GET /api/profiles` returns `defaultProfileId: null` and:
+
+- `mock` always
+- one profile per configured key: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`
+- `openai-compat` when both `OPENAI_COMPAT_BASE_URL` and `OPENAI_COMPAT_API_KEY` are set (`CUSTOM_OPENAI_*` are legacy aliases)
+
+Providers: `openai`, `anthropic`, `xai`, `deepseek`, `openrouter`, `openai-compat`, `mock`.
+
+Optional `profiles.json` (`BOTANICAL_PROFILES_FILE`) or inline `BOTANICAL_PROFILES` replaces that model list. Entries for providers without a key are omitted. See `profiles.example.json`. Profile JSON rejects `apiKey`.
+
+`POST /api/chats/:id/messages` requires `profileId`. `mock` echoes the user and calls `file_list`. Any other profile streams through `@botanical/providers`, normalized to the agent-runtime `LLMProvider` interface (`config.providers.runtime`). File-tool schemas on the agent allowlist are sent as function tools. The runtime tool loop (m06) executes tools; this route forwards `tool-call` events from the model.
+
+## What's left
+
+- Postgres `createStore` from `packages/db` runs migrations on boot when `DATABASE_URL` is set.
+- Shell and web packages register when they export `createToolContributor`.
+- Non-mock profiles resolve through `config.providers.runtime`. Mock profiles still call `file_list` or `send_agent_message` from the local script. MCP boots with the server.

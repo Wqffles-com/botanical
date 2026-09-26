@@ -1,0 +1,141 @@
+# Botanical MVP: Postgres + Bun API + Next.js web.
+# Project name botanical-mvp keeps this stack off a Compose project named botanical.
+# Host ports default to web 3000, API 8788, Postgres 5433.
+# Inside the network the API listens on 8787 and Next listens on 3000.
+#
+#   cp .env.example .env
+#   docker compose up --build -d
+#
+# The lead integrator starts this stack. Do not point it at the other project's ports.
+
+name: botanical-mvp
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-botanical}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-botanical}
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - botanical_pg:/var/lib/postgresql/data
+      - ./deploy/postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUN_IMAGE: ${BUN_IMAGE:-oven/bun:1.4.2-alpine}
+    restart: unless-stopped
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-SELF_HOST}
+      BOTANICAL_DEPLOYMENT_MODE: ${BOTANICAL_DEPLOYMENT_MODE:-}
+      BOTANICAL_PASSCODE: ${BOTANICAL_PASSCODE:-change-me-passcode}
+      BOTANICAL_PASSWORD: ${BOTANICAL_PASSWORD:-}
+      BOTANICAL_PASSWORD_HASH: ${BOTANICAL_PASSWORD_HASH:-}
+      BOTANICAL_SESSION_SECRET: ${BOTANICAL_SESSION_SECRET:-}
+      BOTANICAL_PUBLIC_ORIGIN: ${BOTANICAL_PUBLIC_ORIGIN:-http://localhost:3000}
+      BOTANICAL_COOKIE_SECURE: ${BOTANICAL_COOKIE_SECURE:-false}
+      BOTANICAL_TRUST_PROXY: ${BOTANICAL_TRUST_PROXY:-true}
+      BOTANICAL_CORS_ORIGIN: ${BOTANICAL_CORS_ORIGIN:-}
+      BOTANICAL_WORKSPACE: /data
+      BOTANICAL_MCP_CONFIG: /config/mcp.json
+      BOTANICAL_MCP_SERVERS: ${BOTANICAL_MCP_SERVERS:-}
+      BOTANICAL_MCP_DISABLED: ${BOTANICAL_MCP_DISABLED:-}
+      BOTANICAL_MCP_CONNECT_TIMEOUT_MS: ${BOTANICAL_MCP_CONNECT_TIMEOUT_MS:-}
+      BOTANICAL_MCP_TOOL_TIMEOUT_MS: ${BOTANICAL_MCP_TOOL_TIMEOUT_MS:-}
+      BOTANICAL_PROFILES: ${BOTANICAL_PROFILES:-}
+      BOTANICAL_HOST: 0.0.0.0
+      BOTANICAL_PORT: "8787"
+      PORT: "8787"
+      HOST: 0.0.0.0
+      DATABASE_URL: ${DATABASE_URL:-postgresql://botanical:change-me-postgres@postgres:5432/botanical}
+      DATABASE_SSL: ${DATABASE_SSL:-}
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-4}
+      POSTGRES_USER: ${POSTGRES_USER:-botanical}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-botanical}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      XAI_API_KEY: ${XAI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      CUSTOM_OPENAI_BASE_URL: ${CUSTOM_OPENAI_BASE_URL:-}
+      CUSTOM_OPENAI_API_KEY: ${CUSTOM_OPENAI_API_KEY:-}
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
+      BRAVE_API_KEY: ${BRAVE_API_KEY:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      SERPER_API_KEY: ${SERPER_API_KEY:-}
+      SEARXNG_URL: ${SEARXNG_URL:-}
+      SEARXNG_API_KEY: ${SEARXNG_API_KEY:-}
+      BOTANICAL_SEARCH_PROVIDER: ${BOTANICAL_SEARCH_PROVIDER:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "127.0.0.1:${SERVER_PORT:-8788}:8787"
+    volumes:
+      - botanical_workspace:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "fetch('http://127.0.0.1:8787/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  web:
+    build:
+      context: .
+      dockerfile: web.Dockerfile
+      args:
+        BUN_IMAGE: ${BUN_IMAGE:-oven/bun:1.4.2-alpine}
+        NODE_IMAGE: ${NODE_IMAGE:-node:22-alpine}
+        BOTANICAL_API_URL: ${BOTANICAL_API_URL:-http://server:8787}
+    restart: unless-stopped
+    init: true
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      BOTANICAL_API_URL: ${BOTANICAL_API_URL:-http://server:8787}
+    ports:
+      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+volumes:
+  botanical_pg:
+  botanical_workspace:
