@@ -69,9 +69,9 @@ A profile may run a subscription coding-agent CLI on the server instead of an HT
 
 - Configure them in `BOTANICAL_PROFILES` (`kind`, `cli`, optional `label` / `model` / `bin` / `timeoutMs`) or with `BOTANICAL_CLI_PROFILES=grok-build,claude-code,codex`. The shortcut only adds presets that the JSON did not already declare. Explicit JSON wins.
 - `model` is passed to the CLI only when the profile sets it (`-m` or `--model`). Omitting it leaves the CLI's own default. That is not a Botanical default model, and CLI profiles are never auto-selected.
-- The CLI runs its own tools. Botanical does not forward its tool list. The working directory is the agent's folder inside the existing workspace jail.
-- Grok is invoked as `grok -p <prompt> --output-format streaming-messages-json --include-partial-messages --always-approve --cwd <dir>` because that format emits incremental text deltas. ACP `streaming-json` lines are still parsed if a binary emits them.
-- Claude Code uses `claude -p … --output-format stream-json --verbose --include-partial-messages --permission-mode bypassPermissions`. Codex uses `codex exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox -C <dir>`. The extra flags keep the process from blocking on prompts or a git repo check. The workspace jail is the external sandbox.
+- The CLI runs in the agent's folder inside the existing workspace jail. Botanical tools reach it through a per-run MCP server (refined below). Set `botanicalTools: false` on a profile to opt out.
+- Grok is invoked with `--prompt-file` (not `-p <prompt>`) plus `--output-format streaming-messages-json --include-partial-messages --always-approve --cwd <dir>` because that format emits incremental text deltas. ACP `streaming-json` lines are still parsed if a binary emits them.
+- Claude Code reads the prompt on stdin (`-p` with no prompt argument) and uses `--output-format stream-json --verbose --include-partial-messages --permission-mode bypassPermissions`. Codex uses `codex exec … -` so the prompt is stdin. The extra flags keep the process from blocking on prompts or a git repo check. The workspace jail is the external sandbox.
 - `GET /api/profiles` includes every CLI profile with `kind`, `available`, and `unavailableReason` when the binary is missing or login cannot be confirmed. A chat turn on an unavailable CLI profile fails with `profile_unavailable`. It does not crash the process.
 - Docker: `docker-compose.cli.yml` is opt-in and does not change `docker compose up`.
 
@@ -96,3 +96,20 @@ Enforcement happens at tool dispatch, not only when the tool list is built. A de
 Builtin roles, seeded idempotently: **Coder** (no `agent.create`), **Reviewer** (`file.read`, `web`, `memory.read`), **Orchestrator** (every capability and MCP `*`). Builtin roles can have their description and permissions edited. Their names cannot change and they cannot be deleted.
 
 `agent_list` is capability `agent.message` (same gate as sending mail). `file_delete` is `file.write`. There is no separate file-edit tool.
+
+---
+
+## 2026-09-27 — CLI profiles get Botanical tools over a per-run MCP server
+
+**Status:** LOCKED for this slice. Refines the CLI-profile bullets above (prompt argv and "tools are not forwarded").
+
+A CLI turn (`grok-build`, `claude-code`, `codex`) opens `POST /internal/mcp/runs/<runId>` on this server process for the length of the turn. `tools/list` is the same catalog and role filter an API-profile turn would send. `tools/call` goes through `dispatchToolCall` (the agent loop's allowlist and role check, then the same tool source, workspace context, and truncation). A denial is an MCP tool result with `isError: true` and the same text the API turn would persist, not an HTTP error.
+
+- The run is bound to the agent, the chat, and the turn. v0 has one operator and no tenant id, so the principal is `local`.
+- Auth is a fresh 32-byte bearer token, compared in constant time. The session cookie is not accepted. Unknown or revoked runs return 404. A live run with a missing or wrong token returns 401. The token is revoked when the turn ends (success, error, cancel, timeout).
+- The CLI is a child of the server. The URL defaults to `http://127.0.0.1:<PORT>` and can be set with `BOTANICAL_INTERNAL_URL`. It is not listed on the public API map.
+- The prompt is never an argv element. Grok uses `--prompt-file` (0600, temp dir). Claude Code and Codex read stdin (`-p` and `codex exec -`).
+- MCP server name is `botanical`, so the CLI shows tools as `mcp__botanical__<tool>`. User MCP tools keep model-facing names such as `mcp__notes__search` inside that server.
+- Grok Build 1.0.40 has no `--mcp-config`. The project file `cwd/.grok/config.toml` is written for the run and restored afterwards (`.mcp.json` is not touched). The header is `Bearer ${BOTANICAL_MCP_TOKEN}` (Grok expands `${VAR}` in MCP headers). Claude Code uses `--mcp-config` and `--strict-mcp-config`. Codex uses `-c mcp_servers.botanical.url=…` and `bearer_token_env_var`.
+- Calls made through this endpoint are streamed as `tool-call` / `tool-result` and stored as tool messages. The CLI's own native tools are not Botanical tool cards.
+- `botanicalTools: false` on a CLI profile skips the endpoint. Presets from `BOTANICAL_CLI_PROFILES` leave it on. CLI profiles are still never the default model.

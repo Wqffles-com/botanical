@@ -11,6 +11,7 @@ import { createA2AService, type A2AService } from "./a2a/service.ts";
 import { createSendAgentMessageTool } from "./a2a/tool.ts";
 import { LoginRateLimiter } from "./auth/rate-limit.ts";
 import type { ServerConfig } from "./config.ts";
+import { createCliToolHost, registerCliMcp, type CliToolHost } from "./cli-mcp.ts";
 import { emptyServerMcp, type ServerMcp } from "./mcp-host.ts";
 import { createRouter } from "./router.ts";
 import { createServerProfileResolver } from "./runtime/profiles.ts";
@@ -58,6 +59,8 @@ export interface App {
   close(): Promise<void>;
   /** Agent-to-agent bus for this process. Tests wait on `whenIdle`. */
   a2a: A2AService;
+  /** Per-run MCP endpoint for CLI profiles. Session cookies do not authenticate it. */
+  cliTools: CliToolHost;
 }
 
 export function createApp(deps: AppDeps): App {
@@ -67,7 +70,17 @@ export function createApp(deps: AppDeps): App {
     profiles: deps.config.profiles,
   });
   const mcp = deps.mcp ?? emptyServerMcp();
-  const runtime = createRuntime(deps, a2a, mcp);
+  let runtimeDeps: RuntimeDeps | undefined;
+  const cliTools = createCliToolHost({
+    port: deps.config.port,
+    env: deps.env ?? (process.env as Env),
+    getDeps: () => {
+      if (!runtimeDeps) throw new Error("CLI tool host is not ready");
+      return runtimeDeps;
+    },
+  });
+  const runtime = createRuntime(deps, a2a, mcp, cliTools);
+  runtimeDeps = runtime.deps;
   const router = createRouter();
   registerHealth(router);
   registerAuth(router);
@@ -79,6 +92,7 @@ export function createApp(deps: AppDeps): App {
   registerAgentMessages(router, a2a);
   registerProfiles(router);
   registerMcp(router);
+  registerCliMcp(router, cliTools);
   registerTools(router, runtime.registry);
   const rateLimiter = deps.rateLimiter ?? new LoginRateLimiter(20, 15 * 60 * 1000);
 
@@ -86,6 +100,7 @@ export function createApp(deps: AppDeps): App {
     tools: mcp.registry,
     close: () => mcp.close(),
     a2a,
+    cliTools,
     fetch(request, extras) {
       return router.handle(request, {
         config: deps.config,
@@ -103,6 +118,7 @@ function createRuntime(
   deps: AppDeps,
   a2a: A2AService,
   mcp: ServerMcp,
+  cliTools: CliToolHost,
 ): { deps: RuntimeDeps; registry: RuntimeToolRegistry } {
   const env = deps.env ?? (process.env as Env);
   const registry = deps.toolRegistry ?? createDefaultToolRegistry();
@@ -113,7 +129,7 @@ function createRuntime(
     registry.register(createMemoryContributor(deps.store));
     registry.register(createAgentAdminContributor(deps.store));
   }
-  const profiles = deps.profiles ?? createServerProfileResolver(deps.config, env);
+  const profiles = deps.profiles ?? createServerProfileResolver(deps.config, env, cliTools);
   const store = adaptServerStore(deps.store);
   const bus = createAgentMessageBus(store.agents, store.agentMessages);
   return {

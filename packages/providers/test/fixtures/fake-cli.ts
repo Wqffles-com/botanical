@@ -3,6 +3,9 @@
  * Fixture CLI for provider tests. Mode comes from FAKE_CLI_MODE.
  * `models`, `--version`, and `login status` answer availability probes.
  */
+import { readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+
 const args = process.argv.slice(2);
 const mode = process.env.FAKE_CLI_MODE ?? "grok";
 
@@ -18,6 +21,92 @@ if (args[0] === "models" || args[0] === "--version" || (args[0] === "login" && a
 if (mode === "args") {
   process.stdout.write(`${args.join("\n")}\n`);
   process.exit(0);
+}
+
+if (mode === "capture") {
+  const stdin = await readStdin();
+  process.stdout.write(`STDIN_BYTES:${stdin.length}\n`);
+  for (const arg of args) {
+    process.stdout.write(arg.length > 200 ? `ARG_LEN:${arg.length}\n` : `ARG:${arg}\n`);
+  }
+  const promptIndex = args.indexOf("--prompt-file");
+  const promptPath = promptIndex >= 0 ? args[promptIndex + 1] : undefined;
+  if (promptPath) {
+    const body = readFileSync(promptPath);
+    process.stdout.write(`PROMPT_FILE_BYTES:${body.length}\n`);
+    process.stdout.write(`PROMPT_FILE:${promptPath}\n`);
+    process.stdout.write(`PROMPT_MODE:${(statSync(promptPath).mode & 0o777).toString(8)}\n`);
+  }
+  const configPath = join(process.cwd(), ".grok", "config.toml");
+  const token = process.env.BOTANICAL_MCP_TOKEN ?? "";
+  try {
+    const text = readFileSync(configPath, "utf8");
+    process.stdout.write("CONFIG:yes\n");
+    process.stdout.write(`CONFIG_URL:${text.includes("mcp_servers.botanical") ? "yes" : "no"}\n`);
+    process.stdout.write(`CONFIG_ENVREF:${text.includes("${BOTANICAL_MCP_TOKEN}") ? "yes" : "no"}\n`);
+    process.stdout.write(`CONFIG_LEAK:${token.length > 0 && text.includes(token) ? "yes" : "no"}\n`);
+    process.stdout.write(`CONFIG_MODE:${(statSync(configPath).mode & 0o777).toString(8)}\n`);
+  } catch {
+    process.stdout.write("CONFIG:no\n");
+  }
+  const mcpIndex = args.indexOf("--mcp-config");
+  const mcpPath = mcpIndex >= 0 ? args[mcpIndex + 1] : undefined;
+  if (mcpPath && !mcpPath.startsWith("-")) {
+    const text = readFileSync(mcpPath, "utf8");
+    process.stdout.write(`MCP_ENVREF:${text.includes("${BOTANICAL_MCP_TOKEN}") ? "yes" : "no"}\n`);
+    process.stdout.write(`MCP_LEAK:${token.length > 0 && text.includes(token) ? "yes" : "no"}\n`);
+    process.stdout.write(`MCP_MODE:${(statSync(mcpPath).mode & 0o777).toString(8)}\n`);
+  }
+  process.stdout.write(`TOKEN_ENV:${token.length > 0 ? "ok" : "missing"}\n`);
+  process.exit(0);
+}
+
+if (mode === "mcp-call") {
+  const configPath = join(process.cwd(), ".grok", "config.toml");
+  const text = readFileSync(configPath, "utf8");
+  const url = /url = "([^"]+)"/.exec(text)?.[1] ?? "";
+  const token = process.env.BOTANICAL_MCP_TOKEN ?? "";
+  const runId = url.split("/").filter(Boolean).pop() ?? "";
+  process.stdout.write(`RUN_ID:${runId}\n`);
+  if (!url || !token) {
+    console.error("missing mcp url or token");
+    process.exit(2);
+  }
+  const headers = {
+    authorization: `Bearer ${token}`,
+    "content-type": "application/json",
+    accept: "application/json, text/event-stream",
+  };
+  const rpc = async (body: unknown, id?: number) => {
+    const response = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+    const payload = await response.text();
+    return { status: response.status, payload, id };
+  };
+  const init = await rpc({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "fake-cli", version: "0" } },
+  });
+  if (init.status !== 200) {
+    console.error(`initialize ${init.status}`);
+    process.exit(2);
+  }
+  const noted = await rpc({ jsonrpc: "2.0", method: "notifications/initialized" });
+  if (noted.status !== 202 && noted.status !== 200) {
+    console.error(`initialized ${noted.status}`);
+    process.exit(2);
+  }
+  const listed = await rpc({ jsonrpc: "2.0", id: 2, method: "tools/list" });
+  process.stdout.write(`HAS_MEMORY:${listed.payload.includes("memory_write") ? "yes" : "no"}\n`);
+  const called = await rpc({
+    jsonrpc: "2.0",
+    id: 3,
+    method: "tools/call",
+    params: { name: "memory_write", arguments: { scope: "agent", content: "fern from cli" } },
+  });
+  process.stdout.write(called.payload.includes('"isError":true') ? "CALL_ERROR\n" : "CALL_OK\n");
+  process.exit(called.status === 200 ? 0 : 2);
 }
 
 if (mode === "plain") {
@@ -109,3 +198,11 @@ process.stdout.write(
   })}\n`,
 );
 process.exit(0);
+
+async function readStdin(): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+  }
+  return Buffer.concat(chunks);
+}

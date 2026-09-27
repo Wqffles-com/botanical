@@ -5,12 +5,18 @@ export interface CliPromptMessage {
 }
 
 /**
- * One prompt for a CLI that has no Botanical tool channel. Prior turns are
- * rendered compactly. The CLI executes its own tools in the workspace.
+ * One prompt for a headless CLI. Prior turns are rendered compactly.
+ * When Botanical tools are wired, the CLI reaches them through the MCP server
+ * named `botanical` (its own tools still run in the working directory).
  */
-export function renderCliPrompt(messages: readonly CliPromptMessage[]): string {
+export function renderCliPrompt(
+  messages: readonly CliPromptMessage[],
+  options?: { botanicalTools?: boolean },
+): string {
   const parts: string[] = [
-    "You are running headless inside Botanical. Use your own tools in this working directory. Botanical does not call tools for you and will not answer permission prompts.",
+    options?.botanicalTools
+      ? 'You are running headless inside Botanical. Botanical tools and the user\'s MCP servers are available from the MCP server named "botanical" (for example memory_write). Use those when the task needs Botanical state. Your own tools still run in this working directory. Botanical will not answer permission prompts.'
+      : "You are running headless inside Botanical. Use your own tools in this working directory. Botanical does not call tools for you and will not answer permission prompts.",
   ];
   for (const message of messages) {
     const text = messageText(message);

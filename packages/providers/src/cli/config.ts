@@ -12,17 +12,20 @@ const PRESET_LABELS: Record<CliProfilePresetId, { cli: CliName; label: string; d
   "grok-build": {
     cli: "grok",
     label: "Grok Build",
-    description: "Grok Build headless. The CLI runs its own tools; Botanical tools are not sent.",
+    description:
+      "Grok Build headless. Botanical tools and your MCP servers are exposed on a per-run loopback MCP server named botanical.",
   },
   "claude-code": {
     cli: "claude",
     label: "Claude Code",
-    description: "Claude Code headless. The CLI runs its own tools; Botanical tools are not sent.",
+    description:
+      "Claude Code headless. Botanical tools and your MCP servers are exposed on a per-run loopback MCP server named botanical.",
   },
   codex: {
     cli: "codex",
     label: "Codex",
-    description: "Codex headless. The CLI runs its own tools; Botanical tools are not sent.",
+    description:
+      "Codex headless. Botanical tools and your MCP servers are exposed on a per-run loopback MCP server named botanical.",
   },
 };
 
@@ -123,16 +126,20 @@ function parseCliEntry(value: Record<string, unknown>, index: number): CliProfil
     throw new ProviderError(`${label}.bin must be an absolute path.`, { code: "config" });
   }
   const description = optionalText(value.description, `${label}.description`);
+  const botanicalTools = readBotanicalTools(value.botanicalTools, label);
   return {
     id,
     cli,
     label: title,
     description:
       description ??
-      `Subscription CLI (${cli}). Botanical tools are not sent; the CLI runs its own tools.`,
+      (botanicalTools
+        ? `Subscription CLI (${cli}). Botanical tools are exposed on a per-run MCP server named botanical.`
+        : `Subscription CLI (${cli}). Botanical tools are off for this profile; the CLI runs its own tools.`),
     ...(model ? { model } : {}),
     ...(bin ? { bin } : {}),
     timeoutMs: readTimeout(value.timeoutMs, label),
+    botanicalTools,
   };
 }
 
@@ -144,6 +151,7 @@ function presetSpec(id: CliProfilePresetId): CliProfileSpec {
     label: preset.label,
     description: preset.description,
     timeoutMs: DEFAULT_CLI_TIMEOUT_MS,
+    botanicalTools: true,
   };
 }
 
@@ -170,6 +178,14 @@ function optionalText(value: unknown, label: string): string | undefined {
   if (typeof value !== "string") throw new ProviderError(`${label} must be a string.`, { code: "config" });
   const text = value.trim();
   return text.length > 0 ? text : undefined;
+}
+
+function readBotanicalTools(value: unknown, label: string): boolean {
+  if (value === undefined || value === null || value === "") return true;
+  if (typeof value !== "boolean") {
+    throw new ProviderError(`${label}.botanicalTools must be a boolean.`, { code: "config" });
+  }
+  return value;
 }
 
 function readTimeout(value: unknown, label: string): number {

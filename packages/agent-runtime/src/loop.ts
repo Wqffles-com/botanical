@@ -145,25 +145,44 @@ export async function* runAgentTurn(
     const toolCalls: ToolCall[] = [];
     let errorMessage: string | null = null;
     const seenIds = new Set<string>();
+    const settled = new Map<string, ToolResult>();
 
     for await (const event of profile.provider.complete({
       model: profile.model,
       messages: requestMessages,
       tools: visibleTools.map(toDefinition),
       signal: input.signal,
+      agentId: agent.id,
+      chatId: chat.id,
       ...(cwd ? { cwd } : {}),
     })) {
       if (event.type === "text-delta") {
         text += event.text;
         yield event;
       } else if (event.type === "tool-call") {
-        if (toolCalls.length >= MAX_TOOL_CALLS_PER_STEP) continue;
+        // CLI MCP calls are already dispatched. The per-step cap only limits
+        // model-requested calls that this loop still has to execute.
+        if (!event.settled && toolCalls.length >= MAX_TOOL_CALLS_PER_STEP) continue;
         let id = event.id?.trim() || `call_${newId()}`;
         if (seenIds.has(id)) id = `${id}_${toolCalls.length}`;
         seenIds.add(id);
         const call: ToolCall = { id, name: event.name, arguments: event.arguments };
         toolCalls.push(call);
         yield { type: "tool-call", id, name: event.name, arguments: event.arguments };
+        if (event.settled) {
+          const result: ToolResult = {
+            output: event.settled.output,
+            isError: event.settled.isError === true,
+          };
+          settled.set(id, result);
+          yield {
+            type: "tool-result",
+            id,
+            name: event.name,
+            result: result.output,
+            isError: result.isError === true,
+          };
+        }
       } else if (event.type === "usage") {
         yield event;
       } else if (event.type === "error") {
@@ -181,16 +200,34 @@ export async function* runAgentTurn(
     });
     transcript.push(assistant);
 
+    const external = toolCalls.filter((call) => settled.has(call.id));
+    const pending = toolCalls.filter((call) => !settled.has(call.id));
+    for (const call of external) {
+      const result = settled.get(call.id);
+      if (!result) continue;
+      const sent = a2aSideEffect(call.name, result);
+      if (sent) yield { type: "a2a-sent", messageId: sent.messageId, toAgentId: sent.toAgentId };
+      const toolMessage = await deps.store.messages.append({
+        chatId: chat.id,
+        role: "tool",
+        name: call.name,
+        toolCallId: call.id,
+        content: toolResultToContent(result),
+        profileId,
+      });
+      transcript.push(toolMessage);
+    }
+
     if (errorMessage) {
       yield { type: "done", finishReason: "error" };
       return;
     }
-    if (toolCalls.length === 0) {
+    if (pending.length === 0) {
       yield { type: "done", finishReason: "stop" };
       return;
     }
 
-    for (const call of toolCalls) {
+    for (const call of pending) {
       if (input.signal?.aborted) {
         yield { type: "done", finishReason: "aborted" };
         return;
@@ -260,6 +297,48 @@ interface ExecutedCall {
   sent?: { messageId: string; toAgentId: string };
 }
 
+/**
+ * The same allowlist and role check the model loop uses, then the tool
+ * source's own call (workspace jail, limits, truncation). A denial is a tool
+ * result, not a throw. CLI MCP calls this directly so it cannot drift.
+ */
+export async function dispatchToolCall(
+  deps: Pick<RuntimeDeps, "toolSources">,
+  agent: AgentRecord,
+  catalog: readonly ListedTool[],
+  call: { name: string; arguments: unknown },
+  ctx: { agentId: string; chatId: string; signal?: AbortSignal },
+): Promise<ToolResult> {
+  const match = catalog.find((tool) => tool.name === call.name);
+  if (!match) {
+    return {
+      output: { error: `Tool "${call.name}" is not allowed for agent "${agent.name}"` },
+      isError: true,
+    };
+  }
+  const access = toolAccess(agent, match);
+  if (!access.ok) {
+    return { output: { error: access.message }, isError: true };
+  }
+  let args: unknown;
+  try {
+    args = normalizeToolArguments(call.arguments);
+  } catch (error) {
+    const message = error instanceof ValidationError ? error.message : "Invalid tool arguments";
+    return { output: { error: message }, isError: true };
+  }
+  const source = deps.toolSources.find((candidate) => candidate.id === match.sourceId);
+  if (!source) {
+    return { output: { error: `Tool source "${match.sourceId}" is not registered` }, isError: true };
+  }
+  try {
+    return await source.call(call.name, args, ctx);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { output: { error: message }, isError: true };
+  }
+}
+
 async function executeCall(
   deps: RuntimeDeps,
   agent: AgentRecord,
@@ -267,38 +346,9 @@ async function executeCall(
   call: ToolCall,
   ctx: { agentId: string; chatId: string; signal?: AbortSignal },
 ): Promise<ExecutedCall> {
-  const match = catalog.find((tool) => tool.name === call.name);
-  if (!match) {
-    return {
-      result: {
-        output: { error: `Tool "${call.name}" is not allowed for agent "${agent.name}"` },
-        isError: true,
-      },
-    };
-  }
-  const access = toolAccess(agent, match);
-  if (!access.ok) {
-    return { result: { output: { error: access.message }, isError: true } };
-  }
-  let args: unknown;
-  try {
-    args = normalizeToolArguments(call.arguments);
-  } catch (error) {
-    const message = error instanceof ValidationError ? error.message : "Invalid tool arguments";
-    return { result: { output: { error: message }, isError: true } };
-  }
-  const source = deps.toolSources.find((candidate) => candidate.id === match.sourceId);
-  if (!source) {
-    return { result: { output: { error: `Tool source "${match.sourceId}" is not registered` }, isError: true } };
-  }
-  try {
-    const result = await source.call(call.name, args, ctx);
-    const sent = a2aSideEffect(call.name, result);
-    return sent ? { result, sent } : { result };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { result: { output: { error: message }, isError: true } };
-  }
+  const result = await dispatchToolCall(deps, agent, catalog, call, ctx);
+  const sent = a2aSideEffect(call.name, result);
+  return sent ? { result, sent } : { result };
 }
 
 function a2aSideEffect(

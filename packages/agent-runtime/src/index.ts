@@ -103,6 +103,7 @@ export { createRuntimeToolSource } from "./runtime-tools";
 export { claimInbox, renderInbox } from "./inbox";
 export {
   DEFAULT_MAX_STEPS,
+  dispatchToolCall,
   prepareTurn,
   readTranscript,
   runAgentTurn,

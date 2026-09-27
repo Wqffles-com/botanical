@@ -16,6 +16,7 @@ import {
   type Env,
   type ProviderType,
 } from "@botanical/providers";
+import type { CliToolHost } from "../cli-mcp.ts";
 import type { ServerConfig } from "../config.ts";
 import type { ModelProfile } from "../types.ts";
 
@@ -62,7 +63,7 @@ function messagesSinceLastUser(messages: readonly ChatMessage[]): readonly ChatM
   return messages.slice(lastUser);
 }
 
-export function createServerProfileResolver(config: ServerConfig, env: Env): ProfileResolver {
+export function createServerProfileResolver(config: ServerConfig, env: Env, cliTools?: CliToolHost): ProfileResolver {
   const byId = new Map(config.profiles.map((profile) => [profile.id, profile]));
   const bridged = config.providers?.runtime;
 
@@ -81,7 +82,7 @@ export function createServerProfileResolver(config: ServerConfig, env: Env): Pro
         return {
           profileId: profile.id,
           providerId: "cli",
-          provider: cliProvider(profile),
+          provider: cliProvider(profile, cliTools),
           model: profile.model,
         };
       }
@@ -106,15 +107,18 @@ export function createServerProfileResolver(config: ServerConfig, env: Env): Pro
 }
 
 /**
- * Subscription CLIs run their own tools. Botanical's tool list is ignored.
- * Text comes back as the same text-delta events the chat loop already streams.
+ * Subscription CLIs run in the agent workspace. When `botanicalTools` is on,
+ * the same turn exposes Botanical's tool catalog over a per-run MCP server.
+ * Tool calls from that server are already dispatched; they arrive as settled
+ * tool-call events so the loop records them and does not run them twice.
  */
-function cliProvider(profile: ModelProfile): RuntimeProvider {
+function cliProvider(profile: ModelProfile, cliTools?: CliToolHost): RuntimeProvider {
+  const exposeTools = profile.botanicalTools !== false && cliTools != null;
   return {
     id: profile.id,
     capabilities() {
       return {
-        tools: false,
+        tools: exposeTools,
         parallelTools: false,
         vision: false,
         maxContext: 200_000,
@@ -138,20 +142,46 @@ function cliProvider(profile: ModelProfile): RuntimeProvider {
         return;
       }
       const cwd = request.cwd?.trim() || process.cwd();
-      yield* runCli({
-        cli: profile.cli,
-        bin: status.bin,
-        cwd,
-        messages: request.messages.map((message) => ({
-          role: message.role,
-          content: message.content,
-          ...(message.name ? { name: message.name } : {}),
-        })),
-        timeoutMs: profile.timeoutMs ?? 600_000,
-        ...(profile.passModel && profile.model ? { model: profile.model } : {}),
-        ...(request.signal ? { signal: request.signal } : {}),
-        env: process.env,
-      });
+      const session =
+        exposeTools && cliTools && request.agentId && request.chatId
+          ? cliTools.open({
+              agentId: request.agentId,
+              chatId: request.chatId,
+              ...(request.signal ? { signal: request.signal } : {}),
+            })
+          : undefined;
+      try {
+        for await (const event of runCli({
+          cli: profile.cli,
+          bin: status.bin,
+          cwd,
+          messages: request.messages.map((message) => ({
+            role: message.role,
+            content: message.content,
+            ...(message.name ? { name: message.name } : {}),
+          })),
+          timeoutMs: profile.timeoutMs ?? 600_000,
+          ...(profile.passModel && profile.model ? { model: profile.model } : {}),
+          ...(request.signal ? { signal: request.signal } : {}),
+          ...(session ? { mcp: { url: session.url, token: session.token }, toolEvents: session.events } : {}),
+          env: process.env,
+        })) {
+          if (event.type === "tool-call") {
+            yield {
+              type: "tool-call",
+              id: event.id,
+              name: event.name,
+              arguments: event.arguments,
+              settled: { output: event.output, isError: event.isError === true },
+            };
+            continue;
+          }
+          if (event.type === "done") continue;
+          yield event;
+        }
+      } finally {
+        session?.close();
+      }
     },
   };
 }

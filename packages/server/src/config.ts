@@ -309,6 +309,7 @@ function toCliProfile(spec: CliProfileSpec): ModelProfile {
     cli: spec.cli,
     timeoutMs: spec.timeoutMs,
     passModel: Boolean(spec.model),
+    botanicalTools: spec.botanicalTools,
   };
   if (spec.bin) profile.bin = spec.bin;
   return profile;

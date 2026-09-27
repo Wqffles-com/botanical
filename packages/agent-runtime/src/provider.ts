@@ -31,11 +31,24 @@ export interface ChatRequest {
   signal?: AbortSignal;
   /** Working directory for CLI profiles. API providers ignore it. */
   cwd?: string;
+  /** Bound by the turn loop so a CLI profile can open a per-run tool endpoint. */
+  agentId?: string;
+  chatId?: string;
 }
 
 export type ChatEvent =
   | { type: "text-delta"; text: string }
-  | { type: "tool-call"; id: string; name: string; arguments: unknown }
+  | {
+      type: "tool-call";
+      id: string;
+      name: string;
+      arguments: unknown;
+      /**
+       * Set when the call already went through `dispatchToolCall` (CLI MCP).
+       * The loop records it and does not execute it again.
+       */
+      settled?: { output: unknown; isError?: boolean };
+    }
   | { type: "usage"; inputTokens: number; outputTokens: number }
   | { type: "error"; error: Error }
   | { type: "done" };
