@@ -36,7 +36,7 @@ Also applied from the parent, before the command runs:
 - **Core dumps** disabled.
 - **Output cap** default 64 KiB combined stdout and stderr. Past that the process group is killed and the result is marked truncated.
 - **Environment scrub.** The child does not inherit `process.env`. `PATH` is a fixed system path. `HOME` is `/workspace`, not the server user's home. `LD_*`, `NODE_OPTIONS`, `PYTHONPATH`, `BASH_ENV`, and similar knobs cannot be injected via `extraEnv`.
-- **cwd check.** Requested `cwd` is `realpath`'d and must stay inside the workspace. A symlink that points outside is rejected before the jail starts. The mount namespace is what still blocks escape if the check were wrong.
+- **cwd check.** For an agent turn the workspace root is that agent's directory (`<root>/agents/<agentId>`), created on demand. Requested `cwd` is `realpath`'d and must stay inside it. `.` and `/` mean that directory. A symlink that points outside is rejected before the jail starts. The mount namespace is what still blocks escape if the check were wrong. The cwd check is not a second sandbox: a command can still name paths this jail mounts, including read-only `/usr`.
 - **Host paths in tool output** for the workspace and the jail scratch directory are redacted to `[redacted-path]` before `content` is returned.
 - **Allowlist (optional).** `shellAllowlist` / `BOTANICAL_SHELL_ALLOWLIST` execs one basename directly. Pipes, redirects, command substitution, and absolute paths are rejected. This is an operator policy on top of the jail, not a replacement for it.
 
@@ -68,7 +68,7 @@ Copied into the jail for name resolution, even when network is off: `/etc/resolv
 
 ## Operator checklist
 
-- Dedicated workspace directory per chat or per user. Not `$HOME`.
+- Dedicated directory per agent (`<workspace>/agents/<agentId>`). Not `$HOME`.
 - Leave network disabled unless a task truly needs it.
 - Keep `approval: "ask"` for both tools in the server policy.
 - Prefer `shellAllowlist` when the agent only needs a few programs.

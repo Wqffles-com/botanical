@@ -115,7 +115,7 @@ describe("built-in tool registry", () => {
 
     const escaped = await registry.call("file_read", { path: "../outside.txt" }, ctx);
     expect(escaped.isError).toBe(true);
-    expect(escaped.content).toContain("escapes");
+    expect(escaped.content).toContain('path "../outside.txt" is outside this agent\'s workspace');
   });
 
   test("truncates tool text to the registry cap", async () => {

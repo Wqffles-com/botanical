@@ -1,6 +1,7 @@
 import { ToolError, ToolErrorCode } from "../errors.ts";
 import type { ToolContext } from "../types.ts";
 import { canonicalizeWorkspaceRoot } from "../path-jail.ts";
+import { ensureAgentWorkspace } from "../workspace.ts";
 
 export const DEFAULT_FILE_LIMITS = {
   maxReadBytes: 1_048_576,
@@ -50,7 +51,19 @@ export function resolveFileConfig(config: FileToolsConfig = {}): ResolvedFileLim
   };
 }
 
-export async function openWorkspace(config: ResolvedFileLimits, ctx: ToolContext): Promise<string> {
+export interface OpenedWorkspace {
+  /** Canonical directory this call may touch. */
+  root: string;
+  /** True when `root` is `<base>/agents/<agentId>` from the turn's agent id. */
+  agentScoped: boolean;
+}
+
+/**
+ * Jail for this call. `ctx.workspaceRoot` is the shared base. When the turn
+ * passes `ctx.agentId`, the jail is that agent's directory, created on demand.
+ * The id is taken from the tool context, never from tool arguments.
+ */
+export async function openWorkspace(config: ResolvedFileLimits, ctx: ToolContext): Promise<OpenedWorkspace> {
   if (ctx.signal?.aborted) {
     throw new ToolError(ToolErrorCode.aborted, "operation aborted");
   }
@@ -61,7 +74,11 @@ export async function openWorkspace(config: ResolvedFileLimits, ctx: ToolContext
       "workspace root is not configured",
     );
   }
-  return canonicalizeWorkspaceRoot(requested);
+  const base = await canonicalizeWorkspaceRoot(requested);
+  const agentId = ctx.agentId?.trim();
+  if (!agentId) return { root: base, agentScoped: false };
+  const root = await ensureAgentWorkspace(base, agentId);
+  return { root, agentScoped: true };
 }
 
 function positive(value: number | undefined, fallback: number, name: string): number {

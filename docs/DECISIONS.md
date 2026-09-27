@@ -96,3 +96,28 @@ Enforcement happens at tool dispatch, not only when the tool list is built. A de
 Builtin roles, seeded idempotently: **Coder** (no `agent.create`), **Reviewer** (`file.read`, `web`, `memory.read`), **Orchestrator** (every capability and MCP `*`). Builtin roles can have their description and permissions edited. Their names cannot change and they cannot be deleted.
 
 `agent_list` is capability `agent.message` (same gate as sending mail). `file_delete` is `file.write`. There is no separate file-edit tool.
+
+---
+
+## 2026-09-27 — Per-agent file workspace
+
+**Status:** LOCKED for this slice.
+**Effect:** Built-in file tools and the shell/code_exec working directory are confined to the agent that is running the turn. CLI profiles keep the same directory they already use.
+
+### Scope
+
+The shared workspace root (`BOTANICAL_WORKSPACE`, otherwise the server default) stays the parent directory. Each agent gets `<root>/agents/<agentId>`. The id is sanitized the same way as the CLI cwd helper: characters outside `[A-Za-z0-9_-]` become `_`, and the name is capped at 80 characters. The directory is created on demand.
+
+The agent id comes from the turn at dispatch and is passed on the tool context. Tool arguments cannot select another agent's directory.
+
+For that agent, `.` and `/` are its own directory. `file_read`, `file_write`, `file_list`, and `file_delete` resolve every path inside that directory. A path that leaves it is a tool error, not a crash. That includes `..`, an absolute path outside the directory, and a symlink whose real path is outside it. For a write to a path that does not exist yet, the check uses the nearest existing parent, so a symlink parent that points outside is rejected before the file is created. The error names the path, for example `path "../x" is outside this agent's workspace`.
+
+There is no shared file area. Memory rows still have a `shared` scope; files do not. An agent cannot list, read, or write another agent's directory through these tools.
+
+### Shell and code_exec
+
+`shell` and `code_exec` start in the same agent directory. A `cwd` argument must stay inside it, including through symlinks. `.` and `/` mean that directory.
+
+Shell is not a filesystem sandbox beyond the existing process jail. The jail, when it starts, mounts the agent directory at `/workspace` and also mounts the paths that jail already allows, including a read-only `/usr`. A command can still name those paths. Setting the working directory to the agent folder does not hide them. If the jail cannot start, the tool returns an error and does not run the command on the host.
+
+CLI profiles already use this agent directory as their working directory. That stays the same path.

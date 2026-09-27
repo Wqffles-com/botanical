@@ -20,12 +20,28 @@ export interface ResolveInsideOptions {
   allowMissingParents?: boolean;
   /** Leave a final symlink unfollowed. Delete uses this so the link, not its target, is removed. */
   noFollowFinal?: boolean;
+  /**
+   * The root is one agent's directory. Escape errors name the caller's path
+   * and say it is outside that agent's workspace. `/` means the agent directory.
+   */
+  agentScope?: boolean;
+}
+
+/** `path "../x" is outside this agent's workspace` */
+export function outsideAgentWorkspace(userPath: string): string {
+  const shown = userPath.length > 180 ? `${userPath.slice(0, 180)}…` : userPath;
+  return `path ${JSON.stringify(shown)} is outside this agent's workspace`;
+}
+
+function isAgentRootAlias(userPath: string): boolean {
+  return userPath === "/" || userPath === "/." || userPath === "//";
 }
 
 /**
  * `root` must already be canonical (see {@link canonicalizeWorkspaceRoot}).
  * Every path component is walked. `..` is applied after symlink resolution,
  * so a lexical `path.normalize` cannot hide a symlink that steps outside.
+ * With `agentScope`, `/` is the root and escapes name the caller's path.
  */
 export async function resolveInsideWorkspace(
   rootReal: string,
@@ -38,7 +54,27 @@ export async function resolveInsideWorkspace(
   if (userPath.includes("\0")) {
     throw new ToolError(ToolErrorCode.invalidParams, "path contains a null byte");
   }
+  const requested = options.agentScope && isAgentRootAlias(userPath) ? "." : userPath;
+  try {
+    return await resolveInsideWorkspaceUnchecked(rootReal, requested, options);
+  } catch (err) {
+    if (
+      options.agentScope &&
+      err instanceof ToolError &&
+      (err.code === ToolErrorCode.pathEscape || err.code === ToolErrorCode.symlinkEscape) &&
+      !err.message.includes("too many")
+    ) {
+      throw new ToolError(err.code, outsideAgentWorkspace(userPath));
+    }
+    throw err;
+  }
+}
 
+async function resolveInsideWorkspaceUnchecked(
+  rootReal: string,
+  userPath: string,
+  options: ResolveInsideOptions,
+): Promise<ResolvedPath> {
   const absoluteInput = path.isAbsolute(userPath);
   let start = rootReal;
   let segments: string[];

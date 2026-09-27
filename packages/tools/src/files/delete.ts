@@ -22,7 +22,8 @@ const parameters = {
     path: {
       type: "string",
       minLength: 1,
-      description: "File, symlink, or directory inside the workspace. The workspace root itself is refused.",
+      description:
+        "File, symlink, or directory inside this call's workspace. On an agent turn that is the agent's own directory. The workspace root itself is refused.",
     },
     confirm: {
       type: "boolean",
@@ -45,7 +46,7 @@ export function createFileDeleteTool(config: ResolvedFileLimits): ToolDefinition
   return defineTool({
     name: "file_delete",
     description:
-      "Delete a file, symlink, or directory inside the workspace. confirm must be true. Refuses the workspace root. A non-empty directory requires recursive: true. Symlinks are removed without deleting their targets. The tree is counted first and left untouched when it exceeds the entry cap. Requires approval.",
+      "Delete a file, symlink, or directory inside the workspace. On an agent turn the workspace is that agent's directory. confirm must be true. Refuses the workspace root. A non-empty directory requires recursive: true. Symlinks are removed without deleting their targets. The tree is counted first and left untouched when it exceeds the entry cap. Requires approval.",
     parameters,
     risk: "destructive",
     requiresApproval: true,
@@ -59,8 +60,12 @@ export function createFileDeleteTool(config: ResolvedFileLimits): ToolDefinition
         );
       }
       const recursive = asBoolean(params, "recursive", false);
-      const root = await openWorkspace(config, ctx);
-      const resolved = await resolveInsideWorkspace(root, userPath, { noFollowFinal: true });
+      const opened = await openWorkspace(config, ctx);
+      const root = opened.root;
+      const resolved = await resolveInsideWorkspace(root, userPath, {
+        noFollowFinal: true,
+        agentScope: opened.agentScoped,
+      });
       if (resolved.absolute === root || resolved.relative === ".") {
         throw new ToolError(
           ToolErrorCode.workspaceRootProtected,

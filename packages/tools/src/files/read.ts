@@ -25,7 +25,7 @@ const parameters = {
       type: "string",
       minLength: 1,
       description:
-        "File path relative to the workspace root. Absolute paths are accepted only when they stay inside the workspace.",
+        "File path relative to this call's workspace. On an agent turn that is the agent's own directory: `.` and `/` are that folder. Absolute paths are accepted only when they stay inside it.",
     },
     offset: {
       type: "integer",
@@ -45,7 +45,7 @@ export function createFileReadTool(config: ResolvedFileLimits): ToolDefinition<F
   return defineTool({
     name: "file_read",
     description:
-      "Read a UTF-8 text file inside the workspace. Paths stay inside the configured workspace root, including through symlinks. Use offset (1-based line) and limit to window a large file. Refuses binary files and directories.",
+      "Read a UTF-8 text file inside the workspace. On an agent turn the workspace is that agent's directory (`.` and `/` are that directory). Paths stay inside it, including through symlinks. Use offset (1-based line) and limit to window a large file. Refuses binary files and directories.",
     parameters,
     risk: "read",
     requiresApproval: false,
@@ -53,8 +53,9 @@ export function createFileReadTool(config: ResolvedFileLimits): ToolDefinition<F
       const userPath = asString(params, "path");
       const offset = asInteger(params, "offset");
       const limit = asInteger(params, "limit");
-      const root = await openWorkspace(config, ctx);
-      const resolved = await resolveInsideWorkspace(root, userPath);
+      const opened = await openWorkspace(config, ctx);
+      const root = opened.root;
+      const resolved = await resolveInsideWorkspace(root, userPath, { agentScope: opened.agentScoped });
 
       const handle = await openNoFollow(resolved.absolute, constants.O_RDONLY);
       try {

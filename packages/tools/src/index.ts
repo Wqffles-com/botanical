@@ -22,6 +22,7 @@ export {
   canonicalizeWorkspaceRoot,
   isInsideWorkspace,
   mkdirAllInside,
+  outsideAgentWorkspace,
   resolveInsideWorkspace,
   toPosixRelative,
 } from "./path-jail.ts";
@@ -49,10 +50,13 @@ export {
 } from "./limits.ts";
 export type { LimitedToolResult } from "./limits.ts";
 export {
+  agentWorkspacePath,
   DEFAULT_WORKSPACE_DIR,
+  ensureAgentWorkspace,
   ensureWorkspaceDir,
   ensureWorkspaceRoot,
   resolveWorkspaceDir,
+  sanitizeAgentId,
 } from "./workspace.ts";
 export type { FileReadData } from "./files/read.ts";
 export type { FileWriteData } from "./files/write.ts";
