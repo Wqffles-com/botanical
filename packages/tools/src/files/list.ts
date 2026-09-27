@@ -36,7 +36,8 @@ const parameters = {
       type: "string",
       minLength: 1,
       default: ".",
-      description: "Directory relative to the workspace root. Defaults to the workspace root.",
+      description:
+        "Directory relative to this call's workspace. On an agent turn that is the agent's own directory. `.` and `/` mean that directory. Defaults to it.",
     },
     recursive: {
       type: "boolean",
@@ -60,7 +61,7 @@ export function createFileListTool(config: ResolvedFileLimits): ToolDefinition<F
   return defineTool({
     name: "file_list",
     description:
-      "List files and directories inside the workspace. path defaults to the workspace root. recursive walks subdirectories. Symlinks are listed and not followed; targets outside the workspace are marked and their paths are omitted.",
+      "List files and directories inside the workspace. On an agent turn the workspace is that agent's directory, so `.` does not show other agents. path defaults to that directory. recursive walks subdirectories. Symlinks are listed and not followed; targets outside the workspace are marked and their paths are omitted.",
     parameters,
     risk: "read",
     requiresApproval: false,
@@ -77,8 +78,9 @@ export function createFileListTool(config: ResolvedFileLimits): ToolDefinition<F
         throw new ToolError(ToolErrorCode.invalidParams, "maxEntries must be a positive integer");
       }
 
-      const root = await openWorkspace(config, ctx);
-      const resolved = await resolveInsideWorkspace(root, userPath);
+      const opened = await openWorkspace(config, ctx);
+      const root = opened.root;
+      const resolved = await resolveInsideWorkspace(root, userPath, { agentScope: opened.agentScoped });
       let info;
       try {
         info = await lstat(resolved.absolute);

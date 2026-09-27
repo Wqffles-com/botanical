@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
+import { agentWorkspace } from "../src/runtime/workspace.ts";
 import { bearer, createAgent, login, readJson, setup } from "./helpers.ts";
 
 async function postJson(
@@ -25,7 +26,6 @@ describe("mock profile and file_list", () => {
   test("echoes the user and lists the workspace", async () => {
     const workspace = join(tmpdir(), `botanical-mock-${Date.now()}`);
     mkdirSync(workspace, { recursive: true });
-    writeFileSync(join(workspace, "notes.txt"), "garden");
     process.env.BOTANICAL_WORKSPACE = workspace;
 
     const profiles = [
@@ -35,6 +35,7 @@ describe("mock profile and file_list", () => {
     const { app } = setup({ BOTANICAL_PROFILES: JSON.stringify(profiles) });
     const { token } = await login(app);
     const agent = await createAgent(app, token, { toolIds: ["file_list"] });
+    writeFileSync(join(agentWorkspace(agent.id), "notes.txt"), "garden");
     const created = await postJson(
       app,
       "/api/chats",

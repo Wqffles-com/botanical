@@ -50,7 +50,9 @@ There is **no implicit jail** to `process.cwd()`. If neither the factory nor the
 
 ### Jail
 
-Every path is resolved inside the workspace root from `realpath`:
+When a call includes `agentId` (the agent running the turn), the jail root is `<workspaceRoot>/agents/<agentId>`, created on demand. `.` and `/` are that directory. The id is sanitized (`[^A-Za-z0-9_-]` becomes `_`, 80 characters). There is no shared file directory next to it. Calls without `agentId` keep using `workspaceRoot` itself.
+
+Every path is resolved inside that root from `realpath`:
 
 - Relative paths are walked component by component. `..` is applied **after** symlink resolution, so normalizing the string first cannot hide a link that steps outside.
 - Absolute paths are accepted only when they already sit under the root. A sibling such as `/data/ws-evil` is not inside `/data/ws`.

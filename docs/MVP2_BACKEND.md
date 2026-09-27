@@ -185,9 +185,20 @@ docker compose -f docker-compose.yml -f docker-compose.cli.yml up -d
 
 Put `auth.json` at `$BOTANICAL_CLI_HOME/.grok/auth.json`. The grok binary on Alpine must be statically linked. The CLI home mount must be writable by the `botanical` user. The default `docker compose up` does not use this file.
 
+## Workspace scoping
+
+Built-in file tools (`file_read`, `file_write`, `file_list`, `file_delete`) and the working directory of `shell` and `code_exec` use `<BOTANICAL_WORKSPACE>/agents/<agentId>` (the server default when the variable is unset). The directory is created when the agent first uses it. `.` and `/` are that directory.
+
+The agent id is the one running the turn. It is copied onto the tool context at dispatch. The model cannot pass a different id or a path that leaves the directory. `..`, an absolute path outside the directory, and a symlink that resolves outside it (including a not-yet-existing write whose nearest existing parent is outside) return a tool error such as `path "../x" is outside this agent's workspace`.
+
+There is no shared file directory. Agents do not see each other's files through these tools. Shared memory rows are unchanged; that scope is for memories, not files.
+
+`shell` and `code_exec` are not an extra filesystem sandbox. Their cwd is the agent directory, and a `cwd` argument must stay there, but a command can still refer to any path the existing jail mounts (for example read-only `/usr`). If the jail cannot start, the tool errors and does not fall back to an unjailed process. CLI profiles use this same agent directory as their cwd.
+
 ## Known limitations
 
-- CLI profiles do not receive Botanical tools or MCP. The CLI's own tools run in `/data/agents/<agentId>` (or `BOTANICAL_WORKSPACE/agents/<agentId>`).
+- CLI profiles do not receive Botanical tools or MCP. The CLI's own tools run in the same per-agent directory as Botanical file tools and shell cwd: `/data/agents/<agentId>` or `BOTANICAL_WORKSPACE/agents/<agentId>`.
+- `shell` and `code_exec` cwd scoping is not a second filesystem sandbox. Isolation is whatever the existing jail already enforces. A command can still name paths that jail mounts.
 - Prompt text is passed as an argv argument (`-p` or the Codex positional). Very large transcripts can hit the OS argument limit.
 - Grok incremental text uses `streaming-messages-json`, not ACP `streaming-json`. Both shapes are parsed.
 - Claude and Codex are not installed in the default image. Mount them the same way as grok if you enable those presets.

@@ -1,4 +1,5 @@
 import type { ModelProfile } from "@botanical/core";
+import { profileUnavailableText } from "./errors";
 
 export function relativeTime(iso: string, now = Date.now()): string {
   const then = new Date(iso).getTime();
@@ -29,6 +30,14 @@ export function profileKind(profile: { kind?: string | null; provider?: string |
 
 export function profileIsAvailable(profile: { available?: boolean | null }): boolean {
   return profile.available !== false;
+}
+
+/** Hint when the selected profile cannot run a turn. Null when send is allowed. */
+export function unavailableProfileHint(
+  profile: { name?: string | null; available?: boolean | null; unavailableReason?: string | null } | null | undefined,
+): string | null {
+  if (!profile || profileIsAvailable(profile)) return null;
+  return profileUnavailableText(profile.name ?? "This profile", profile.unavailableReason ?? "");
 }
 
 export function formatJson(value: unknown, limit = 0): string {
