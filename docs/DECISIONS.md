@@ -1,66 +1,40 @@
-# Botanical — Decision Log
+# Botanical: decision log
 
-Authoritative product decisions. When these conflict with earlier brainstorm notes, **this file wins**. Later entries in this file refine earlier ones.
-
-**Latest refinement (2026-09-23):** Botanical is **open-source (self-hostable)** and a **hosted SaaS** on the same codebase. See the business model entry at the end of this file.
+This log records the project's design decisions and why they were made. Later entries refine earlier ones. Planned work that is not built yet is tracked in [ROADMAP.md](./ROADMAP.md).
 
 ---
 
-## 2026-09-23 — Charlie interview with Ash (orchestrator)
+## 2026-09-23: Foundational product decisions
 
-**Status:** LOCKED for v0 planning.  
-**Source:** Charlie × Ash interview (orchestrator session).  
-**Effect:** Supersedes conflicting earlier notes that pushed **local-first** and **CLI-as-MVP**. Those ideas remain useful history in [BRAINSTORM.md](./BRAINSTORM.md) where marked superseded; they are not the build plan.
+**Status:** Accepted.
 
-### Locked decisions
+1. **Server, not local-first.** Botanical is a server that clients connect to. The operator self-hosts it, or it runs as the hosted service. This keeps history, keys, and agents in one place, and makes always-on work possible.
+2. **Web first.** The first client is a web UI talking to that server. Other clients (CLI, mobile) can come later against the same API.
+3. **Scope of the first release.** Streaming chat, tools, and MCP. Scheduled routines were deferred (see [ROADMAP.md](./ROADMAP.md)).
+4. **Portable hosting.** No hard dependency on one cloud vendor. Docker Compose is the reference deploy.
+5. **No default model.** Every chat must name an explicit model profile. Nothing is silently auto-selected, so cost and behavior are always a visible choice.
+6. **Passcode auth.** A single operator passcode protects the web → server boundary. Multi-user accounts are deferred.
+7. **Stack.** TypeScript on Bun (Bun was picked over Deno when the repo was scaffolded).
+8. **Unlimited custom agents.** Each agent is defined by a prompt/description and a set of tools.
+9. **One agent per chat.** Each thread is owned by one agent, which keeps context and permissions unambiguous.
+10. **Async agent-to-agent messaging.** Agents can message each other asynchronously (an inbox model) without merging chats.
+11. **Core built-in tools.** Web search/fetch, shell/code execution, and file read/write. Anything heavier (browser or computer use) is opt-in, not core.
+12. **Server-side keys only.** Model API keys live in the server environment and are never supplied by or sent to the web client.
+13. **Postgres** stores chats, agents, messages, and related state.
+14. **Open source and hosted, same code.** The core is MIT-licensed and self-hostable. A hosted service runs the same codebase. `DEPLOYMENT_MODE` (`SELF_HOST` / `SAAS`) is configuration, not a fork, and chat, tools, and MCP behave the same in both modes. See [DEPLOYMENT_MODES.md](./DEPLOYMENT_MODES.md).
 
-1. **Audience** — Charlie as personal power user. Not teams-first or OSS-community-first yet. (Refined the same day: the product is MIT open-source and self-hostable, and also a hosted SaaS. Community growth is still not the v0 wedge.)
-2. **Architecture** — **Not** local-first. Botanical **server** — self-hosted by the operator, or hosted by us — with clients connecting from elsewhere. Enables always-on cloud capabilities later.
-3. **First client** — **Web** UI talking to that server.
-4. **v0 MVP scope** — Streaming **chat + tools + MCP**. Always-on routines / schedulers are **post-v0**.
-5. **Hosting** — Vendor undecided. Keep the server **portable / host-agnostic** (no hard lock to one cloud). Deployment **mode** is decided: self-host or our hosted SaaS, same code.
-6. **Default model** — **None**. Force an explicit **profile** pick; no silent everyday default.
-7. **Auth (web → server)** — **Password / passcode** for v0.
-8. **Stack** — **TypeScript**; runtime **Bun or Deno**, chosen at scaffold time. **Resolved:** **Bun**. See [Scaffold: Bun](#2026-09-23--scaffold-bun).
-9. **Agents** — **Unlimited** user-defined agents; each customized with **functions (tools) + description/prompt**.
-10. **Agent UX** — **One agent per chat** (each thread owned by one chosen agent).
-11. **Agent collaboration** — Full **async agent-to-agent messaging** (teammate-style), even with one-agent-per-user-chat.
-12. **Built-in tools (v0)** — **Web search/fetch**, **shell/code exec**, **file read/write**. Everything else (e.g. browser / computer use) is **opt-in configurable**, not core.
-13. **Model API keys** — **Server-side only** (never supplied from the web client).
-14. **Persistence** — **Postgres** for chats, agents, messages, and related state.
+### Deferred at the time
 
-### Implications (short)
-
-| Area | Was (early brainstorm) | Now (locked) |
-|------|------------------------|--------------|
-| Deployment | Local-first CLI on user machine | Server + remote clients; self-host or hosted SaaS (same code) |
-| MVP surface | CLI | Web UI |
-| Persistence | SQLite / files | Postgres |
-| Runtime | Node 20+ lean | **Bun** (picked at scaffold) |
-| Keys | BYOK in client/env on machine | Server-held keys only |
-| Agents | Implicit single-agent chat | Multi-agent model + A2A messaging |
-| Default brain | Auto / preferred profile OK | Explicit profile pick required |
-
-### Explicitly deferred (post-v0)
-
-- Always-on routines / schedulers
-- Teams / multi-tenant auth and billing (required later for hosted SaaS; not v0 — see business model entry)
-- OSS-community growth as the primary go-to-market (the core **is** MIT and self-hostable; community-building is still not the v0 wedge)
-- Browser / computer-use as **core** built-ins (opt-in only)
-- Hosting vendor choice
-
-### Related docs
-
-- [VISION.md](./VISION.md) — product vision (aligned)
-- [BRAINSTORM.md](./BRAINSTORM.md) — ideas; superseded bits marked
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — system sketch (aligned)
-- [BUSINESS_MODEL.md](./BUSINESS_MODEL.md) — MIT self-host vs hosted subscription; deployment mode in v0
+- Always-on routines and schedulers
+- Multi-tenant accounts and billing for the hosted mode
+- Browser / computer use as core built-ins
+- Choosing a specific hosting vendor
 
 ---
 
-## 2026-09-27 — MVP2 backend: CLI profiles, memory, agent creation, roles
+## 2026-09-27: Backend slice 2: CLI profiles, memory, agent creation, roles
 
-**Status:** LOCKED for this backend slice.  
+**Status:** Accepted.  
 **Effect:** Adds four server capabilities. Does not change the rule that every chat names a profile and that there is no silent default model.
 
 ### 1. CLI profiles (`kind: "cli"`)
@@ -99,9 +73,9 @@ Builtin roles, seeded idempotently: **Coder** (no `agent.create`), **Reviewer** 
 
 ---
 
-## 2026-09-27 — Per-agent file workspace
+## 2026-09-27: Per-agent file workspace
 
-**Status:** LOCKED for this slice.
+**Status:** Accepted.
 **Effect:** Built-in file tools and the shell/code_exec working directory are confined to the agent that is running the turn. CLI profiles keep the same directory they already use.
 
 ### Scope
@@ -121,3 +95,33 @@ There is no shared file area. Memory rows still have a `shared` scope; files do 
 Shell is not a filesystem sandbox beyond the existing process jail. The jail, when it starts, mounts the agent directory at `/workspace` and also mounts the paths that jail already allows, including a read-only `/usr`. A command can still name those paths. Setting the working directory to the agent folder does not hide them. If the jail cannot start, the tool returns an error and does not run the command on the host.
 
 CLI profiles already use this agent directory as their working directory. That stays the same path.
+
+---
+
+## 2026-09-27: Botanical is a cloud, always-on platform
+
+**Status:** Accepted. This sharpens decision 1 of 2026-09-23.
+
+Botanical is meant to run **always on, on a server the user controls** (their own server or VPS) **or on the hosted service**. It is not designed to run on a personal PC or laptop. Local runs (`bun run dev`, Compose on a workstation) are for development only.
+
+The point is that agents keep working while the user is away:
+
+- **Today:** agent-to-agent messages can start background turns for the recipient (`BOTANICAL_A2A_AUTORUN=true`), and all state lives in Postgres on the server.
+- **Planned:** routines (scheduled runs) and listeners (event triggers) that start agent turns with no browser connected. See [ROADMAP.md](./ROADMAP.md).
+
+Consequences: docs and quickstarts lead with deploying to a server. Features should assume a long-running process and must not depend on an open browser tab.
+
+---
+
+## 2026-09-27: First-class developers and non-developers, with a developer mode
+
+**Status:** Accepted as direction. The developer-mode setting is **not implemented yet**.
+
+Botanical serves two audiences as first-class users, in roughly equal measure:
+
+- **Non-developers** get a simpler assistant experience: chat, agents, memory, web tools, and connectors, with no terminal-shaped features in the way.
+- **Developers** can declare themselves developers in a per-user setting. That unlocks a **coding-agent base**: coding CLI profiles (Grok Build, Claude Code, Codex), `shell` / `code_exec`, in-browser terminals into the agent workspace, and similar tooling.
+
+Current state: there is no developer setting in the code. Every user sees the same UI. Coding CLI profiles, `shell`, and `code_exec` already exist, and access is controlled by the operator through agent tool allowlists and roles (for example, the built-in **Reviewer** role has no shell access). Terminals do not exist yet.
+
+When the setting is built, it should gate the UI surfaces and default tool sets. It must not replace role enforcement: permissions stay enforced at tool dispatch.

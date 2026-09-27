@@ -83,7 +83,7 @@ describe('v0 postgres schema', () => {
 
     const [owner] = await db
       .insert(users)
-      .values({ displayName: 'Charlie' })
+      .values({ displayName: 'Operator' })
       .returning();
     if (!owner) throw new Error('expected owner');
 

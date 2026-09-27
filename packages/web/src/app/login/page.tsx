@@ -80,7 +80,7 @@ function LoginForm() {
         <div className="mb-8 flex flex-col items-center text-center">
           <Mark className="size-12" />
           <Wordmark className="mt-4 text-[2.4rem]" />
-          <p className="mt-2 text-sm text-muted-foreground">Personal agent server. Any brain.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Always-on agent server. Any model.</p>
         </div>
         <Card className="bg-card">
           <CardContent className="px-5">

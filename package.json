@@ -2,7 +2,7 @@
   "name": "botanical",
   "version": "0.0.0",
   "private": true,
-  "description": "Personal hosted agent server with a web client and swappable model providers.",
+  "description": "Open-source, always-on AI agent server with a web client and swappable model providers.",
   "license": "MIT",
   "type": "module",
   "packageManager": "bun@1.4.2",
