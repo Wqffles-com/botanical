@@ -1,8 +1,6 @@
-# Botanical — Architecture (First Pass)
+# Botanical: architecture
 
-Target shape aligned with locked decisions in [DECISIONS.md](./DECISIONS.md). The monorepo scaffold is in place (Bun, `GET /health`, empty packages). Behavior below is still the target, not as-built.
-
-> Earlier drafts leaned local-first CLI + SQLite. That lean is **superseded**: a Botanical **server** you **self-host** or that we run as **hosted SaaS** (same codebase, deployment mode), **web** first client, **Postgres**, TypeScript on **Bun**.
+This doc describes the system design, following the decisions in [DECISIONS.md](./DECISIONS.md). Botanical is an always-on **server**, either self-hosted or run as the hosted service from the same codebase. The **web** UI is the first client, state lives in **Postgres**, and everything is TypeScript on **Bun**. Some sections describe target behavior. Items that are not built yet are marked, and [ROADMAP.md](./ROADMAP.md) tracks them.
 
 ---
 
@@ -11,7 +9,7 @@ Target shape aligned with locked decisions in [DECISIONS.md](./DECISIONS.md). Th
 ```
                     ┌──────────────────────────────────────────┐
                     │              Clients                     │
-                    │  Web UI (v0) · CLI/desktop (later)       │
+                    │  Web UI (v0) · CLI/mobile (later)        │
                     └──────────────────┬───────────────────────┘
                                        │  password / passcode
                     ┌──────────────────▼───────────────────────┐
@@ -41,28 +39,33 @@ Postgres ────────▶ chats, agents, messages, A2A, usage
 
 **Invariant:** model API keys are **server-side only**.
 
-**Invariant:** self-host and hosted SaaS are deployment modes of this same server. Core paths must run without SaaS billing, our accounts, or our domain.
+**Invariant:** self-host and hosted SaaS are deployment modes of this same server. Core paths must run without SaaS billing, a hosted account system, or a specific domain.
 
 ---
 
-## 2. Packages (proposed monorepo)
+## 2. Packages
 
 ```
 botanical/
   packages/
-    core/          # shared types, agent config schemas, agent loop (later)
-    providers/     # LLMProvider implementations (was sketched as adapters/)
-    tools/         # built-in tools + MCP client bridge
-    server/        # HTTP API, auth, orchestration, Postgres access
-    web/           # v0 client (Vite + React + TypeScript)
-    db/            # Postgres schema + migrations
+    server/         # HTTP API: auth, agents, chats, streaming turns, A2A, memory, roles
+    agent-runtime/  # agent loop, tool dispatch, permission checks
+    providers/      # streaming model adapters (OpenAI-compat, Anthropic, xAI, DeepSeek, OpenRouter, CLI)
+    tools/          # file tools (per-agent workspace jail)
+    tools-shell/    # shell + code_exec (Linux namespace jail)
+    tools-web/      # web_search + web_fetch
+    mcp/            # MCP client
+    db/             # Postgres schema (Drizzle) + migrations
+    core/           # shared types + web client for the API
+    web/            # Next.js App Router + shadcn/ui client
+    e2e/            # Playwright suite
   docker-compose.yml
-  docs/            # decisions, vision, brainstorm, architecture
+  docs/
 ```
 
 Language: **TypeScript**. Runtime: **Bun**. Persistence: **Postgres**. A later CLI would be another client against the same API, not a second runtime.
 
-Deployment: **same codebase**, two modes — **self-host** and **hosted SaaS** — selected by config, not a fork. Do not hard-code SaaS-only assumptions (billing, our accounts, our domain) into the core. Hosting vendor stays **portable / host-agnostic**.
+Deployment: **same codebase**, two modes — **self-host** and **hosted SaaS** — selected by config, not a fork. Do not hard-code SaaS-only assumptions (billing, hosted accounts, a specific domain) into the core. Hosting vendor stays **portable / host-agnostic**.
 
 ---
 
@@ -72,21 +75,21 @@ Deployment: **same codebase**, two modes — **self-host** and **hosted SaaS** �
 |--------|------|------|
 | Web UI | Chat, agent picker, mandatory profile pick, settings, A2A activity | **v0** |
 | CLI | Thin client against server API | Later |
-| Desktop | OS integrations, notifications | Later |
+| Mobile | Notifications, quick replies | Later |
 
 Clients are thin: authenticate, send user turns, render `ChatEvent` streams. Business logic lives in `core` / `server`.
 
 ### Auth (v0)
 
 - Web → server: **password / passcode**
-- Enough for a personal or single-operator self-host, and for a single-operator hosted deploy
+- Enough for a single-operator self-host, and for a single-operator hosted deploy
 - Hosted SaaS needs **multi-tenant auth** later. Keep the auth boundary replaceable; do not build tenancy or billing in v0
 
 ---
 
 ## 4. Orchestration core
 
-Responsibilities:
+Responsibilities (some are planned; see [ROADMAP.md](./ROADMAP.md)):
 - Load **config** (providers, profiles, MCP servers) — keys from server env
 - Maintain **session** state (messages, tool results, active profile, owning agent)
 - Run the **agent loop** (model ↔ tools until completion or max steps)
@@ -122,10 +125,10 @@ Profile can change between steps if the user requests a switch or a policy escal
 
 ## 5. Tool / MCP layer
 
-### Built-ins (v0 — locked)
+### Built-ins (core)
 
 - **Web search / fetch** — search + HTTP fetch with size limits
-- **Shell / code exec** — gated; approvals / allowlists
+- **Shell / code exec** — Linux namespace jail; gated by allowlists and roles (UI approval prompts are planned)
 - **File read / write** — workspace-scoped paths only
 - **Memory and agent admin (MVP2)** — `memory_*`, `agent_create`, `agent_list`. With roles, a tool runs only when the allowlist matches and the role union permits its capability. Agents with no roles stay allowlist-only. See [DECISIONS.md](./DECISIONS.md).
 
@@ -140,12 +143,12 @@ Profile can change between steps if the user requests a switch or a policy escal
 - Tool namespaced as `mcp.<server>.<tool>` to avoid collisions
 - Capability negotiation: if a profile’s model is weak at tools, warn or disable MCP for that profile
 
-### Approvals
+### Approvals (planned)
 
 - Policy levels: `allow` | `ask` | `deny` per tool or pattern
 - Web: modal / inline prompt; later CLI/daemon policies as needed
 
-### Audit
+### Audit (planned)
 
 - Append-only log of tool calls (args redacted for secrets) for debugging and trust
 
@@ -207,7 +210,7 @@ interface LLMProvider {
 | `deepseek` | OpenAI-compat; reasoning models may need special handling for “think” channels |
 | `openrouter` | OpenAI-compat + `HTTP-Referer` / `X-Title` + optional provider routing |
 | `openai-compat` | Generic: `baseURL`, `apiKey`, `defaultHeaders` — covers local and unknown hosts |
-| `cli` | Subscription coding CLIs (`grok`, `claude`, `codex`) spawned headless. They use their own tools. Botanical streams stdout back as `text-delta`. |
+| `cli` | Subscription coding CLIs (`grok`, `claude`, `codex`) spawned headless in the agent's workspace. They keep their own tools and also reach Botanical's tools and the operator's MCP tools through a per-run MCP endpoint on the server, with the same role checks. The prompt goes by file or stdin. Botanical streams stdout back as `text-delta`. |
 
 ### Config sketch (server-side)
 
@@ -273,16 +276,18 @@ Same server, two modes. Not local-first: the runtime is always a server that cli
 | Mode | Description | v0 |
 |------|-------------|-----|
 | **Self-host** | Operator runs Botanical (Docker / bare metal / any VPS). MIT OSS core. | **Supported** |
-| **Hosted SaaS** | We run the same codebase on our servers. Subscription billing is **post-v0**. | **Same code**; billing deferred |
+| **Hosted SaaS** | The same codebase run as a hosted service. Subscription billing is planned. | **Same code**; billing deferred |
 | **Portable host** | No hard dependency on one cloud vendor inside the core | **Required** |
-| **User box sandbox** | Optional remote sandbox for heavier computer use | Later / opt-in |
-| ~~Local-first CLI only~~ | Runtime primarily on a laptop with SQLite | **SUPERSEDED** |
+| **Remote sandbox** | Optional remote sandbox for heavier computer use | Later / opt-in |
+| Local / laptop | `bun run dev` or Compose on a workstation | Development only |
+
+Botanical is designed to run always on, so agents can keep working while no client is connected. Agent-to-agent autorun works today; routines and listeners are planned.
 
 Mode is configuration (a deployment-mode setting plus env), not a compile-time fork. Core features — chat, tools, MCP, agents, Postgres — behave the same in both modes. SaaS-only concerns (tenant identity, subscription state) stay off the v0 core path so a self-host operator is not blocked on them.
 
-Always-on routines/schedulers are enabled by this architecture but are **post-v0**. Multi-tenant auth for hosted SaaS is also **post-v0**; leave a seam at the auth boundary.
+Always-on routines and listeners are enabled by this architecture and are planned. Multi-tenant auth for hosted SaaS is also planned; leave a seam at the auth boundary.
 
-Reference deploy is Docker Compose ([DEPLOY.md](./DEPLOY.md)): Postgres, server, and web from one codebase. `DEPLOYMENT_MODE=self_host` is the personal server. `DEPLOYMENT_MODE=saas` is the same images on operated hosts. Multi-tenant accounts and billing stay deferred; v0 does not assume a SaaS-only runtime.
+Reference deploy is Docker Compose ([DEPLOY.md](./DEPLOY.md)): Postgres, server, and web from one codebase. `DEPLOYMENT_MODE=SELF_HOST` is a server you run. `DEPLOYMENT_MODE=SAAS` is the same images run as the hosted service. Multi-tenant accounts and billing stay deferred; v0 does not assume a SaaS-only runtime.
 
 ---
 
@@ -330,16 +335,15 @@ Runnable v0 smoke (health, passcode auth, create agent, create chat, mock provid
 
 ---
 
-## 12. What “done” looks like for architecture v0
+## 12. Status
 
-- [ ] `LLMProvider` interface stabilized
-- [ ] Five named providers + custom base URL work for streaming chat
-- [ ] Web UI auth (passcode) + mandatory profile pick
-- [ ] Postgres-backed chats, agents, messages
-- [ ] Built-ins: web search/fetch, shell/code exec, file read/write
-- [ ] One MCP server callable from the agent loop
-- [ ] Multi-agent create + one-agent-per-chat + async A2A path
-- [x] Documented portable deploy (host-agnostic) — [DEPLOY.md](./DEPLOY.md)
-- [ ] Documented threat model for tools
-
-When those land, revisit this doc and replace sketches with “as-built” diagrams.
+- [x] Five named providers + custom base URL for streaming chat, plus CLI profiles
+- [x] Web UI auth (passcode) + mandatory profile pick
+- [x] Postgres-backed chats, agents, messages, memories, roles
+- [x] Built-ins: web search/fetch, shell/code exec, file read/write
+- [x] MCP servers callable from the agent loop
+- [x] Multi-agent create + one-agent-per-chat + async A2A path
+- [x] Documented portable deploy (host-agnostic): [DEPLOY.md](./DEPLOY.md)
+- [x] Shell jail limits: [packages/tools-shell/SECURITY.md](../packages/tools-shell/SECURITY.md)
+- [ ] UI approvals and tool audit log
+- [ ] Routines, listeners, developer mode ([ROADMAP.md](./ROADMAP.md))

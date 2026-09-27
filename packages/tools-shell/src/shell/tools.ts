@@ -1,20 +1,25 @@
+import { ensureAgentWorkspace } from "@botanical/tools";
 import { ToolInputError } from "../errors.ts";
 import { MIN_TIMEOUT_MS } from "../sandbox/limits.ts";
 import { FIXED_PATH } from "../sandbox/env.ts";
-import { whichOnFixedPath } from "../sandbox/paths.ts";
+import { resolveWorkspaceCwd, whichOnFixedPath } from "../sandbox/paths.ts";
 import { runSandboxed, type SandboxRequest } from "../sandbox/run.ts";
 import type { JsonObjectSchema, ToolContext, ToolDefinition, ToolResult } from "../types.ts";
 import { parseCodeArgs, parseShellArgs, shellCommandArgv } from "./args.ts";
 import { sandboxToToolResult } from "./format.ts";
 import { type CodeLanguage, type ResolvedShellOptions } from "./options.ts";
 
-const SHELL_DESCRIPTION = `Run a command with /bin/sh inside the workspace jail.
+const SHELL_DESCRIPTION = `Run a command with /bin/sh. The working directory is this agent's workspace (or a subdirectory given as cwd). cwd must stay inside that directory. "." and "/" mean that directory.
 
-The process starts in the workspace (or a subdirectory given as cwd) with a scrubbed environment: no host secrets, HOME=/workspace, and a fixed PATH. It cannot read or write host files outside the workspace. Output is capped and the process is killed when the timeout fires. Network is disabled unless the operator turned it on. Do not assume access to the server home directory, API keys, or paths outside the workspace.`;
+Shell is not a filesystem sandbox beyond the existing process jail. The jail, when it starts, mounts the agent directory at /workspace and also mounts the paths that jail already allows, including a read-only /usr. A command can still name those paths. Choosing the agent directory as cwd does not hide them. If the jail cannot start, this tool returns an error and does not run the command on the host.
 
-const CODE_DESCRIPTION = `Execute JavaScript, TypeScript, or Python inside the workspace jail.
+The process gets a scrubbed environment: no host secrets, HOME=/workspace, and a fixed PATH. Output is capped and the process is killed when the timeout fires. Network is disabled unless the operator turned it on.`;
 
-JavaScript and TypeScript run on Bun. Python runs as \`python3 -I -B\`. The program is mounted read-only at /botanical and starts with cwd inside the workspace. The same jail, environment scrub, timeout, and output cap as the shell tool apply. Network is disabled unless the operator turned it on.`;
+const CODE_DESCRIPTION = `Execute JavaScript, TypeScript, or Python. The program starts in this agent's workspace (or a subdirectory given as cwd). cwd must stay inside that directory.
+
+code_exec is not a filesystem sandbox beyond the existing process jail. The jail, when it starts, mounts the agent directory at /workspace and also mounts the paths that jail already allows, including a read-only /usr. A command can still name those paths. If the jail cannot start, this tool returns an error and does not run the program on the host.
+
+JavaScript and TypeScript run on Bun. Python runs as \`python3 -I -B\`. The source is mounted read-only at /botanical. The same jail, environment scrub, timeout, and output cap as the shell tool apply. Network is disabled unless the operator turned it on.`;
 
 function inputError(err: ToolInputError): ToolResult {
   return {
@@ -37,12 +42,44 @@ function requireWorkspace(ctx: ToolContext): ToolResult | undefined {
   return undefined;
 }
 
+/**
+ * Working directory for this call. `agentId` comes from the turn, not from
+ * tool arguments. The returned root is `<workspaceRoot>/agents/<agentId>`.
+ */
+async function bindWorkspace(
+  ctx: ToolContext,
+): Promise<{ root: string; agentScope: boolean } | ToolResult> {
+  const missing = requireWorkspace(ctx);
+  if (missing) return missing;
+  const agentId = typeof ctx.agentId === "string" ? ctx.agentId.trim() : "";
+  if (!agentId) return { root: ctx.workspaceRoot, agentScope: false };
+  try {
+    const root = await ensureAgentWorkspace(ctx.workspaceRoot, agentId);
+    return { root, agentScope: true };
+  } catch (err) {
+    const message = err instanceof Error && err.message ? err.message : "invalid workspace";
+    return {
+      ok: false,
+      error: message,
+      content: `error: ${message}`,
+      data: { errorCode: "invalid_workspace" },
+    };
+  }
+}
+
+function isBound(value: { root: string; agentScope: boolean } | ToolResult): value is {
+  root: string;
+  agentScope: boolean;
+} {
+  return "root" in value;
+}
+
 function sharedParameterProps(maxTimeoutMs: number): JsonObjectSchema["properties"] {
   return {
     cwd: {
       type: "string",
       description:
-        "Working directory relative to the workspace. Absolute paths must stay inside the workspace. Omit to use the workspace root.",
+        "Working directory relative to this agent's workspace. `.` and `/` are that directory. Omit to start there. A cwd that leaves the directory is rejected. This does not add filesystem isolation beyond the process jail.",
     },
     timeout_ms: {
       type: "integer",
@@ -85,13 +122,14 @@ export function createShellTool(options: ResolvedShellOptions): ToolDefinition {
     parameters,
     approval: "ask",
     async execute(args, ctx) {
-      const missing = requireWorkspace(ctx);
-      if (missing) return missing;
+      const bound = await bindWorkspace(ctx);
+      if (!isBound(bound)) return bound;
       try {
         const parsed = parseShellArgs(args, options.limits);
         const argv = shellCommandArgv(parsed.command, options.shellAllowlist);
         const req: SandboxRequest = {
-          workspaceRoot: ctx.workspaceRoot,
+          workspaceRoot: bound.root,
+          agentScope: bound.agentScope,
           argv,
           timeoutMs: parsed.timeoutMs,
           maxOutputBytes: options.limits.maxOutputBytes,
@@ -160,14 +198,16 @@ export function createCodeExecTool(options: ResolvedShellOptions): ToolDefinitio
     parameters,
     approval: "ask",
     async execute(args, ctx) {
-      const missing = requireWorkspace(ctx);
-      if (missing) return missing;
+      const bound = await bindWorkspace(ctx);
+      if (!isBound(bound)) return bound;
       try {
         const parsed = parseCodeArgs(args, options.limits, options.languages);
+        resolveWorkspaceCwd(bound.root, parsed.cwd, { agentScope: bound.agentScope });
         const filename = `prog.${EXTENSION[parsed.language]}`;
         const argv = interpreterArgv(parsed.language, filename);
         const req: SandboxRequest = {
-          workspaceRoot: ctx.workspaceRoot,
+          workspaceRoot: bound.root,
+          agentScope: bound.agentScope,
           argv,
           timeoutMs: parsed.timeoutMs,
           maxOutputBytes: options.limits.maxOutputBytes,

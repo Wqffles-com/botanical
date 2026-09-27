@@ -6,6 +6,7 @@ import { useWorkspace } from "@/components/workspace-provider";
 import { api } from "@/lib/api";
 import { applyStreamEvent, draftToMessage, emptyDraft, type StreamDraft } from "@/lib/chat-stream";
 import { errorText, isProfileRequired, isProfileUnavailable, profileRequiredMessage, profileUnavailableText } from "@/lib/errors";
+import { unavailableProfileHint } from "@/lib/format";
 import { toast } from "sonner";
 
 export function useChatThread(chatId: string) {
@@ -91,6 +92,7 @@ export function useChatThread(chatId: string) {
   const send = useCallback(async () => {
     const content = draft.trim();
     if (!content || streaming) return false;
+    if (unavailableProfileHint(profiles.find((item) => item.id === profileId) ?? null)) return false;
     if (!profileId) {
       setProfileError(profileRequiredMessage());
       return false;
@@ -180,7 +182,7 @@ export function useChatThread(chatId: string) {
     } finally {
       if (abortRef.current === ac) abortRef.current = null;
     }
-  }, [chatId, draft, profileId, refresh, streaming, unavailableCopy]);
+  }, [chatId, draft, profileId, profiles, refresh, streaming, unavailableCopy]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();

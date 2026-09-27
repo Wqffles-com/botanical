@@ -13,18 +13,45 @@ function assertNoNul(label: string, value: string): void {
   }
 }
 
+export interface ResolveCwdOptions {
+  /**
+   * The workspace root is one agent's directory. `/` means that directory.
+   * Escapes name the requested cwd.
+   */
+  agentScope?: boolean;
+}
+
+function isAgentRootAlias(requested: string): boolean {
+  return requested === "/" || requested === "/." || requested === "//";
+}
+
+function cwdEscape(requested: string | undefined, agentScope: boolean): ToolInputError {
+  if (agentScope) {
+    const shown = requested == null || requested === "" ? "." : requested;
+    const text = shown.length > 180 ? `${shown.slice(0, 180)}…` : shown;
+    return new ToolInputError(
+      "cwd_escape",
+      `path ${JSON.stringify(text)} is outside this agent's workspace`,
+    );
+  }
+  return new ToolInputError("cwd_escape", "cwd escapes the workspace");
+}
+
 /**
  * Resolve `requested` cwd against the workspace and return both the host
  * directory (for the bind mount) and the path the command will see (`/workspace/...`).
  *
  * Symlinks are resolved with `realpath`. A link that points outside the
  * workspace is rejected before the jail starts. The jail is still what
- * enforces the boundary at runtime.
+ * enforces the boundary at runtime. This check is not a second sandbox:
+ * a command can still name paths the jail itself mounts.
  */
 export function resolveWorkspaceCwd(
   workspaceRoot: string,
   requested: string | undefined,
+  options: ResolveCwdOptions = {},
 ): { workspaceReal: string; jailCwd: string } {
+  const agentScope = options.agentScope === true;
   assertNoNul("workspace", workspaceRoot);
   if (requested != null) assertNoNul("cwd", requested);
 
@@ -51,13 +78,19 @@ export function resolveWorkspaceCwd(
     );
   }
 
-  if (requested == null || requested === "" || requested === ".") {
+  if (
+    requested == null ||
+    requested === "" ||
+    requested === "." ||
+    requested === "./" ||
+    (agentScope && isAgentRootAlias(requested))
+  ) {
     return { workspaceReal, jailCwd: "/workspace" };
   }
 
   const lexical = path.resolve(workspaceReal, requested);
   if (!isInside(workspaceReal, lexical)) {
-    throw new ToolInputError("cwd_escape", "cwd escapes the workspace");
+    throw cwdEscape(requested, agentScope);
   }
 
   let realCwd: string;
@@ -67,7 +100,7 @@ export function resolveWorkspaceCwd(
     throw new ToolInputError("invalid_cwd", "cwd does not exist");
   }
   if (!isInside(workspaceReal, realCwd)) {
-    throw new ToolInputError("cwd_escape", "cwd escapes the workspace");
+    throw cwdEscape(requested, agentScope);
   }
   let cwdInfo;
   try {
@@ -82,7 +115,7 @@ export function resolveWorkspaceCwd(
   const rel = path.relative(workspaceReal, realCwd);
   const jailCwd = rel === "" ? "/workspace" : `/workspace/${rel.split(path.sep).join("/")}`;
   if (!(jailCwd === "/workspace" || jailCwd.startsWith("/workspace/"))) {
-    throw new ToolInputError("cwd_escape", "cwd escapes the workspace");
+    throw cwdEscape(requested, agentScope);
   }
   return { workspaceReal, jailCwd };
 }

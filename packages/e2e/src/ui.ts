@@ -201,6 +201,17 @@ export async function openAgent(page: Page, name: string): Promise<void> {
   await expect(page).toHaveURL(/\/agents\/[^/]+$/);
 }
 
+const CHAT_URL = /\/chats\/(?!new(?:[/?#]|$))[^/?#]+/;
+const NEW_CHAT_URL = /\/chats\/new(?:[/?#]|$)/;
+
+function onNewChatForm(page: Page): boolean {
+  return NEW_CHAT_URL.test(new URL(page.url()).pathname);
+}
+
+function startChatButton(page: Page): Locator {
+  return main(page).getByRole("button", { name: /^(start chat|starting…)$/i }).first();
+}
+
 export async function startChat(page: Page, agentName: string): Promise<void> {
   await clickFirstVisible(
     page.getByRole("button", { name: /^(new chat|start chat)$/i }).or(
@@ -208,11 +219,21 @@ export async function startChat(page: Page, agentName: string): Promise<void> {
     ),
   );
 
-  const landed = await page
-    .waitForURL(/\/chats\/[^/?#]+/, { timeout: 8_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (landed) return;
+  // Since MVP2, "New chat" opens /chats/new: pick the agent here, then the
+  // model profile (see selectMockProfile), then "Start chat" creates the chat.
+  const target = await Promise.race([
+    page.waitForURL(CHAT_URL, { timeout: 20_000 }).then(() => "chat" as const),
+    page.waitForURL(NEW_CHAT_URL, { timeout: 20_000 }).then(() => "form" as const),
+  ]).catch(() => null);
+  if (target === "chat") return;
+
+  if (target === "form") {
+    const agents = main(page).getByRole("radiogroup", { name: /^agent$/i });
+    const option = agents.getByRole("radio", { name: new RegExp(`^${escapeRegExp(agentName)}\\b`, "i") }).first();
+    await option.click();
+    await expect(option).toHaveAttribute("aria-checked", "true");
+    return;
+  }
 
   const dialog = page.getByRole("dialog");
   if (await dialog.isVisible().catch(() => false)) {
@@ -222,7 +243,7 @@ export async function startChat(page: Page, agentName: string): Promise<void> {
     if ((await confirm.count()) > 0 && (await confirm.first().isEnabled())) await confirm.first().click();
   }
 
-  await expect(page).toHaveURL(/\/chats\/[^/?#]+/, { timeout: 20_000 });
+  await expect(page).toHaveURL(CHAT_URL, { timeout: 20_000 });
 }
 
 function profileField(page: Page): Locator {
@@ -245,6 +266,15 @@ function sendButton(page: Page): Locator {
 }
 
 export async function expectProfileRequired(page: Page): Promise<void> {
+  if (onNewChatForm(page)) {
+    // No default model: the chat cannot be started until a profile is chosen.
+    await expect(startChatButton(page)).toBeDisabled();
+    const field = profileField(page);
+    await expect(field).toBeVisible();
+    await expect(field).not.toHaveText(/^\s*mock\b/i);
+    await expect(main(page).getByText(/no default model|choose a model profile|select a model profile/i).first()).toBeVisible();
+    return;
+  }
   const composer = composerField(page);
   const send = sendButton(page);
   await expect(composer).toBeVisible();
@@ -297,6 +327,12 @@ async function chooseOption(page: Page, field: Locator, option: RegExp): Promise
 
 export async function selectMockProfile(page: Page): Promise<void> {
   await chooseOption(page, profileField(page), /\bmock\b/i);
+  if (onNewChatForm(page)) {
+    const start = startChatButton(page);
+    await expect(start).toBeEnabled();
+    await start.click();
+    await expect(page).toHaveURL(CHAT_URL, { timeout: 20_000 });
+  }
   await expect(composerField(page)).toBeEnabled();
 }
 
@@ -350,13 +386,13 @@ export async function sendInboxMessage(page: Page, fromName: string, toName: str
   }
   const from = root
     .getByTestId("inbox-from")
-    .or(root.getByLabel(/^from$/i))
-    .or(root.getByRole("combobox", { name: /^from$/i }))
+    .or(root.getByLabel(/^from( agent)?$/i))
+    .or(root.getByRole("combobox", { name: /^from( agent)?$/i }))
     .first();
   const to = root
     .getByTestId("inbox-to")
-    .or(root.getByLabel(/^to$/i))
-    .or(root.getByRole("combobox", { name: /^(to|recipient)$/i }))
+    .or(root.getByLabel(/^to( agent)?$/i))
+    .or(root.getByRole("combobox", { name: /^(to|recipient)( agent)?$/i }))
     .first();
   await chooseOption(page, from, new RegExp(escapeRegExp(fromName), "i"));
   await chooseOption(page, to, new RegExp(escapeRegExp(toName), "i"));
@@ -392,7 +428,7 @@ export async function expectSettingsTabs(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/settings\/?$/);
   const tabs: { name: RegExp; text: RegExp }[] = [
     { name: /^general$/i, text: /self[-\s]?host|saas|mcp|tool/i },
-    { name: /^profiles$/i, text: /\bmock\b/i },
+    { name: /^profiles$/i, text: /mock/i }, // table cells have no separators in textContent
     { name: /^memory$/i, text: /memor/i },
     { name: /roles/i, text: /role|capabilit|coder|reviewer/i },
   ];

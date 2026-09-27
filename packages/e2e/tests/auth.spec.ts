@@ -14,7 +14,12 @@ test("a wrong passcode stays on /login", async ({ page }) => {
 test("anonymous visits to app routes land on /login", async ({ page }) => {
   for (const path of ["/agents", "/inbox", "/settings"]) {
     await page.goto(path);
-    await expect(page).toHaveURL(/\/login\/?$/);
+    // ?next= sends the operator back after login. The fixture uses a bare /login.
+    await expect(page).toHaveURL(/\/login\/?(?:\?.*)?$/);
+    const url = new URL(page.url());
+    expect(url.pathname.replace(/\/$/, "") || "/").toBe("/login");
+    const next = url.searchParams.get("next");
+    expect(next === null || next === path).toBe(true);
     await expect(passcodeInput(page)).toBeVisible();
   }
 });

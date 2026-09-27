@@ -1,12 +1,9 @@
 # Botanical MVP: Postgres + Bun API + Next.js web.
-# Project name botanical-mvp keeps this stack off a Compose project named botanical.
 # Host ports default to web 3000, API 8788, Postgres 5433.
 # Inside the network the API listens on 8787 and Next listens on 3000.
 #
 #   cp .env.example .env
 #   docker compose up --build -d
-#
-# The lead integrator starts this stack. Do not point it at the other project's ports.
 
 name: botanical-mvp
 

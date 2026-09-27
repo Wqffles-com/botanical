@@ -128,7 +128,7 @@
 
       function renderLogin() {
         mount(
-          `<main class="login"><h1>Botanical</h1><p>Personal agent server.</p><form id="login-form"><label>Passcode <input data-testid="passcode" name="passcode" type="password" autocomplete="current-password" /></label><p id="login-error" role="alert" hidden>Invalid passcode</p><button type="submit">Continue</button></form></main>`,
+          `<main class="login"><h1>Botanical</h1><p>Always-on agent server.</p><form id="login-form"><label>Passcode <input data-testid="passcode" name="passcode" type="password" autocomplete="current-password" /></label><p id="login-error" role="alert" hidden>Invalid passcode</p><button type="submit">Continue</button></form></main>`,
           false,
         );
         document.getElementById("login-form").addEventListener("submit", (event) => {
@@ -325,14 +325,14 @@
 
       function renderSettings() {
         mount(
-          `<h1>Settings</h1><div role="tablist" aria-label="Settings"><button type="button" role="tab" id="tab-profiles" aria-controls="panel-profiles" aria-selected="true">Profiles</button><button type="button" role="tab" id="tab-tools" aria-controls="panel-tools" aria-selected="false">Tools</button><button type="button" role="tab" id="tab-mcp" aria-controls="panel-mcp" aria-selected="false">MCP</button><button type="button" role="tab" id="tab-deployment" aria-controls="panel-deployment" aria-selected="false">Deployment</button></div><section role="tabpanel" id="panel-profiles" aria-labelledby="tab-profiles"><h2>Profiles</h2><ul><li>Mock · mock / mock-echo</li></ul><p>The mock profile is always available.</p></section><section role="tabpanel" id="panel-tools" aria-labelledby="tab-tools" hidden><h2>Tools</h2><ul><li>file_list</li><li>web_search</li></ul></section><section role="tabpanel" id="panel-mcp" aria-labelledby="tab-mcp" hidden><h2>MCP</h2><p>Configured MCP servers and their status.</p></section><section role="tabpanel" id="panel-deployment" aria-labelledby="tab-deployment" hidden><h2>Deployment</h2><p>Self-host</p><p>Version 0.0.0</p></section>`,
+          `<h1>Settings</h1><div role="tablist" aria-label="Settings"><button type="button" role="tab" id="tab-general" aria-controls="panel-general" aria-selected="true">General</button><button type="button" role="tab" id="tab-profiles" aria-controls="panel-profiles" aria-selected="false">Profiles</button><button type="button" role="tab" id="tab-memory" aria-controls="panel-memory" aria-selected="false">Memory</button><button type="button" role="tab" id="tab-roles" aria-controls="panel-roles" aria-selected="false">Roles</button></div><section role="tabpanel" id="panel-general" aria-labelledby="tab-general"><h2>General</h2><p>Self-host</p><p>Tools and MCP servers are configured on the server.</p></section><section role="tabpanel" id="panel-profiles" aria-labelledby="tab-profiles" hidden><h2>Profiles</h2><ul><li>Mock · mock / mock-echo</li></ul><p>The mock profile is always available.</p></section><section role="tabpanel" id="panel-memory" aria-labelledby="tab-memory" hidden><h2>Memory</h2><p>Agent memory entries.</p></section><section role="tabpanel" id="panel-roles" aria-labelledby="tab-roles" hidden><h2>Roles</h2><p>Coder and Reviewer roles grant capabilities.</p></section>`,
           true,
         );
         const tabs = [
+          ["general", "General"],
           ["profiles", "Profiles"],
-          ["tools", "Tools"],
-          ["mcp", "MCP"],
-          ["deployment", "Deployment"],
+          ["memory", "Memory"],
+          ["roles", "Roles"],
         ];
         tabs.forEach(([id]) => {
           document.getElementById("tab-" + id).addEventListener("click", () => {

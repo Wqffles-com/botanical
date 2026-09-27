@@ -5,7 +5,7 @@ Two layers:
 - **Browser end-to-end** (`packages/e2e`) walks the MVP UI: passcode login, agent icon and color, a required model profile, a streamed mock reply with a tool card, reload, the agent inbox, and settings tabs. See [Browser end-to-end](#browser-end-to-end).
 - **API smoke** (`scripts/smoke/`) checks liveness, passcode auth, agent create, and chat create. The default run answers the chat turn with an in-process mock provider, so it needs no model API key and no Postgres.
 
-The smoke harness lives at the repo root (`scripts/smoke/`) so it can run before `packages/server` is merged, and can target Compose or the server package once they exist.
+The smoke harness lives at the repo root (`scripts/smoke/`). It can target an in-process mock, Compose, or `packages/server`.
 
 ## Quick start
 
@@ -159,8 +159,6 @@ node scripts/smoke/run.mjs [--boot mock|server|compose] [--assume]
 | 1 | A required step failed, or the target could not be booted. |
 
 `--self-test` checks the SSE parser and exits.
-
-Once the workspace `package.json` exists, a root script named `smoke` should run `node scripts/smoke/run.mjs`.
 
 ## Out of scope for this harness
 

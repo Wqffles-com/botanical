@@ -38,12 +38,20 @@ export interface JsonObjectSchema extends JsonSchema {
  * Workspace-scoped tools require `workspaceRoot` to be an existing directory.
  */
 export interface ToolContext {
-  /** Absolute host path this call is confined to. */
+  /**
+   * Shared workspace root for this call. When `agentId` is set, shell and
+   * code_exec narrow cwd to `<workspaceRoot>/agents/<agentId>`.
+   */
   workspaceRoot: string;
   /** Cancels the underlying process. */
   signal?: AbortSignal;
   /** Correlation ids for audit. Never forwarded into a sandbox. */
   meta?: Readonly<Record<string, string>>;
+  /**
+   * Agent executing the turn. Set by dispatch, not by tool arguments.
+   * Selects the working directory.
+   */
+  agentId?: string;
 }
 
 export interface ToolResult {

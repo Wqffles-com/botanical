@@ -51,6 +51,8 @@ export interface SandboxRequest {
   scratchFiles?: readonly { name: string; contents: string }[];
   maxFileBytes: number;
   nofile: number;
+  /** When set, cwd escapes are reported as outside this agent's workspace. */
+  agentScope?: boolean;
 }
 
 export interface SandboxResult {
@@ -231,12 +233,14 @@ export async function runSandboxed(req: SandboxRequest): Promise<SandboxResult> 
     return blank(`stdin exceeds ${req.maxStdinBytes} bytes`, started);
   }
 
+  const { workspaceReal, jailCwd } = resolveWorkspaceCwd(req.workspaceRoot, req.cwd, {
+    agentScope: req.agentScope === true,
+  });
+
   const check = checkShellSandbox();
   if (!check.ok) {
-    return blank(`sandbox unavailable; missing ${check.missing.join(", ")}`, started);
+    return blank(`sandbox unavailable; missing ${check.missing.join(", ")}`, started, jailCwd);
   }
-
-  const { workspaceReal, jailCwd } = resolveWorkspaceCwd(req.workspaceRoot, req.cwd);
   const runDir = mkdtempSync(path.join(tmpdir(), "botanical-shell-"));
   let child: ChildProcess | undefined;
   let timedOut = false;

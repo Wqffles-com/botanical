@@ -1,16 +1,16 @@
-# Botanical — Business model
+# Botanical: deployment modes
 
-Same MIT codebase. Two deployment modes. v0 encodes the split and does **not** charge anyone.
+One MIT codebase, two deployment modes: **self-host** and **hosted (SaaS)**. Neither mode charges anyone today.
 
-Locked product scope stays in [DECISIONS.md](./DECISIONS.md). This page is how self-host and hosted relate, and what “v0” means for money and tenancy.
+> **Which setting does what.** The running API server (`packages/server`) reads `BOTANICAL_DEPLOYMENT_MODE` = `SELF_HOST` | `SAAS`. The Docker entrypoint fills it in from `DEPLOYMENT_MODE` and accepts `self_host` / `saas` in any case. In the server, both modes share routes, passcode auth (plaintext or an argon2 `BOTANICAL_PASSWORD_HASH`), and storage, and SaaS mode changes the brand name. The `@botanical/core` deployment module described below is the stricter seam for future tenancy and billing. It has its own aliases and a `sha256:` passcode hash, and the API server does not use it yet.
 
-## The split
+## The split (as modeled in `@botanical/core`)
 
 | | Self-host (open source) | Hosted (SaaS) |
 |--|-------------------------|---------------|
-| Code license | **MIT** — use, modify, redistribute | **Same MIT code**. A subscription would pay for *our* operation of that code, not for a separate license |
+| Code license | **MIT** — use, modify, redistribute | **Same MIT code**. A subscription would pay for running that code as a service, not for a separate license |
 | Mode | `self-host` (default) | `saas` |
-| Who runs it | You, on any host | Botanical, on our servers — not offered for purchase in v0 |
+| Who runs it | You, on any host | The Botanical project, on its servers. Not offered for purchase yet |
 | Auth | One passcode for the single operator | Account login is **not** built. The single-tenant passcode is rejected in this mode |
 | Tenant | Fixed id `self` | Fixed placeholder id `placeholder` — not a customer, not isolation |
 | Billing | Not applicable | Hooks exist and are stubs. They do not check a subscription, record usage, or block work |
@@ -19,15 +19,15 @@ Locked product scope stays in [DECISIONS.md](./DECISIONS.md). This page is how s
 
 Unset `BOTANICAL_DEPLOYMENT_MODE` means `self-host`. A process does not become SaaS by accident.
 
-## What v0 includes
+## What exists today
 
-**Product (both modes)** — personal hosted server + web client:
+**Product (both modes):** an always-on server plus a web client:
 
 - Streaming chat, tools, and MCP
 - Unlimited user-defined agents, one agent per chat, async agent-to-agent messaging
 - Built-ins: web search/fetch, shell/code exec, file read/write
 - Postgres; model API keys server-side only; no silent default model
-- TypeScript on Bun or Deno (chosen at scaffold)
+- TypeScript on Bun
 
 **Commercial shape (this codebase, not a store):**
 
@@ -37,9 +37,9 @@ Unset `BOTANICAL_DEPLOYMENT_MODE` means `self-host`. A process does not become S
 - SaaS tenant id: the constant `placeholder`
 - Billing hooks `assertCanSpend`, `recordUsage`, `resolveSubscription` — safe to call, not wired to a payment provider
 
-Audience for the product is still Charlie as a personal power user. The mode flag is so the code does not assume one host model. It is not a public SaaS launch and not an OSS-community growth program.
+The mode flag exists so the code does not assume a single hosting model.
 
-## What v0 does not include
+## What does not exist yet
 
 - A payment provider, checkout, plans, invoices, seats, or quotas
 - Signup, real `tenant_id` issuance, or per-tenant data isolation
@@ -47,7 +47,7 @@ Audience for the product is still Charlie as a personal power user. The mode fla
 - Metering a self-hosted install
 - Different chat, tools, or MCP behavior per mode
 
-Teams, real multi-tenant accounts, and subscription enforcement stay **post-v0**. The placeholder and the hooks are the seam, not the product.
+Teams, real multi-tenant accounts, and subscription enforcement are on the [roadmap](./ROADMAP.md). The placeholder and the hooks are the seam, not the product.
 
 ## Config
 
@@ -99,6 +99,7 @@ Invariants:
 
 ## Related
 
-- [DECISIONS.md](./DECISIONS.md) — locked product scope
+- [DECISIONS.md](./DECISIONS.md): design decisions
+- [ROADMAP.md](./ROADMAP.md): planned work
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — server, web, Postgres
 - [LICENSE](../LICENSE) — MIT

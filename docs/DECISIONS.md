@@ -1,66 +1,40 @@
-# Botanical — Decision Log
+# Botanical: decision log
 
-Authoritative product decisions. When these conflict with earlier brainstorm notes, **this file wins**. Later entries in this file refine earlier ones.
-
-**Latest refinement (2026-09-23):** Botanical is **open-source (self-hostable)** and a **hosted SaaS** on the same codebase. See the business model entry at the end of this file.
+This log records the project's design decisions and why they were made. Later entries refine earlier ones. Planned work that is not built yet is tracked in [ROADMAP.md](./ROADMAP.md).
 
 ---
 
-## 2026-09-23 — Charlie interview with Ash (orchestrator)
+## 2026-09-23: Foundational product decisions
 
-**Status:** LOCKED for v0 planning.  
-**Source:** Charlie × Ash interview (orchestrator session).  
-**Effect:** Supersedes conflicting earlier notes that pushed **local-first** and **CLI-as-MVP**. Those ideas remain useful history in [BRAINSTORM.md](./BRAINSTORM.md) where marked superseded; they are not the build plan.
+**Status:** Accepted.
 
-### Locked decisions
+1. **Server, not local-first.** Botanical is a server that clients connect to. The operator self-hosts it, or it runs as the hosted service. This keeps history, keys, and agents in one place, and makes always-on work possible.
+2. **Web first.** The first client is a web UI talking to that server. Other clients (CLI, mobile) can come later against the same API.
+3. **Scope of the first release.** Streaming chat, tools, and MCP. Scheduled routines were deferred (see [ROADMAP.md](./ROADMAP.md)).
+4. **Portable hosting.** No hard dependency on one cloud vendor. Docker Compose is the reference deploy.
+5. **No default model.** Every chat must name an explicit model profile. Nothing is silently auto-selected, so cost and behavior are always a visible choice.
+6. **Passcode auth.** A single operator passcode protects the web → server boundary. Multi-user accounts are deferred.
+7. **Stack.** TypeScript on Bun (Bun was picked over Deno when the repo was scaffolded).
+8. **Unlimited custom agents.** Each agent is defined by a prompt/description and a set of tools.
+9. **One agent per chat.** Each thread is owned by one agent, which keeps context and permissions unambiguous.
+10. **Async agent-to-agent messaging.** Agents can message each other asynchronously (an inbox model) without merging chats.
+11. **Core built-in tools.** Web search/fetch, shell/code execution, and file read/write. Anything heavier (browser or computer use) is opt-in, not core.
+12. **Server-side keys only.** Model API keys live in the server environment and are never supplied by or sent to the web client.
+13. **Postgres** stores chats, agents, messages, and related state.
+14. **Open source and hosted, same code.** The core is MIT-licensed and self-hostable. A hosted service runs the same codebase. `DEPLOYMENT_MODE` (`SELF_HOST` / `SAAS`) is configuration, not a fork, and chat, tools, and MCP behave the same in both modes. See [DEPLOYMENT_MODES.md](./DEPLOYMENT_MODES.md).
 
-1. **Audience** — Charlie as personal power user. Not teams-first or OSS-community-first yet. (Refined the same day: the product is MIT open-source and self-hostable, and also a hosted SaaS. Community growth is still not the v0 wedge.)
-2. **Architecture** — **Not** local-first. Botanical **server** — self-hosted by the operator, or hosted by us — with clients connecting from elsewhere. Enables always-on cloud capabilities later.
-3. **First client** — **Web** UI talking to that server.
-4. **v0 MVP scope** — Streaming **chat + tools + MCP**. Always-on routines / schedulers are **post-v0**.
-5. **Hosting** — Vendor undecided. Keep the server **portable / host-agnostic** (no hard lock to one cloud). Deployment **mode** is decided: self-host or our hosted SaaS, same code.
-6. **Default model** — **None**. Force an explicit **profile** pick; no silent everyday default.
-7. **Auth (web → server)** — **Password / passcode** for v0.
-8. **Stack** — **TypeScript**; runtime **Bun or Deno**, chosen at scaffold time. **Resolved:** **Bun**. See [Scaffold: Bun](#2026-09-23--scaffold-bun).
-9. **Agents** — **Unlimited** user-defined agents; each customized with **functions (tools) + description/prompt**.
-10. **Agent UX** — **One agent per chat** (each thread owned by one chosen agent).
-11. **Agent collaboration** — Full **async agent-to-agent messaging** (teammate-style), even with one-agent-per-user-chat.
-12. **Built-in tools (v0)** — **Web search/fetch**, **shell/code exec**, **file read/write**. Everything else (e.g. browser / computer use) is **opt-in configurable**, not core.
-13. **Model API keys** — **Server-side only** (never supplied from the web client).
-14. **Persistence** — **Postgres** for chats, agents, messages, and related state.
+### Deferred at the time
 
-### Implications (short)
-
-| Area | Was (early brainstorm) | Now (locked) |
-|------|------------------------|--------------|
-| Deployment | Local-first CLI on user machine | Server + remote clients; self-host or hosted SaaS (same code) |
-| MVP surface | CLI | Web UI |
-| Persistence | SQLite / files | Postgres |
-| Runtime | Node 20+ lean | **Bun** (picked at scaffold) |
-| Keys | BYOK in client/env on machine | Server-held keys only |
-| Agents | Implicit single-agent chat | Multi-agent model + A2A messaging |
-| Default brain | Auto / preferred profile OK | Explicit profile pick required |
-
-### Explicitly deferred (post-v0)
-
-- Always-on routines / schedulers
-- Teams / multi-tenant auth and billing (required later for hosted SaaS; not v0 — see business model entry)
-- OSS-community growth as the primary go-to-market (the core **is** MIT and self-hostable; community-building is still not the v0 wedge)
-- Browser / computer-use as **core** built-ins (opt-in only)
-- Hosting vendor choice
-
-### Related docs
-
-- [VISION.md](./VISION.md) — product vision (aligned)
-- [BRAINSTORM.md](./BRAINSTORM.md) — ideas; superseded bits marked
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — system sketch (aligned)
-- [BUSINESS_MODEL.md](./BUSINESS_MODEL.md) — MIT self-host vs hosted subscription; deployment mode in v0
+- Always-on routines and schedulers
+- Multi-tenant accounts and billing for the hosted mode
+- Browser / computer use as core built-ins
+- Choosing a specific hosting vendor
 
 ---
 
-## 2026-09-27 — MVP2 backend: CLI profiles, memory, agent creation, roles
+## 2026-09-27: Backend slice 2: CLI profiles, memory, agent creation, roles
 
-**Status:** LOCKED for this backend slice.  
+**Status:** Accepted.  
 **Effect:** Adds four server capabilities. Does not change the rule that every chat names a profile and that there is no silent default model.
 
 ### 1. CLI profiles (`kind: "cli"`)
@@ -99,17 +73,75 @@ Builtin roles, seeded idempotently: **Coder** (no `agent.create`), **Reviewer** 
 
 ---
 
-## 2026-09-27 — CLI profiles get Botanical tools over a per-run MCP server
+## 2026-09-27: Per-agent file workspace
 
-**Status:** LOCKED for this slice. Refines the CLI-profile bullets above (prompt argv and "tools are not forwarded").
+**Status:** Accepted.
+**Effect:** Built-in file tools and the shell/code_exec working directory are confined to the agent that is running the turn. CLI profiles keep the same directory they already use.
 
-A CLI turn (`grok-build`, `claude-code`, `codex`) opens `POST /internal/mcp/runs/<runId>` on this server process for the length of the turn. `tools/list` is the same catalog and role filter an API-profile turn would send. `tools/call` goes through `dispatchToolCall` (the agent loop's allowlist and role check, then the same tool source, workspace context, and truncation). A denial is an MCP tool result with `isError: true` and the same text the API turn would persist, not an HTTP error.
+### Scope
 
-- The run is bound to the agent, the chat, and the turn. v0 has one operator and no tenant id, so the principal is `local`.
-- Auth is a fresh 32-byte bearer token, compared in constant time. The session cookie is not accepted. Unknown or revoked runs return 404. A live run with a missing or wrong token returns 401. The token is revoked when the turn ends (success, error, cancel, timeout).
-- The CLI is a child of the server. The URL defaults to `http://127.0.0.1:<PORT>` and can be set with `BOTANICAL_INTERNAL_URL`. It is not listed on the public API map.
-- The prompt is never an argv element. Grok uses `--prompt-file` (0600, temp dir). Claude Code and Codex read stdin (`-p` and `codex exec -`).
-- MCP server name is `botanical`, so the CLI shows tools as `mcp__botanical__<tool>`. User MCP tools keep model-facing names such as `mcp__notes__search` inside that server.
-- Grok Build 1.0.40 has no `--mcp-config`. The project file `cwd/.grok/config.toml` is written for the run and restored afterwards (`.mcp.json` is not touched). The header is `Bearer ${BOTANICAL_MCP_TOKEN}` (Grok expands `${VAR}` in MCP headers). Claude Code uses `--mcp-config` and `--strict-mcp-config`. Codex uses `-c mcp_servers.botanical.url=…` and `bearer_token_env_var`.
-- Calls made through this endpoint are streamed as `tool-call` / `tool-result` and stored as tool messages. The CLI's own native tools are not Botanical tool cards.
-- `botanicalTools: false` on a CLI profile skips the endpoint. Presets from `BOTANICAL_CLI_PROFILES` leave it on. CLI profiles are still never the default model.
+The shared workspace root (`BOTANICAL_WORKSPACE`, otherwise the server default) stays the parent directory. Each agent gets `<root>/agents/<agentId>`. The id is sanitized the same way as the CLI cwd helper: characters outside `[A-Za-z0-9_-]` become `_`, and the name is capped at 80 characters. The directory is created on demand.
+
+The agent id comes from the turn at dispatch and is passed on the tool context. Tool arguments cannot select another agent's directory.
+
+For that agent, `.` and `/` are its own directory. `file_read`, `file_write`, `file_list`, and `file_delete` resolve every path inside that directory. A path that leaves it is a tool error, not a crash. That includes `..`, an absolute path outside the directory, and a symlink whose real path is outside it. For a write to a path that does not exist yet, the check uses the nearest existing parent, so a symlink parent that points outside is rejected before the file is created. The error names the path, for example `path "../x" is outside this agent's workspace`.
+
+There is no shared file area. Memory rows still have a `shared` scope; files do not. An agent cannot list, read, or write another agent's directory through these tools.
+
+### Shell and code_exec
+
+`shell` and `code_exec` start in the same agent directory. A `cwd` argument must stay inside it, including through symlinks. `.` and `/` mean that directory.
+
+Shell is not a filesystem sandbox beyond the existing process jail. The jail, when it starts, mounts the agent directory at `/workspace` and also mounts the paths that jail already allows, including a read-only `/usr`. A command can still name those paths. Setting the working directory to the agent folder does not hide them. If the jail cannot start, the tool returns an error and does not run the command on the host.
+
+CLI profiles already use this agent directory as their working directory. That stays the same path.
+
+---
+
+## 2026-09-27: Botanical is a cloud, always-on platform
+
+**Status:** Accepted. This sharpens decision 1 of 2026-09-23.
+
+Botanical is meant to run **always on, on a server the user controls** (their own server or VPS) **or on the hosted service**. It is not designed to run on a personal PC or laptop. Local runs (`bun run dev`, Compose on a workstation) are for development only.
+
+The point is that agents keep working while the user is away:
+
+- **Today:** agent-to-agent messages can start background turns for the recipient (`BOTANICAL_A2A_AUTORUN=true`), and all state lives in Postgres on the server.
+- **Planned:** routines (scheduled runs) and listeners (event triggers) that start agent turns with no browser connected. See [ROADMAP.md](./ROADMAP.md).
+
+Consequences: docs and quickstarts lead with deploying to a server. Features should assume a long-running process and must not depend on an open browser tab.
+
+---
+
+## 2026-09-27: First-class developers and non-developers, with a developer mode
+
+**Status:** Accepted as direction. The developer-mode setting is **not implemented yet**.
+
+Botanical serves two audiences as first-class users, in roughly equal measure:
+
+- **Non-developers** get a simpler assistant experience: chat, agents, memory, web tools, and connectors, with no terminal-shaped features in the way.
+- **Developers** can declare themselves developers in a per-user setting. That unlocks a **coding-agent base**: coding CLI profiles (Grok Build, Claude Code, Codex), `shell` / `code_exec`, in-browser terminals into the agent workspace, and similar tooling.
+
+Current state: there is no developer setting in the code. Every user sees the same UI. Coding CLI profiles, `shell`, and `code_exec` already exist, and access is controlled by the operator through agent tool allowlists and roles (for example, the built-in **Reviewer** role has no shell access). Terminals do not exist yet.
+
+When the setting is built, it should gate the UI surfaces and default tool sets. It must not replace role enforcement: permissions stay enforced at tool dispatch.
+
+---
+
+## 2026-09-27: CLI profiles get Botanical tools over a per-run MCP server
+
+**Status:** Accepted.
+**Effect:** Grok Build, Claude Code, and Codex profiles can call Botanical's tools (memory, agents, files, shell, web) and the operator's MCP tools. The prompt no longer travels on the command line. Before this, CLI profiles got no Botanical tools and received the prompt as an argument.
+
+A CLI turn opens `POST /internal/mcp/runs/<runId>` on the same server process for the length of the turn. It speaks MCP over streamable HTTP (JSON responses). `tools/list` returns the same catalog and role filter an API-profile turn would send. `tools/call` goes through the same dispatch function as the agent loop: allowlist and role check, then the same tool source, per-agent workspace context, limits, and truncation. A denial is an MCP tool result with `isError: true` and the same text an API turn would store. It is not an HTTP error.
+
+- The run is bound to the agent, the chat, and the turn. The agent id comes from the turn, never from the CLI.
+- Auth is a fresh 32-byte random bearer token, compared in constant time. The session cookie is not accepted. Unknown or revoked runs return 404, and a live run with a missing or wrong token returns 401. The token is revoked when the turn ends (success, error, cancel, or timeout).
+- The CLI is a child process of the server, so the URL defaults to `http://127.0.0.1:<PORT>`. `BOTANICAL_INTERNAL_URL` overrides it. The route is not part of the public API.
+- The MCP server is named `botanical`, so a CLI shows tools as `mcp__botanical__<tool>`. The operator's MCP tools keep their model-facing names (for example `mcp__notes__search`) inside that server.
+- The prompt is never an argv element. Grok reads `--prompt-file` (a 0600 temp file, deleted afterwards). Claude Code reads stdin with `-p`. Codex reads stdin with `codex exec … -`.
+- Grok Build has no `--mcp-config` flag. Botanical writes `[mcp_servers.botanical]` into `<agent dir>/.grok/config.toml` for the run and restores the previous file (or removes it) afterwards. `.mcp.json` is not touched. The header is `Authorization = "Bearer ${BOTANICAL_MCP_TOKEN}"`; Grok expands the variable, so the token is only in the child's environment. Grok starts project-scoped MCP servers only in a trusted folder, so the child gets `GROK_FOLDER_TRUST=0`. That changes nothing on disk, and the CLI already runs with `--always-approve` in that folder.
+- Claude Code gets `--mcp-config <temp file> --strict-mcp-config` and `--allowedTools mcp__botanical__*`. Codex gets `-c mcp_servers.botanical.url=…` and `bearer_token_env_var`. Neither is installed in the default image; these flags follow their published CLI references.
+- Calls made through the endpoint stream as `tool-call` / `tool-result` events and are stored as tool messages, so they render as tool cards. The CLI's own native tools are not Botanical tool cards.
+- `botanicalTools: false` on a CLI profile skips the endpoint. Presets from `BOTANICAL_CLI_PROFILES` leave it on.
+- Chat SSE streams send a `: ping` comment after 5 seconds without an event. Bun closes idle connections after 10 seconds, and CLI turns are often silent while the CLI looks up or runs tools; without the ping that aborted the turn.
