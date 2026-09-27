@@ -1,0 +1,90 @@
+import { isCliName, LoginBusyError } from "@botanical/providers";
+
+import { HttpError, isRecord, json, readJson } from "../http.ts";
+import { authed, type RequestContext, type Router } from "../router.ts";
+import type { CliService } from "../cli-install/service.ts";
+
+export function registerCli(router: Router, service: CliService): void {
+  router.add(
+    "GET",
+    "/api/cli",
+    authed(async () => json(200, { clis: await service.list() })),
+  );
+
+  router.add(
+    "POST",
+    "/api/cli/:cli/install",
+    authed(async (ctx) => {
+      const cli = requireEnabled(ctx, service);
+      const update = await wantsUpdate(ctx);
+      const row = await service.install(cli, update);
+      return json(200, { cli: row });
+    }),
+  );
+
+  router.add(
+    "POST",
+    "/api/cli/:cli/login",
+    authed((ctx) => {
+      const cli = requireEnabled(ctx, service);
+      try {
+        return json(200, { login: service.loginStart(cli) });
+      } catch (error) {
+        if (error instanceof LoginBusyError) throw new HttpError(409, "login_in_progress", error.message);
+        throw error;
+      }
+    }),
+  );
+
+  router.add(
+    "GET",
+    "/api/cli/:cli/login",
+    authed((ctx) => {
+      const cli = requireEnabled(ctx, service);
+      return json(200, { login: service.loginGet(cli) });
+    }),
+  );
+
+  router.add(
+    "POST",
+    "/api/cli/:cli/login/input",
+    authed(async (ctx) => {
+      const cli = requireEnabled(ctx, service);
+      const body = await readJson(ctx.request, ctx.config);
+      if (!isRecord(body) || typeof body.input !== "string") {
+        throw new HttpError(400, "invalid_body", "input must be a string");
+      }
+      try {
+        return json(200, { login: await service.loginInput(cli, body.input) });
+      } catch (error) {
+        if (error instanceof LoginBusyError) throw new HttpError(409, "login_in_progress", error.message);
+        throw new HttpError(400, "invalid_body", "Login is not waiting for input");
+      }
+    }),
+  );
+
+  router.add(
+    "DELETE",
+    "/api/cli/:cli/login",
+    authed((ctx) => {
+      const cli = requireEnabled(ctx, service);
+      return json(200, { login: service.loginCancel(cli) });
+    }),
+  );
+}
+
+function requireEnabled(ctx: RequestContext, service: CliService): string {
+  const name = ctx.params.cli ?? "";
+  if (!isCliName(name) || !service.describe(name)) {
+    throw new HttpError(404, "not_found", "Unknown or disabled CLI");
+  }
+  return name;
+}
+
+async function wantsUpdate(ctx: RequestContext): Promise<boolean> {
+  const text = await ctx.request.clone().text();
+  if (text.trim() === "") return false;
+  const body = await readJson(ctx.request, ctx.config);
+  if (!isRecord(body)) throw new HttpError(400, "invalid_json", "Request body must be a JSON object");
+  return body.update === true;
+}

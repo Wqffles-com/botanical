@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import type { Writable } from "node:stream";
 
+import { runCliChildEnv } from "./child-env.ts";
 import { prepareCliLaunch, type CliMcpTarget } from "./launch.ts";
 import { parseCliLine } from "./parse.ts";
 import { renderCliPrompt, type CliPromptMessage } from "./prompt.ts";
@@ -87,7 +88,7 @@ export async function* runCli(input: RunCliInput): AsyncGenerator<CliStreamEvent
   try {
     child = spawn(input.bin, plan.args, {
       cwd: input.cwd,
-      env: childEnv(input.env, plan.env),
+      env: runCliChildEnv(input.env, plan.env, input.cli),
       stdio: ["pipe", "pipe", "pipe"],
       detached: process.platform !== "win32",
     });
@@ -268,19 +269,12 @@ export function killProcessTree(child: ChildProcess): void {
   }
 }
 
-function childEnv(
+export function runChildEnv(
   env: Record<string, string | undefined> | undefined,
   extra: Record<string, string>,
+  cli: CliName,
 ): NodeJS.ProcessEnv {
-  const source = env ?? process.env;
-  const next: NodeJS.ProcessEnv = {};
-  for (const [key, value] of Object.entries(source)) {
-    if (typeof value === "string") next[key] = value;
-  }
-  const home = source.BOTANICAL_CLI_HOME?.trim() || source.HOME;
-  if (home) next.HOME = home;
-  for (const [key, value] of Object.entries(extra)) next[key] = value;
-  return next;
+  return runCliChildEnv(env, extra, cli);
 }
 
 function stderrTail(parts: readonly string[]): string {

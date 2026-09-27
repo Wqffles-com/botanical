@@ -13,11 +13,18 @@ RUN bun install --frozen-lockfile --production
 
 FROM ${BUN_IMAGE} AS runtime
 WORKDIR /app
-RUN apk add --no-cache ca-certificates su-exec \
+# Alpine stays the base: Grok's Linux build is a static binary, Claude publishes
+# a musl build, and Codex publishes a musl build. Claude's musl binary needs
+# libgcc, libstdc++, and the system ripgrep (its bundled rg is glibc).
+RUN alpine_ver="$(cut -d. -f1,2 /etc/alpine-release)" \
+  && if ! grep -q '/community' /etc/apk/repositories; then \
+       echo "https://dl-cdn.alpinelinux.org/alpine/v${alpine_ver}/community" >> /etc/apk/repositories; \
+     fi \
+  && apk add --no-cache ca-certificates su-exec libgcc libstdc++ ripgrep \
   && addgroup -S botanical \
   && adduser -S -D -H -h /tmp -G botanical botanical \
-  && mkdir -p /data /config \
-  && chown botanical:botanical /data
+  && mkdir -p /data /config /opt/botanical-cli/bin /home/botanical \
+  && chown -R botanical:botanical /data /opt/botanical-cli /home/botanical
 COPY --from=install /app /app
 COPY deploy/scripts/server-entrypoint.sh /entrypoint.sh
 COPY config/mcp.json /config/mcp.json
@@ -28,7 +35,9 @@ ENV NODE_ENV=production \
     BOTANICAL_HOST=0.0.0.0 \
     BOTANICAL_WORKSPACE=/data \
     BOTANICAL_MCP_CONFIG=/config/mcp.json \
-    HOME=/tmp
+    HOME=/tmp \
+    PATH="/opt/botanical-cli/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+    USE_BUILTIN_RIPGREP=0
 EXPOSE 8787
 HEALTHCHECK --interval=10s --timeout=5s --start-period=40s --retries=12 \
   CMD bun -e "fetch('http://127.0.0.1:'+(process.env.PORT||8787)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

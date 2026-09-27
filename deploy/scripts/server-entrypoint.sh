@@ -30,8 +30,11 @@ fi
 
 if [ "$(id -u)" = "0" ]; then
   workspace="${BOTANICAL_WORKSPACE:-/data}"
-  mkdir -p "$workspace"
+  cli_root="${BOTANICAL_CLI_BIN:-/opt/botanical-cli}"
+  cli_home="${BOTANICAL_CLI_HOME:-/home/botanical}"
+  mkdir -p "$workspace" "$cli_root/bin" "$cli_home"
   chown botanical:botanical "$workspace" || true
+  chown -R botanical:botanical "$cli_root" "$cli_home" || true
   if ! command -v su-exec >/dev/null 2>&1; then
     echo "botanical: su-exec is missing from the image" >&2
     exit 1

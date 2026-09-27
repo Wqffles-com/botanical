@@ -12,6 +12,7 @@ import { createSendAgentMessageTool } from "./a2a/tool.ts";
 import { LoginRateLimiter } from "./auth/rate-limit.ts";
 import type { ServerConfig } from "./config.ts";
 import { createCliToolHost, registerCliMcp, type CliToolHost } from "./cli-mcp.ts";
+import { createCliService, type CliService } from "./cli-install/service.ts";
 import { emptyServerMcp, type ServerMcp } from "./mcp-host.ts";
 import { createRouter } from "./router.ts";
 import { createServerProfileResolver } from "./runtime/profiles.ts";
@@ -21,6 +22,7 @@ import { registerAgentMessages } from "./routes/agent-messages.ts";
 import { registerAgents } from "./routes/agents.ts";
 import { registerAuth } from "./routes/auth.ts";
 import { registerChats } from "./routes/chats.ts";
+import { registerCli } from "./routes/cli.ts";
 import { registerHealth } from "./routes/health.ts";
 import { registerMcp } from "./routes/mcp.ts";
 import { registerMemories } from "./routes/memories.ts";
@@ -50,6 +52,8 @@ export interface AppDeps {
    * Tests that pass a closed catalog leave this unset.
    */
   installPlatformTools?: boolean;
+  /** Coding-CLI install and login. Tests pass a fake so nothing is downloaded. */
+  cli?: CliService;
 }
 
 export interface App {
@@ -61,6 +65,8 @@ export interface App {
   a2a: A2AService;
   /** Per-run MCP endpoint for CLI profiles. Session cookies do not authenticate it. */
   cliTools: CliToolHost;
+  /** Install and device-login for coding CLIs. */
+  cli: CliService;
 }
 
 export function createApp(deps: AppDeps): App {
@@ -81,6 +87,12 @@ export function createApp(deps: AppDeps): App {
   });
   const runtime = createRuntime(deps, a2a, mcp, cliTools);
   runtimeDeps = runtime.deps;
+  const cli =
+    deps.cli ??
+    createCliService({
+      env: deps.env ?? (process.env as Env),
+      profiles: () => deps.config.profiles,
+    });
   const router = createRouter();
   registerHealth(router);
   registerAuth(router);
@@ -91,6 +103,7 @@ export function createApp(deps: AppDeps): App {
   registerMessages(router, runtime.deps);
   registerAgentMessages(router, a2a);
   registerProfiles(router);
+  registerCli(router, cli);
   registerMcp(router);
   registerCliMcp(router, cliTools);
   registerTools(router, runtime.registry);
@@ -98,9 +111,13 @@ export function createApp(deps: AppDeps): App {
 
   return {
     tools: mcp.registry,
-    close: () => mcp.close(),
+    close: async () => {
+      cli.close();
+      await mcp.close();
+    },
     a2a,
     cliTools,
+    cli,
     fetch(request, extras) {
       return router.handle(request, {
         config: deps.config,
