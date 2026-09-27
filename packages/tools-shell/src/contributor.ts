@@ -85,6 +85,7 @@ export function createToolContributor(options: ShellContributorOptions = {}): To
         (signal) => tool.execute(args, {
           workspaceRoot: root,
           signal,
+          ...(ctx.agentId ? { agentId: ctx.agentId } : {}),
           meta: {
             ...(ctx.agentId ? { agentId: ctx.agentId } : {}),
             ...(ctx.chatId ? { chatId: ctx.chatId } : {}),

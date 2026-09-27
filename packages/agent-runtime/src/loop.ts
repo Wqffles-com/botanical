@@ -195,6 +195,7 @@ export async function* runAgentTurn(
         yield { type: "done", finishReason: "aborted" };
         return;
       }
+      // agentId is the executing agent. File tools and shell cwd use it; tool arguments cannot replace it.
       const executed = await executeCall(deps, agent, catalog, call, {
         agentId: agent.id,
         chatId: chat.id,

@@ -5,6 +5,7 @@ import { Send, Square } from "lucide-react";
 import { useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
 import { ProfileSelect } from "@/components/chat/profile-select";
 import { Button } from "@/components/ui/button";
+import { unavailableProfileHint } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export function Composer({
@@ -33,7 +34,8 @@ export function Composer({
   profileNeeded?: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  const canSubmit = !disabled && !streaming && value.trim().length > 0;
+  const unavailableHint = unavailableProfileHint(profiles?.find((profile) => profile.id === profileId) ?? null);
+  const canSubmit = !disabled && !streaming && !unavailableHint && value.trim().length > 0;
 
   useEffect(() => {
     const el = ref.current;
@@ -73,7 +75,17 @@ export function Composer({
           disabled={disabled || streaming}
           rows={1}
           className="max-h-[200px] min-h-[44px] w-full bg-transparent px-3.5 pt-3 pb-1 text-[14.5px] leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
+          aria-describedby={unavailableHint ? "composer-unavailable" : undefined}
         />
+        {unavailableHint ? (
+          <p
+            id="composer-unavailable"
+            data-testid="profile-unavailable"
+            className="px-3.5 pb-1 text-[11px] leading-snug text-muted-foreground"
+          >
+            {unavailableHint}
+          </p>
+        ) : null}
         <div className="flex items-end gap-2 px-2 pb-2">
           {profiles && onProfile ? (
             <ProfileSelect
@@ -85,9 +97,11 @@ export function Composer({
               compact
             />
           ) : null}
-          <span className="mb-1 hidden text-[11px] text-muted-foreground sm:inline">
-            Enter to send · Shift+Enter newline
-          </span>
+          {unavailableHint ? null : (
+            <span className="mb-1 hidden text-[11px] text-muted-foreground sm:inline">
+              Enter to send · Shift+Enter newline
+            </span>
+          )}
           <span className="ml-auto flex items-center gap-2">
             {streaming ? (
               <Button type="button" variant="outline" size="icon" data-testid="stop" onClick={onStop} aria-label="Stop">

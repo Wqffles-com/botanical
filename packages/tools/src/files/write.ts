@@ -25,7 +25,8 @@ const parameters = {
     path: {
       type: "string",
       minLength: 1,
-      description: "File path relative to the workspace root, or an absolute path inside it.",
+      description:
+        "File path relative to this call's workspace. On an agent turn that is the agent's own directory: `.` and `/` are that folder. Absolute paths must already be inside it.",
     },
     content: {
       type: "string",
@@ -50,7 +51,7 @@ export function createFileWriteTool(config: ResolvedFileLimits): ToolDefinition<
   return defineTool({
     name: "file_write",
     description:
-      "Write a UTF-8 text file inside the workspace. mode is overwrite (default), append, or create (fail if the file exists). Parent directories are created inside the workspace unless createDirectories is false. Refuses paths that escape the workspace, including via symlinks. Requires approval.",
+      "Write a UTF-8 text file inside the workspace. On an agent turn the workspace is that agent's directory. mode is overwrite (default), append, or create (fail if the file exists). Parent directories are created inside the workspace unless createDirectories is false. Refuses paths that leave the workspace, including via symlinks and via a missing path whose nearest existing parent is outside. Requires approval.",
     parameters,
     risk: "write",
     requiresApproval: true,
@@ -71,10 +72,12 @@ export function createFileWriteTool(config: ResolvedFileLimits): ToolDefinition<
         );
       }
 
-      const root = await openWorkspace(config, ctx);
+      const opened = await openWorkspace(config, ctx);
+      const root = opened.root;
       const resolved = await resolveInsideWorkspace(root, userPath, {
         allowMissing: true,
         allowMissingParents: createDirectories,
+        agentScope: opened.agentScoped,
       });
       if (resolved.relative === ".") {
         throw new ToolError(ToolErrorCode.isDirectory, "path is a directory");

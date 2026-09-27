@@ -128,6 +128,8 @@ function createRuntime(
       },
       toolSources: registry.toToolSources((ctx) => ({
         ...ctx,
+        // Shared base. File tools and shell/code_exec narrow this to
+        // agents/<agentId> from ctx.agentId. The model does not choose the directory.
         workspaceRoot: ctx.workspaceRoot ?? ensureWorkspaceRoot(),
       })),
     },
