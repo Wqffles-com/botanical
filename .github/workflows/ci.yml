@@ -33,12 +33,11 @@ jobs:
           node-version: 22
       - run: bun install --frozen-lockfile
 
-      # core and tools-web have known typecheck errors; web lint has known
-      # react-hooks errors. They are left out until fixed (see PR notes).
+      # web lint has known react-hooks errors and is left out until fixed.
       - name: Typecheck
         run: |
           set -e
-          for pkg in agent-runtime db e2e mcp providers server tools tools-shell web; do
+          for pkg in agent-runtime core db e2e mcp providers server tools tools-shell tools-web web; do
             echo "::group::typecheck $pkg"
             (cd "packages/$pkg" && bun run typecheck)
             echo "::endgroup::"
