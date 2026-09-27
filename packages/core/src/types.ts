@@ -238,7 +238,7 @@ export type ChatStreamEvent =
   | { type: "message-start"; messageId: string; role?: MessageRole }
   | { type: "text-delta"; text: string }
   | { type: "tool-call"; id: string; name: string; arguments: unknown }
-  | { type: "tool-result"; id: string; content: string }
+  | { type: "tool-result"; id: string; content: string; isError?: boolean }
   | { type: "usage"; inputTokens: number; outputTokens: number }
   | { type: "error"; error: string }
   | { type: "done"; messageId?: string };

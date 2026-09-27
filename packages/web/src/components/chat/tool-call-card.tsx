@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronRight, FileText, Globe, LoaderCircle, SquareTerminal, Unplug } from "lucide-react";
+import { Check, ChevronRight, CircleAlert, FileText, Globe, LoaderCircle, SquareTerminal, Unplug } from "lucide-react";
 import { useState } from "react";
 import type { UiToolCall } from "@/lib/chat-stream";
 import { formatJson } from "@/lib/format";
@@ -15,17 +15,19 @@ function ToolIcon({ name }: { name: string }) {
 }
 
 export function ToolCallCard({ call }: { call: UiToolCall }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(call.status === "running");
+  const [full, setFull] = useState(false);
   const running = call.status === "running";
+  const failed = call.status === "error";
   const args = formatJson(call.arguments);
   const output = call.result ?? "";
+  const long = output.length > 500 || output.split("\n").length > 14;
+
   return (
     <div
-      className={cn(
-        "my-2 overflow-hidden rounded-md border bg-card/70 text-[12.5px]",
-        running ? "border-primary/30" : "border-border",
-      )}
+      className={cn("my-2 overflow-hidden rounded-md border bg-card text-[12.5px]", failed && "border-foreground/40")}
       data-testid="tool-call"
+      data-tool-name={call.name}
     >
       <button
         type="button"
@@ -34,9 +36,11 @@ export function ToolCallCard({ call }: { call: UiToolCall }) {
         aria-expanded={open}
       >
         {running ? (
-          <LoaderCircle className="size-3.5 shrink-0 animate-spin text-primary" />
+          <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
+        ) : failed ? (
+          <CircleAlert className="size-3.5 shrink-0" />
         ) : (
-          <Check className="size-3.5 shrink-0 text-primary" />
+          <Check className="size-3.5 shrink-0" />
         )}
         <ToolIcon name={call.name} />
         <span className="shrink-0 font-mono text-[12px]">{call.name}</span>
@@ -44,20 +48,38 @@ export function ToolCallCard({ call }: { call: UiToolCall }) {
         <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-muted-foreground">
           {args.replace(/\s+/g, " ")}
         </span>
-        <span className="shrink-0 text-[11px] uppercase tracking-wide text-muted-foreground">{call.status}</span>
+        <span className="shrink-0 text-[11px] tracking-wide whitespace-nowrap text-muted-foreground uppercase">
+          {call.status}
+        </span>
       </button>
       {open ? (
         <div className="space-y-2 border-t px-2.5 py-2">
           {args ? (
             <section>
-              <h4 className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Arguments</h4>
-              <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-[11.5px] text-muted-foreground">{args}</pre>
+              <h4 className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Arguments</h4>
+              <pre className="overflow-x-auto font-mono text-[11.5px] whitespace-pre-wrap text-muted-foreground">{args}</pre>
             </section>
           ) : null}
           {output ? (
             <section>
-              <h4 className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Output</h4>
-              <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-[11.5px] text-muted-foreground">{output}</pre>
+              <h4 className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Result</h4>
+              <pre
+                className={cn(
+                  "overflow-auto font-mono text-[11.5px] whitespace-pre-wrap text-muted-foreground",
+                  !full && "max-h-40",
+                )}
+              >
+                {output}
+              </pre>
+              {long ? (
+                <button
+                  type="button"
+                  className="mt-1 text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+                  onClick={() => setFull((value) => !value)}
+                >
+                  {full ? "Show less" : "Expand"}
+                </button>
+              ) : null}
             </section>
           ) : running ? (
             <p className="text-[11.5px] text-muted-foreground">Running…</p>

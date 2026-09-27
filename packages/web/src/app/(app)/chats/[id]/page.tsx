@@ -27,6 +27,7 @@ export default function ChatPage() {
       onProfile={(profileId) => void thread.setProfile(profileId)}
       onSend={() => void thread.send()}
       onStop={thread.stop}
+      creator={thread.creator}
     />
   );
 }

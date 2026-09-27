@@ -23,8 +23,23 @@ export function useAgents() {
   }, []);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    let cancelled = false;
+    listAgents()
+      .then((list) => {
+        if (cancelled) return;
+        setAgents(list);
+        setError(null);
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Could not load agents.");
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return { agents, loading, error, reload };
 }

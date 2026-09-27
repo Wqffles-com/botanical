@@ -391,10 +391,10 @@ export async function expectSettingsTabs(page: Page): Promise<void> {
   await page.goto("/settings");
   await expect(page).toHaveURL(/\/settings\/?$/);
   const tabs: { name: RegExp; text: RegExp }[] = [
+    { name: /^general$/i, text: /self[-\s]?host|saas|mcp|tool/i },
     { name: /^profiles$/i, text: /\bmock\b/i },
-    { name: /^tools$/i, text: /tool|file_list|web_search|shell/i },
-    { name: /^mcp$/i, text: /mcp|server/i },
-    { name: /^deployment$/i, text: /self[-\s]?host|saas/i },
+    { name: /^memory$/i, text: /memor/i },
+    { name: /roles/i, text: /role|capabilit|coder|reviewer/i },
   ];
   for (const tab of tabs) {
     const trigger = page.getByRole("tab", { name: tab.name });

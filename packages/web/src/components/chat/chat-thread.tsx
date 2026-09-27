@@ -7,10 +7,9 @@ import { Composer } from "@/components/chat/composer";
 import { EmptyState } from "@/components/chat/empty-state";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { ProfileRequiredBanner } from "@/components/chat/profile-required-banner";
-import { ProfileSelect } from "@/components/chat/profile-select";
 import { ChatThreadSkeleton } from "@/components/chat/skeletons";
 import { identityFromUnknown } from "@/lib/agent-identity";
-import { draftToMessage, type StreamDraft } from "@/lib/chat-stream";
+import { draftToMessage, presentThread, type StreamDraft } from "@/lib/chat-stream";
 
 export function ChatThread({
   chat,
@@ -29,6 +28,7 @@ export function ChatThread({
   onProfile,
   onSend,
   onStop,
+  creator,
 }: {
   chat: Chat | null;
   agent: Agent | null;
@@ -46,6 +46,7 @@ export function ChatThread({
   onProfile: (profileId: string | null) => void;
   onSend: () => void;
   onStop: () => void;
+  creator?: Agent | null;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
@@ -55,7 +56,7 @@ export function ChatThread({
     const el = scroller.current;
     if (!el || !stick.current) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages, streaming?.content, streaming?.toolCalls.length]);
+  }, [messages, streaming]);
 
   if (loading) return <ChatThreadSkeleton />;
   if (missing || !chat) {
@@ -68,25 +69,19 @@ export function ChatThread({
   }
 
   const live = streaming && streaming.chatId === chat.id ? streaming : null;
+  const rows = presentThread(messages);
+  const unavailable = Boolean(profileError && /unavailable/i.test(profileError));
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ChatAgentHeader
-        agent={identity}
-        title={chat.title}
-        trailing={
-          <ProfileSelect
-            profiles={profiles}
-            value={profileId}
-            onChange={onProfile}
-            needed={!profileReady}
-          />
-        }
-      />
+      <ChatAgentHeader agent={identity} title={chat.title} creator={creator} />
 
       {!profileReady || profileError ? (
         <div className="border-b px-4 py-2">
-          <ProfileRequiredBanner message={profileError ?? undefined} />
+          <ProfileRequiredBanner
+            title={unavailable ? "Profile unavailable" : undefined}
+            message={profileError ?? undefined}
+          />
         </div>
       ) : null}
 
@@ -115,8 +110,13 @@ export function ChatThread({
           </div>
         ) : (
           <div className="mx-auto flex min-h-full max-w-[760px] flex-col justify-end gap-5 px-4 py-6">
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} agent={agent} />
+            {rows.map((row) => (
+              <MessageBubble
+                key={row.key}
+                message={row.message}
+                agent={agent}
+                toolCalls={row.tools.length > 0 ? row.tools : undefined}
+              />
             ))}
             {live ? (
               <MessageBubble
@@ -141,6 +141,10 @@ export function ChatThread({
         streaming={Boolean(live)}
         disabled={!profileReady}
         placeholder={profileReady ? `Message ${identity?.name ?? "this agent"}…` : "Choose a model profile to write"}
+        profiles={profiles}
+        profileId={profileId}
+        onProfile={onProfile}
+        profileNeeded={!profileReady}
       />
     </div>
   );

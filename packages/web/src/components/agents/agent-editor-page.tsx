@@ -1,9 +1,11 @@
 "use client";
 
+import type { RoleRecord } from "@botanical/core";
 import { useEffect, useMemo, useState } from "react";
 import { AgentForm } from "@/components/agents/agent-form";
 import { useWorkspace } from "@/components/workspace-provider";
 import { Skeleton } from "@/components/ui/skeleton";
+import { api } from "@/lib/api";
 import { listProfiles, listTools } from "@/lib/agent-api";
 import { identityFromUnknown, type ProfileInfo, type ToolInfo } from "@/lib/agent-identity";
 
@@ -11,6 +13,7 @@ export function AgentEditorPage({ agentId }: { agentId?: string }) {
   const { ready, agents, error } = useWorkspace();
   const [tools, setTools] = useState<ToolInfo[]>([]);
   const [profiles, setProfiles] = useState<ProfileInfo[]>([]);
+  const [roles, setRoles] = useState<RoleRecord[]>([]);
   const [toolsLoading, setToolsLoading] = useState(true);
 
   const agent = useMemo(() => {
@@ -21,14 +24,15 @@ export function AgentEditorPage({ agentId }: { agentId?: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    setToolsLoading(true);
-    Promise.all([listTools().catch(() => []), listProfiles().catch(() => [])])
-      .then(([nextTools, nextProfiles]) => {
+    Promise.all([listTools().catch(() => []), listProfiles().catch(() => []), api.listRoles().catch(() => [])])
+      .then(([nextTools, nextProfiles, nextRoles]) => {
         if (cancelled) return;
         setTools(nextTools);
         setProfiles(nextProfiles);
+        setRoles(nextRoles);
+        setToolsLoading(false);
       })
-      .finally(() => {
+      .catch(() => {
         if (!cancelled) setToolsLoading(false);
       });
     return () => {
@@ -63,5 +67,14 @@ export function AgentEditorPage({ agentId }: { agentId?: string }) {
     );
   }
 
-  return <AgentForm agent={agent} tools={tools} profiles={profiles} toolsLoading={toolsLoading} />;
+  return (
+    <AgentForm
+      agent={agent}
+      tools={tools}
+      profiles={profiles}
+      roles={roles}
+      agents={agents}
+      toolsLoading={toolsLoading}
+    />
+  );
 }

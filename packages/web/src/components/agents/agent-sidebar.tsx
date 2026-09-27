@@ -54,7 +54,7 @@ export function AgentSidebarList({
                   <span className="min-w-0">
                     <span className="block truncate text-[13px] font-medium">{agent.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {agent.description || "No description"}
+                      {agent.roles.length > 0 ? agent.roles.map((role) => role.name).join(", ") : agent.description || "No description"}
                     </span>
                   </span>
                 </Link>

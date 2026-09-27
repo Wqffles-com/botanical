@@ -3,7 +3,7 @@
 import type { ModelProfile } from "@botanical/core";
 import { isUnauthorized } from "@botanical/core";
 import { Plug, Server, Wrench } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
@@ -15,13 +15,27 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
 import { providerLabel } from "@/lib/format-extra";
+import { useWorkspace } from "@/components/workspace-provider";
+import { MemoryPanel } from "@/components/settings/memory-panel";
+import { ProfilesPanel } from "@/components/settings/profiles-panel";
+import { RolesPanel } from "@/components/settings/roles-panel";
 import { fetchMcpServers, fetchProfiles, fetchSettings, fetchTools } from "@/lib/mvp-api";
 import type { AppSettings, CatalogTool, McpSnapshot, ProviderKeyStatus } from "@/lib/mvp-types";
 import { deriveProviderKeys } from "@/lib/parse";
 import { DeploymentBadge } from "./deployment-badge";
 
+type SettingsTab = "general" | "profiles" | "memory" | "roles";
+
+function normalizeTab(value: string | null): SettingsTab {
+  if (value === "profiles" || value === "memory" || value === "roles") return value;
+  return "general";
+}
+
 export function SettingsView() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab = normalizeTab(searchParams.get("tab"));
+  const { agents, refresh } = useWorkspace();
   const [profiles, setProfiles] = useState<ModelProfile[]>([]);
   const [tools, setTools] = useState<CatalogTool[]>([]);
   const [mcp, setMcp] = useState<McpSnapshot | null>(null);
@@ -72,11 +86,20 @@ export function SettingsView() {
     }
   }
 
+  function selectTab(next: string) {
+    const value = normalizeTab(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "general") params.delete("tab");
+    else params.set("tab", value);
+    const query = params.toString();
+    router.replace(query ? `/settings?${query}` : "/settings", { scroll: false });
+  }
+
   return (
-    <div className="mx-auto w-full max-w-3xl px-6 py-10">
+    <div className="mx-auto w-full max-w-5xl px-6 py-10">
       <PageHeader
         title="Settings"
-        description="Profiles, tools, and MCP live on the server. Keys never enter this browser."
+        description="Profiles, memory, and roles live on the server. Keys never enter this browser."
         actions={
           <Button variant="outline" onClick={() => void onSignOut()} disabled={signingOut}>
             {signingOut ? "Signing out…" : "Sign out"}
@@ -90,25 +113,34 @@ export function SettingsView() {
         </p>
       ) : null}
 
-      <Tabs defaultValue="profiles" className="mt-8">
+      <Tabs value={tab} onValueChange={selectTab} className="mt-8">
         <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4">
+          <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="profiles">Profiles</TabsTrigger>
-          <TabsTrigger value="tools">Tools</TabsTrigger>
-          <TabsTrigger value="mcp">MCP</TabsTrigger>
-          <TabsTrigger value="deployment">Deployment</TabsTrigger>
+          <TabsTrigger value="memory">Memory</TabsTrigger>
+          <TabsTrigger value="roles">Roles & permissions</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="general" className="mt-4 space-y-4">
+          {loading ? (
+            <SettingsSkeleton />
+          ) : (
+            <>
+              <DeploymentTab settings={settings} />
+              <ProfilesTab profiles={[]} providers={providers} keysOnly />
+              <ToolsTab tools={tools} />
+              <McpTab snapshot={mcp} />
+            </>
+          )}
+        </TabsContent>
         <TabsContent value="profiles" className="mt-4">
-          {loading ? <SettingsSkeleton /> : <ProfilesTab profiles={profiles} providers={providers} />}
+          {loading ? <SettingsSkeleton /> : <ProfilesPanel profiles={profiles} />}
         </TabsContent>
-        <TabsContent value="tools" className="mt-4">
-          {loading ? <SettingsSkeleton /> : <ToolsTab tools={tools} />}
+        <TabsContent value="memory" className="mt-4">
+          <MemoryPanel agents={agents} />
         </TabsContent>
-        <TabsContent value="mcp" className="mt-4">
-          {loading ? <SettingsSkeleton /> : <McpTab snapshot={mcp} />}
-        </TabsContent>
-        <TabsContent value="deployment" className="mt-4">
-          {loading ? <SettingsSkeleton /> : <DeploymentTab settings={settings} />}
+        <TabsContent value="roles" className="mt-4">
+          <RolesPanel agents={agents} onAgentsChanged={refresh} />
         </TabsContent>
       </Tabs>
     </div>
@@ -118,9 +150,11 @@ export function SettingsView() {
 function ProfilesTab({
   profiles,
   providers,
+  keysOnly = false,
 }: {
   profiles: ModelProfile[];
   providers: ProviderKeyStatus[];
+  keysOnly?: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -142,7 +176,7 @@ function ProfilesTab({
           ))}
         </CardContent>
       </Card>
-      {profiles.length === 0 ? (
+      {keysOnly ? null : profiles.length === 0 ? (
         <EmptyState
           title="No model profiles"
           body="The server only lists profiles whose provider key is set, plus mock. Set a key and reload."

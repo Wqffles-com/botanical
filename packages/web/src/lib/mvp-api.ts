@@ -51,26 +51,14 @@ export async function fetchMcpServers(): Promise<McpSnapshot> {
 
 export async function fetchSettings(): Promise<AppSettings> {
   const health = await fetchHealth();
-  try {
-    const body = await requestJson("/api/settings");
-    return parseSettings(body, {
+  return parseSettings(
+    {},
+    {
       deploymentMode: health?.mode ?? null,
       brandName: health?.brandName ?? null,
       version: health?.version ?? null,
-    });
-  } catch (error) {
-    if (missingEndpoint(error)) {
-      return parseSettings(
-        {},
-        {
-          deploymentMode: health?.mode ?? null,
-          brandName: health?.brandName ?? null,
-          version: health?.version ?? null,
-        },
-      );
-    }
-    throw error;
-  }
+    },
+  );
 }
 
 export async function fetchAgentMessages(agentId?: string, agentIds: string[] = []): Promise<AgentMessage[]> {

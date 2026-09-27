@@ -67,8 +67,31 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let cancelled = false;
+    void Promise.all([api.me(), api.listAgents(), api.listChats(), api.listProfiles()])
+      .then(([session, nextAgents, nextChats, nextProfiles]) => {
+        if (cancelled) return;
+        setMe(session);
+        setAgents(nextAgents);
+        setChats(nextChats);
+        setProfiles(nextProfiles);
+        setError(null);
+        setReady(true);
+      })
+      .catch((cause: unknown) => {
+        if (cancelled) return;
+        if (isUnauthorized(cause)) {
+          router.replace("/login");
+          return;
+        }
+        const message = cause instanceof BotanicalApiError ? cause.message : "Could not load the workspace.";
+        setError(message);
+        setReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const createChat = useCallback(async (input: CreateChatInput) => {
     const chat = await api.createChat(input);

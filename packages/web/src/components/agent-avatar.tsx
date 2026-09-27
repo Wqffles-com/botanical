@@ -1,6 +1,7 @@
+import { createElement } from "react";
 import { cn } from "@/lib/utils";
-import { agentColorTokens, type AgentColor } from "@/lib/agent-colors";
-import { getAgentIcon, type AgentIconName } from "@/lib/agent-icons";
+import { agentColorTokens, resolveAgentColor, type AgentColor } from "@/lib/agent-colors";
+import { AGENT_ICONS, resolveAgentIconName, type AgentIconName } from "@/lib/agent-icons";
 
 const SIZE = {
   sm: { box: "size-6 rounded-[7px]", icon: "size-3.5" },
@@ -27,22 +28,25 @@ export function AgentAvatar({
   className,
 }: AgentAvatarProps) {
   const tokens = agentColorTokens(color);
-  const Icon = getAgentIcon(icon);
+  const iconName = resolveAgentIconName(icon);
   const dim = SIZE[size];
   const label = name?.trim() || "Agent";
 
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]",
+        "inline-flex shrink-0 items-center justify-center border border-foreground/15",
         dim.box,
         className,
       )}
       style={{ background: tokens.fill, color: tokens.ink }}
+      data-icon={iconName}
+      data-color={resolveAgentColor(color)}
+      data-agent-name={label}
       title={label}
       aria-hidden
     >
-      <Icon className={dim.icon} strokeWidth={2.1} />
+      {createElement(AGENT_ICONS[iconName], { className: dim.icon, strokeWidth: 2.1 })}
     </span>
   );
 }

@@ -1,7 +1,9 @@
 "use client";
 
+import type { ModelProfile } from "@botanical/core";
 import { Send, Square } from "lucide-react";
 import { useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
+import { ProfileSelect } from "@/components/chat/profile-select";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +15,10 @@ export function Composer({
   streaming,
   disabled,
   placeholder,
+  profiles,
+  profileId,
+  onProfile,
+  profileNeeded,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -21,6 +27,10 @@ export function Composer({
   streaming: boolean;
   disabled?: boolean;
   placeholder: string;
+  profiles?: ModelProfile[];
+  profileId?: string | null;
+  onProfile?: (profileId: string | null) => void;
+  profileNeeded?: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const canSubmit = !disabled && !streaming && value.trim().length > 0;
@@ -64,8 +74,18 @@ export function Composer({
           rows={1}
           className="max-h-[200px] min-h-[44px] w-full bg-transparent px-3.5 pt-3 pb-1 text-[14.5px] leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
         />
-        <div className="flex items-center gap-2 px-2 pb-2">
-          <span className="hidden text-[11px] text-muted-foreground sm:inline">
+        <div className="flex items-end gap-2 px-2 pb-2">
+          {profiles && onProfile ? (
+            <ProfileSelect
+              id="composer-profile"
+              profiles={profiles}
+              value={profileId ?? null}
+              onChange={onProfile}
+              needed={profileNeeded}
+              compact
+            />
+          ) : null}
+          <span className="mb-1 hidden text-[11px] text-muted-foreground sm:inline">
             Enter to send · Shift+Enter newline
           </span>
           <span className="ml-auto flex items-center gap-2">

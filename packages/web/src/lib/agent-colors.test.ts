@@ -27,6 +27,13 @@ describe("agent colors", () => {
     }
   });
 
+  test("swatches stay grayscale", () => {
+    for (const color of AGENT_COLORS) {
+      expect(AGENT_COLOR_TOKENS[color].fill).toMatch(/^#([0-9a-f]{2})\1\1$/i);
+      expect(AGENT_COLOR_TOKENS[color].ink).toMatch(/^#([0-9a-f]{2})\1\1$/i);
+    }
+  });
+
   test("resolves unknown values to green", () => {
     expect(isAgentColor("green")).toBe(true);
     expect(isAgentColor("navy")).toBe(false);

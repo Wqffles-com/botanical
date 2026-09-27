@@ -468,12 +468,15 @@ export function coerceStreamEvent(parsed: unknown, eventName = ""): ChatStreamEv
       };
     case "tool-result":
     case "tool.result":
-    case "tool_result":
+    case "tool_result": {
+      const isError = record.isError === true;
       return {
         type: "tool-result",
         id: stringField(record, ["id", "toolCallId", "tool_call_id"]),
         content: normalizeContent(record.content ?? record.result ?? record.text),
+        ...(isError ? { isError: true } : {}),
       };
+    }
     case "usage":
       return {
         type: "usage",

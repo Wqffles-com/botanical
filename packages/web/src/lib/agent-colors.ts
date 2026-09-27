@@ -1,7 +1,9 @@
 /**
- * Agent color palette. Keep in sync with the shared MVP contract:
- * red, orange, amber, green, teal, cyan, blue, violet, pink, gray.
- * Default is green (the Botanical leaf).
+ * Agent color slots. Names stay on the shared contract
+ * (red, orange, amber, green, teal, cyan, blue, violet, pink, gray)
+ * so stored agents keep their identity. Swatches are a grayscale ramp:
+ * icons and names carry the distinction, not hue.
+ * Default is green.
  */
 
 export const AGENT_COLORS = [
@@ -32,71 +34,21 @@ export type AgentColorTokens = {
   ring: string;
 };
 
-/**
- * Calm, slightly desaturated swatches that sit on the botanical dark
- * canvas and still read on the light paper theme.
- */
+const wash = "rgba(0, 0, 0, 0.06)";
+const ring = "rgba(0, 0, 0, 0.45)";
+
+/** Equal-channel hex so each slot is a different gray, never a hue. */
 export const AGENT_COLOR_TOKENS: Record<AgentColor, AgentColorTokens> = {
-  red: {
-    fill: "#c45c4a",
-    ink: "#1a0d0b",
-    wash: "rgba(196, 92, 74, 0.16)",
-    ring: "rgba(196, 92, 74, 0.55)",
-  },
-  orange: {
-    fill: "#d4894a",
-    ink: "#1a1008",
-    wash: "rgba(212, 137, 74, 0.16)",
-    ring: "rgba(212, 137, 74, 0.55)",
-  },
-  amber: {
-    fill: "#d4b07a",
-    ink: "#1a140c",
-    wash: "rgba(212, 176, 122, 0.16)",
-    ring: "rgba(212, 176, 122, 0.55)",
-  },
-  green: {
-    fill: "#8fca7a",
-    ink: "#10150f",
-    wash: "rgba(143, 202, 122, 0.16)",
-    ring: "rgba(143, 202, 122, 0.55)",
-  },
-  teal: {
-    fill: "#5eaea0",
-    ink: "#0c1412",
-    wash: "rgba(94, 174, 160, 0.16)",
-    ring: "rgba(94, 174, 160, 0.55)",
-  },
-  cyan: {
-    fill: "#7eb0c4",
-    ink: "#0c1418",
-    wash: "rgba(126, 176, 196, 0.16)",
-    ring: "rgba(126, 176, 196, 0.55)",
-  },
-  blue: {
-    fill: "#6a8ec8",
-    ink: "#0c1018",
-    wash: "rgba(106, 142, 200, 0.16)",
-    ring: "rgba(106, 142, 200, 0.55)",
-  },
-  violet: {
-    fill: "#9a82c4",
-    ink: "#120e18",
-    wash: "rgba(154, 130, 196, 0.16)",
-    ring: "rgba(154, 130, 196, 0.55)",
-  },
-  pink: {
-    fill: "#c48aa0",
-    ink: "#180c12",
-    wash: "rgba(196, 138, 160, 0.16)",
-    ring: "rgba(196, 138, 160, 0.55)",
-  },
-  gray: {
-    fill: "#8f9c93",
-    ink: "#10150f",
-    wash: "rgba(143, 156, 147, 0.16)",
-    ring: "rgba(143, 156, 147, 0.55)",
-  },
+  red: { fill: "#171717", ink: "#fafafa", wash, ring },
+  orange: { fill: "#262626", ink: "#fafafa", wash, ring },
+  amber: { fill: "#333333", ink: "#fafafa", wash, ring },
+  green: { fill: "#404040", ink: "#fafafa", wash, ring },
+  teal: { fill: "#525252", ink: "#fafafa", wash, ring },
+  cyan: { fill: "#666666", ink: "#fafafa", wash, ring },
+  blue: { fill: "#737373", ink: "#111111", wash, ring },
+  violet: { fill: "#8a8a8a", ink: "#111111", wash, ring },
+  pink: { fill: "#a3a3a3", ink: "#111111", wash, ring },
+  gray: { fill: "#d4d4d4", ink: "#111111", wash, ring },
 };
 
 export function isAgentColor(value: unknown): value is AgentColor {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { LayoutGrid, List, Plus } from "lucide-react";
 import { AgentAvatar } from "@/components/agent-avatar";
+import { RoleBadges } from "@/components/role-badges";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -25,11 +26,13 @@ export function AgentCard({
   selected,
   onSelect,
   layout = "grid",
+  creatorName,
 }: {
   agent: AgentIdentity;
   selected?: boolean;
   onSelect?: (agentId: string) => void;
   layout?: AgentPickerLayout;
+  creatorName?: string | null;
 }) {
   const body = (
     <>
@@ -41,6 +44,7 @@ export function AgentCard({
       />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium leading-tight">{agent.name}</span>
+        <RoleBadges roles={agent.roles} />
         <span
           className={cn(
             "mt-0.5 block text-xs text-muted-foreground",
@@ -52,25 +56,41 @@ export function AgentCard({
       </span>
     </>
   );
+  const creator =
+    agent.createdByAgentId && creatorName ? (
+      <Link
+        href={`/agents/${encodeURIComponent(agent.createdByAgentId)}`}
+        className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+      >
+        Created by {creatorName}
+      </Link>
+    ) : null;
 
   const classes = cn(
     "w-full rounded-xl border bg-card text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-    layout === "grid" ? "flex flex-col items-start gap-3 p-4" : "flex items-start gap-3 px-3 py-2.5",
+    "flex flex-col",
+    layout === "grid" ? "items-start gap-3 p-4" : "gap-2 px-3 py-2.5",
     selected && "border-primary ring-2 ring-primary/20",
   );
 
   if (onSelect) {
     return (
-      <button type="button" onClick={() => onSelect(agent.id)} className={classes} aria-pressed={selected}>
-        {body}
-      </button>
+      <div className={classes}>
+        <button type="button" onClick={() => onSelect(agent.id)} className={cn("flex w-full text-left", layout === "grid" ? "flex-col items-start gap-3" : "items-start gap-3")} aria-pressed={selected}>
+          {body}
+        </button>
+        {creator}
+      </div>
     );
   }
 
   return (
-    <Link href={`/agents/${encodeURIComponent(agent.id)}`} className={cn(classes, "block")}>
-      {body}
-    </Link>
+    <div className={cn(classes, "block")}>
+      <Link href={`/agents/${encodeURIComponent(agent.id)}`} className={cn("flex w-full", layout === "grid" ? "flex-col items-start gap-3" : "items-start gap-3")}>
+        {body}
+      </Link>
+      {creator}
+    </div>
   );
 }
 
@@ -104,6 +124,7 @@ export function AgentPicker({
   const search = query ?? internalQuery;
   const view = onLayoutChange ? layout : internalLayout;
   const filtered = useMemo(() => filterAgents(agents, search), [agents, search]);
+  const names = useMemo(() => new Map(agents.map((agent) => [agent.id, agent.name])), [agents]);
 
   function setSearch(next: string) {
     onQueryChange?.(next);
@@ -172,6 +193,7 @@ export function AgentPicker({
               selected={agent.id === selectedId}
               onSelect={onSelect}
               layout="grid"
+              creatorName={agent.createdByAgentId ? (names.get(agent.createdByAgentId) ?? "another agent") : null}
             />
           ))}
         </div>
@@ -184,6 +206,7 @@ export function AgentPicker({
               selected={agent.id === selectedId}
               onSelect={onSelect}
               layout="list"
+              creatorName={agent.createdByAgentId ? (names.get(agent.createdByAgentId) ?? "another agent") : null}
             />
           ))}
         </div>
