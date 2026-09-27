@@ -1,0 +1,49 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Security issues must not be reported here.** Use the private form under the Security tab instead (see SECURITY.md).
+        Please remove API keys, passcodes, and other secrets from logs before pasting.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: e.g. v0.1.0 or a commit SHA on main
+  - type: dropdown
+    id: install
+    attributes:
+      label: How are you running Botanical?
+      options:
+        - Docker Compose
+        - Release zip
+        - From source (bun run dev)
+        - Other
+  - type: input
+    id: provider
+    attributes:
+      label: Model profile / provider involved (if any)
+      placeholder: e.g. anthropic, openai-compat, claude-code CLI, mock
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs (redacted)
+      render: shell

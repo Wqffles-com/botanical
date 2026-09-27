@@ -51,7 +51,7 @@ describe("htmlToMarkdown", () => {
       <div id="wrap">
         <div id="menu">Home About Contact</div>
         <div id="story">
-          <p>Botanical is a personal agent server with tools, providers, and a web client for long running work.</p>
+          <p>Botanical is an always-on agent server with tools, providers, and a web client for long running work.</p>
           <p>The second paragraph keeps going so the extractor can prefer this block over the short menu above it.</p>
         </div>
       </div>
@@ -63,11 +63,11 @@ describe("htmlToMarkdown", () => {
 
   test("renders a simple table", () => {
     const extracted = htmlToMarkdown(
-      `<table><thead><tr><th>Name</th><th>Role</th></tr></thead><tbody><tr><td>Ash</td><td>Guide</td></tr></tbody></table>`,
+      `<table><thead><tr><th>Name</th><th>Role</th></tr></thead><tbody><tr><td>Sprout</td><td>Guide</td></tr></tbody></table>`,
       "https://example.com/",
     );
     expect(extracted.markdown).toContain("| Name | Role |");
     expect(extracted.markdown).toContain("| --- | --- |");
-    expect(extracted.markdown).toContain("| Ash | Guide |");
+    expect(extracted.markdown).toContain("| Sprout | Guide |");
   });
 });

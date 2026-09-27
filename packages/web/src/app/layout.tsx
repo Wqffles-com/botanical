@@ -8,7 +8,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Botanical",
-  description: "Personal hosted agent server. Any brain.",
+  description: "Always-on AI agent server. Any model.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

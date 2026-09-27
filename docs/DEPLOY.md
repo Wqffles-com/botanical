@@ -1,8 +1,10 @@
 # Deploy Botanical
 
-One codebase, two operating modes. `DEPLOYMENT_MODE=SELF_HOST` is a personal server you run. `DEPLOYMENT_MODE=SAAS` is the same images on hosts Botanical operates. Accounts and subscription billing are not turned on. The license stays MIT.
+Botanical is an always-on server. Deploy it to a VPS or dedicated host you control. Running it on a laptop or workstation is for development only, because agents stop when the machine sleeps.
 
-The MVP stack is Docker Compose, project name **`botanical-mvp`**:
+One codebase, two operating modes. `DEPLOYMENT_MODE=SELF_HOST` is a server you run. `DEPLOYMENT_MODE=SAAS` is the same images run as the hosted service. Accounts and subscription billing are not turned on. The license stays MIT.
+
+The reference stack is Docker Compose, project name **`botanical-mvp`**:
 
 | Service | Role | Inside the network | Published on the host |
 |---------|------|--------------------|------------------------|
@@ -10,7 +12,7 @@ The MVP stack is Docker Compose, project name **`botanical-mvp`**:
 | `server` | Bun API, passcode, provider keys | `8787` | `127.0.0.1:${SERVER_PORT:-8788}` |
 | `postgres` | Postgres 17 | `5432` | `127.0.0.1:${POSTGRES_PORT:-5433}` |
 
-Those host ports are the defaults so this project does not bind 8080, 8787, or 5432. A different Compose project can keep using those.
+The API and Postgres are published on loopback only. Change the host ports with `WEB_PORT`, `SERVER_PORT`, and `POSTGRES_PORT`.
 
 Model calls leave the server for OpenAI, Anthropic, xAI, DeepSeek, OpenRouter, or a custom OpenAI-compatible base URL. Keys stay in the server environment. The browser never receives them.
 
@@ -100,7 +102,7 @@ Copy from [.env.example](../.env.example). Do not commit `.env`.
 | `DEPLOYMENT_MODE` | yes | `SELF_HOST` or `SAAS` |
 | `BOTANICAL_PASSCODE` | yes | Web → server gate. Copied to `BOTANICAL_PASSWORD` when that is empty |
 | `DATABASE_URL` | yes for Postgres | Host `postgres`, port `5432`, on the Compose network |
-| `BOTANICAL_SESSION_SECRET` | SaaS | Cookie signing secret. Change the example before a shared deploy |
+| `BOTANICAL_SESSION_SECRET` | no | Reserved. The current API does not read it |
 | `BOTANICAL_PUBLIC_ORIGIN` | recommended | Public web origin. Pair `https://` with `BOTANICAL_COOKIE_SECURE=true` |
 | `OPENAI_API_KEY` | no | GPT |
 | `ANTHROPIC_API_KEY` | no | Claude |
@@ -215,12 +217,12 @@ docker compose logs -f server web
 
 ## Hosted SaaS
 
-SaaS here means **the same artifacts, operated by us**, not a multi-tenant product.
+SaaS here means **the same artifacts, run as a hosted service**, not a multi-tenant product.
 
 What to set:
 
 - `DEPLOYMENT_MODE=SAAS` (the override file forces this on the server).
-- A passcode that is not the example value, and `BOTANICAL_SESSION_SECRET` of at least 16 characters that is not the example.
+- A long passcode that is not the example value.
 - `BOTANICAL_PUBLIC_ORIGIN=https://…` and `BOTANICAL_COOKIE_SECURE=true`.
 - `DATABASE_URL` pointing at managed Postgres.
 
@@ -251,7 +253,7 @@ Operating notes:
 - Inject secrets from the host secret store. Do not bake `.env` into an image. `.dockerignore` excludes `.env`.
 - Pin image digests (`BUN_IMAGE`, `NODE_IMAGE`, and the Postgres tag) instead of floating tags.
 - Keep Postgres on a private network. Only the TLS edge is public. The API container port stays on loopback; browsers talk to `web`.
-- Use one shared `BOTANICAL_SESSION_SECRET` if you ever run more than one API replica. Sessions are HMAC cookies.
+- Sessions are random tokens stored hashed in Postgres, so API replicas that share the database also share sessions. (The login rate limiter is per process.)
 - The file workspace volume is single-writer. Scale the API only after workspace storage is shared, or with workspace tools disabled.
 - Rebuild `web` when `BOTANICAL_API_URL` changes. Rewrites are compiled into the Next standalone server.
 - Take Postgres backups and rehearse a restore. The entrypoint migrates; it does not snapshot.
@@ -265,8 +267,8 @@ Operating notes:
 | `migrations failed` | `DATABASE_URL` host should be `postgres` and the password must match `POSTGRES_PASSWORD`. `docker compose ps` should show postgres healthy |
 | Web UI loads, `/api/auth/me` fails | Web was built with the wrong `BOTANICAL_API_URL`, or the server is not healthy. Rebuild web after changing the API URL |
 | Cookie does not stick | `https://` origin with the site opened over `http://`, or `BOTANICAL_COOKIE_SECURE` does not match the scheme |
-| Port already in use | Another stack is on 3000, 8788, or 5433. Change `WEB_PORT`, `SERVER_PORT`, or `POSTGRES_PORT`. Do not reuse 8080 / 8787 / 5432 if that project is running |
-| Compose attached to the wrong project | The file sets `name: botanical-mvp`. Do not pass `-p botanical` |
+| Port already in use | Something else is on 3000, 8788, or 5433. Change `WEB_PORT`, `SERVER_PORT`, or `POSTGRES_PORT` |
+| Compose attached to the wrong project | The file sets `name: botanical-mvp`. Pass the same name (or none) to `-p` |
 | MCP file missing | `BOTANICAL_MCP_CONFIG_FILE` must be a file. A missing path makes Docker create a directory and the entrypoint exits |
 | Empty standalone image | `packages/web` must `next build` with `output: "standalone"`. The web Dockerfile fails if `server.js` is not emitted |
 | Old database password | Postgres applies `POSTGRES_PASSWORD` only on first init. Existing volume: `docker compose exec postgres psql -U botanical -d botanical -c "ALTER USER botanical PASSWORD '...'"` and update `DATABASE_URL` |
