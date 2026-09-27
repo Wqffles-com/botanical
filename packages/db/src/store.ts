@@ -2,6 +2,15 @@ import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
 
 import { createDb, ensureDatabase, type BotanicalDb } from './client.ts';
 import { migrateDatabase } from './migrate.ts';
+import {
+  createMvp2,
+  type AgentRoleSummary,
+  type MemoryQuery,
+  type MemoryRecord,
+  type MemoryScope,
+  type RolePermissions,
+  type RoleRecord,
+} from './mvp2.ts';
 import { agentMessages } from './schema/agent-messages.ts';
 import { agents } from './schema/agents.ts';
 import { chats } from './schema/chats.ts';
@@ -58,6 +67,9 @@ export interface Agent {
   systemPrompt: string;
   toolIds: string[];
   defaultProfileId: string | null;
+  createdByAgentId: string | null;
+  roleIds: string[];
+  roles: AgentRoleSummary[];
   createdAt: string;
   updatedAt: string;
 }
@@ -70,6 +82,8 @@ export interface NewAgent {
   systemPrompt: string;
   toolIds: string[];
   defaultProfileId?: string | null;
+  createdByAgentId?: string | null;
+  roleIds?: string[];
 }
 
 export interface AgentPatch {
@@ -80,6 +94,7 @@ export interface AgentPatch {
   systemPrompt?: string;
   toolIds?: string[];
   defaultProfileId?: string | null;
+  roleIds?: string[];
 }
 
 export interface Chat {
@@ -199,6 +214,33 @@ export interface Store {
     create(input: NewAgentMessage): Promise<AgentMessage>;
     update(id: string, patch: AgentMessagePatch): Promise<AgentMessage | null>;
   };
+  readonly memories: {
+    list(query?: MemoryQuery): Promise<MemoryRecord[]>;
+    listVisible(agentId: string, opts?: { limit?: number }): Promise<MemoryRecord[]>;
+    get(id: string): Promise<MemoryRecord | null>;
+    create(input: {
+      scope: MemoryScope;
+      agentId?: string | null;
+      content: string;
+      tags?: string[];
+    }): Promise<MemoryRecord>;
+    update(id: string, patch: { content?: string; tags?: string[] }): Promise<MemoryRecord | null>;
+    delete(id: string): Promise<boolean>;
+    deleteVisible(id: string, agentId: string): Promise<'deleted' | 'missing' | 'forbidden'>;
+  };
+  readonly roles: {
+    list(): Promise<RoleRecord[]>;
+    get(id: string): Promise<RoleRecord | null>;
+    getByName(name: string): Promise<RoleRecord | null>;
+    create(input: { name: string; description?: string; permissions: RolePermissions }): Promise<RoleRecord>;
+    update(
+      id: string,
+      patch: { name?: string; description?: string; permissions?: RolePermissions },
+    ): Promise<RoleRecord | null>;
+    delete(id: string): Promise<boolean>;
+    listForAgent(agentId: string): Promise<RoleRecord[]>;
+    setForAgent(agentId: string, roleIds: readonly string[]): Promise<RoleRecord[]>;
+  };
   close(): Promise<void>;
 }
 
@@ -239,6 +281,12 @@ async function ensureOperator(db: BotanicalDb): Promise<string> {
 
 function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<void>): Store {
   let closed = false;
+  const mvp2 = createMvp2(db, userId);
+
+  async function hydrate(rows: AgentRow[]): Promise<Agent[]> {
+    const grouped = await mvp2.loadRoles(rows.map((row) => row.id));
+    return rows.map((row) => toAgent(row, grouped.get(row.id) ?? []));
+  }
 
   async function requireProfileUuid(publicId: string): Promise<string> {
     const id = publicId.trim();
@@ -279,7 +327,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
           .from(agents)
           .where(eq(agents.userId, userId))
           .orderBy(asc(agents.createdAt), asc(agents.id));
-        return rows.map(toAgent);
+        return hydrate(rows);
       },
       async get(id) {
         if (!isUuid(id)) return null;
@@ -288,7 +336,8 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
           .from(agents)
           .where(and(eq(agents.id, id), eq(agents.userId, userId)))
           .limit(1);
-        return rows[0] ? toAgent(rows[0]) : null;
+        const hydrated = await hydrate(rows);
+        return hydrated[0] ?? null;
       },
       async create(input) {
         const inserted = await db
@@ -302,11 +351,18 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
             prompt: input.systemPrompt,
             tools: toolIdsToBindings(input.toolIds),
             defaultProfileId: normalizeProfileId(input.defaultProfileId),
+            createdByAgentId: input.createdByAgentId ?? null,
           })
           .returning();
         const row = inserted[0];
         if (!row) throw new Error('agent insert failed');
-        return toAgent(row);
+        if (input.roleIds && input.roleIds.length > 0) {
+          await mvp2.roles.setForAgent(row.id, input.roleIds);
+        }
+        const hydrated = await hydrate([row]);
+        const agent = hydrated[0];
+        if (!agent) throw new Error('agent insert failed');
+        return agent;
       },
       async update(id, patch) {
         if (!isUuid(id)) return null;
@@ -334,7 +390,11 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
           .set(values)
           .where(and(eq(agents.id, id), eq(agents.userId, userId)))
           .returning();
-        return updated[0] ? toAgent(updated[0]) : null;
+        const row = updated[0];
+        if (!row) return null;
+        if (patch.roleIds !== undefined) await mvp2.roles.setForAgent(id, patch.roleIds);
+        const hydrated = await hydrate([row]);
+        return hydrated[0] ?? null;
       },
       async delete(id) {
         if (!isUuid(id)) return false;
@@ -663,6 +723,8 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
         return updated[0] ? toAgentMessage(updated[0]) : null;
       },
     },
+    memories: mvp2.memories,
+    roles: mvp2.roles,
   };
 }
 
@@ -673,7 +735,7 @@ type ProfileRow = typeof modelProfiles.$inferSelect;
 type SessionRow = typeof sessions.$inferSelect;
 type AgentMessageRow = typeof agentMessages.$inferSelect;
 
-function toAgent(row: AgentRow): Agent {
+function toAgent(row: AgentRow, assigned: AgentRoleSummary[]): Agent {
   return {
     id: row.id,
     name: row.name,
@@ -683,6 +745,9 @@ function toAgent(row: AgentRow): Agent {
     systemPrompt: row.prompt,
     toolIds: bindingsToToolIds(row.tools),
     defaultProfileId: row.defaultProfileId,
+    createdByAgentId: row.createdByAgentId,
+    roleIds: assigned.map((role) => role.id),
+    roles: assigned,
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
   };

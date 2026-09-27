@@ -33,17 +33,40 @@ export const MODEL_PROVIDERS = [
 ] as const;
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
 
+export type ProfileKind = "api" | "cli";
+export type CliName = "grok" | "claude" | "codex";
+
 /** Operator-configured model profile. API keys are never part of this object. */
 export interface ModelProfile {
   id: string;
   name: string;
-  provider: ModelProvider;
+  provider: ModelProvider | "cli";
   model: string;
   description?: string | null;
   baseUrl?: string;
   /** Output cap forwarded to the provider. Anthropic requires one. */
   maxTokens?: number;
   temperature?: number;
+  /** `api` is a vendor profile. `cli` runs a subscription coding agent on the server. */
+  kind?: ProfileKind;
+  cli?: CliName;
+  /** Absolute path to the CLI binary. Omitted: resolve `cli` on PATH. */
+  bin?: string;
+  timeoutMs?: number;
+  /** When false, do not pass a model flag. Unset model is not a silent default. */
+  passModel?: boolean;
+}
+
+export interface RolePermissions {
+  capabilities: string[];
+  mcp: Array<{ server: string; tools?: string[] }>;
+}
+
+export interface AgentRoleSummary {
+  id: string;
+  name: string;
+  builtin: boolean;
+  permissions: RolePermissions;
 }
 
 export interface Agent {
@@ -58,6 +81,10 @@ export interface Agent {
   toolIds: string[];
   /** Suggestion only. Chats still require an explicit profile. */
   defaultProfileId: string | null;
+  /** Set when another agent created this one. Null for operator-created agents. */
+  createdByAgentId: string | null;
+  roleIds: string[];
+  roles: AgentRoleSummary[];
   createdAt: string;
   updatedAt: string;
 }
@@ -70,6 +97,8 @@ export interface NewAgent {
   systemPrompt: string;
   toolIds: string[];
   defaultProfileId?: string | null;
+  createdByAgentId?: string | null;
+  roleIds?: string[];
 }
 
 export interface AgentPatch {
@@ -80,6 +109,82 @@ export interface AgentPatch {
   systemPrompt?: string;
   toolIds?: string[];
   defaultProfileId?: string | null;
+  roleIds?: string[];
+}
+
+export type MemoryScope = "shared" | "agent";
+
+export interface MemoryRecord {
+  id: string;
+  scope: MemoryScope;
+  agentId: string | null;
+  content: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewMemory {
+  scope: MemoryScope;
+  agentId?: string | null;
+  content: string;
+  tags?: string[];
+}
+
+export interface MemoryPatch {
+  content?: string;
+  tags?: string[];
+}
+
+export interface MemoryQuery {
+  scope?: MemoryScope;
+  agentId?: string;
+  q?: string;
+  tag?: string;
+  limit?: number;
+}
+
+export interface MemoryRepository {
+  list(query?: MemoryQuery): Promise<MemoryRecord[]>;
+  listVisible(agentId: string, opts?: { limit?: number }): Promise<MemoryRecord[]>;
+  get(id: string): Promise<MemoryRecord | null>;
+  create(input: NewMemory): Promise<MemoryRecord>;
+  update(id: string, patch: MemoryPatch): Promise<MemoryRecord | null>;
+  delete(id: string): Promise<boolean>;
+  deleteVisible(id: string, agentId: string): Promise<"deleted" | "missing" | "forbidden">;
+}
+
+export interface RoleRecord {
+  id: string;
+  name: string;
+  description: string;
+  permissions: RolePermissions;
+  builtin: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewRole {
+  name: string;
+  description?: string;
+  permissions: RolePermissions;
+}
+
+export interface RolePatch {
+  name?: string;
+  description?: string;
+  permissions?: RolePermissions;
+}
+
+export interface RoleRepository {
+  list(): Promise<RoleRecord[]>;
+  get(id: string): Promise<RoleRecord | null>;
+  getByName(name: string): Promise<RoleRecord | null>;
+  create(input: NewRole): Promise<RoleRecord>;
+  update(id: string, patch: RolePatch): Promise<RoleRecord | null>;
+  delete(id: string): Promise<boolean>;
+  listForAgent(agentId: string): Promise<RoleRecord[]>;
+  setForAgent(agentId: string, roleIds: readonly string[]): Promise<RoleRecord[]>;
 }
 
 /** One chat is owned by exactly one agent. agentId is immutable after create. */
@@ -258,6 +363,8 @@ export interface Store {
   readonly sessions: SessionRepository;
   readonly profiles: ProfileRepository;
   readonly agentMessages: AgentMessageRepository;
+  readonly memories: MemoryRepository;
+  readonly roles: RoleRepository;
   /** Release the backing pool. Memory stores resolve immediately. */
   close(): Promise<void>;
 }

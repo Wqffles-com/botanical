@@ -119,12 +119,49 @@ export function normalizeMe(body: unknown): Me {
 
 export function normalizeProfile(body: unknown): ModelProfile {
   const record = unwrapEntity(body, ["profile"]);
-  return {
+  const kind = record.kind === "cli" ? "cli" : record.kind === "api" ? "api" : undefined;
+  const available = typeof record.available === "boolean" ? record.available : undefined;
+  const profile: ModelProfile = {
     id: requireRecordId(record, "Profile"),
     name: stringField(record, ["name", "label"], stringField(record, ["id"])),
     provider: stringField(record, ["provider", "providerId", "provider_id"]),
     model: stringField(record, ["model", "modelId", "model_id"]),
     description: nullableString(record.description),
+  };
+  if (kind) profile.kind = kind;
+  if (available !== undefined) profile.available = available;
+  if (typeof record.unavailableReason === "string") profile.unavailableReason = record.unavailableReason;
+  if (typeof record.cli === "string") profile.cli = record.cli;
+  return profile;
+}
+
+export function normalizeMemory(body: unknown): import("./types").MemoryRecord {
+  const record = unwrapEntity(body, ["memory"]);
+  const scope = record.scope === "agent" ? "agent" : "shared";
+  const createdAt = stringField(record, ["createdAt", "created_at"]);
+  const tags = Array.isArray(record.tags) ? record.tags.filter((tag): tag is string => typeof tag === "string") : [];
+  return {
+    id: requireRecordId(record, "Memory"),
+    scope,
+    agentId: nullableString(record.agentId ?? record.agent_id),
+    content: stringField(record, ["content"]),
+    tags,
+    createdAt,
+    updatedAt: stringField(record, ["updatedAt", "updated_at"], createdAt),
+  };
+}
+
+export function normalizeRoleRecord(body: unknown): import("./types").RoleRecord {
+  const record = unwrapEntity(body, ["role"]);
+  const createdAt = stringField(record, ["createdAt", "created_at"]);
+  return {
+    id: requireRecordId(record, "Role"),
+    name: stringField(record, ["name"]),
+    description: stringField(record, ["description"]),
+    permissions: normalizePermissions(record.permissions),
+    builtin: record.builtin === true,
+    createdAt,
+    updatedAt: stringField(record, ["updatedAt", "updated_at"], createdAt),
   };
 }
 
@@ -144,8 +181,67 @@ export function normalizeAgent(body: unknown): Agent {
     toolIds,
     tools: toolIds,
     defaultProfileId: normalizeDefaultProfileId(record.defaultProfileId ?? record.default_profile_id),
+    createdByAgentId: nullableString(record.createdByAgentId ?? record.created_by_agent_id),
+    roleIds: normalizeToolIds(record.roleIds ?? record.role_ids),
+    roles: normalizeRoles(record.roles),
+    effectivePermissions: normalizeEffective(record.effectivePermissions ?? record.effective_permissions),
     createdAt,
     updatedAt: stringField(record, ["updatedAt", "updated_at"], createdAt),
+  };
+}
+
+function normalizeRoles(value: unknown): Agent["roles"] {
+  if (!Array.isArray(value)) return [];
+  const roles: Agent["roles"] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const id = stringField(record, ["id"]);
+    if (!id) continue;
+    roles.push({
+      id,
+      name: stringField(record, ["name"], id),
+      builtin: record.builtin === true,
+      permissions: normalizePermissions(record.permissions),
+    });
+  }
+  return roles;
+}
+
+function normalizePermissions(value: unknown): Agent["roles"][number]["permissions"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { capabilities: [], mcp: [] };
+  const record = value as Record<string, unknown>;
+  const capabilities = Array.isArray(record.capabilities)
+    ? record.capabilities.filter((item): item is string => typeof item === "string")
+    : [];
+  const mcp = Array.isArray(record.mcp)
+    ? record.mcp.flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+        const grant = item as Record<string, unknown>;
+        if (typeof grant.server !== "string" || grant.server.trim() === "") return [];
+        const tools = Array.isArray(grant.tools)
+          ? grant.tools.filter((tool): tool is string => typeof tool === "string")
+          : undefined;
+        return [{ server: grant.server, ...(tools && tools.length > 0 ? { tools } : {}) }];
+      })
+    : [];
+  return { capabilities, mcp };
+}
+
+function normalizeEffective(value: unknown): Agent["effectivePermissions"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { unrestricted: true, capabilities: [], mcp: [], roleNames: [] };
+  }
+  const record = value as Record<string, unknown>;
+  const permissions = normalizePermissions(record);
+  const roleNames = Array.isArray(record.roleNames)
+    ? record.roleNames.filter((item): item is string => typeof item === "string")
+    : [];
+  return {
+    unrestricted: record.unrestricted !== false && roleNames.length === 0 && permissions.capabilities.length === 0,
+    capabilities: permissions.capabilities,
+    mcp: permissions.mcp,
+    roleNames,
   };
 }
 
@@ -372,12 +468,15 @@ export function coerceStreamEvent(parsed: unknown, eventName = ""): ChatStreamEv
       };
     case "tool-result":
     case "tool.result":
-    case "tool_result":
+    case "tool_result": {
+      const isError = record.isError === true;
       return {
         type: "tool-result",
         id: stringField(record, ["id", "toolCallId", "tool_call_id"]),
         content: normalizeContent(record.content ?? record.result ?? record.text),
+        ...(isError ? { isError: true } : {}),
       };
+    }
     case "usage":
       return {
         type: "usage",

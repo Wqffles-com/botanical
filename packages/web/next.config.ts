@@ -5,6 +5,9 @@ import type { NextConfig } from "next";
 const apiUrl = (process.env.BOTANICAL_API_URL ?? "http://127.0.0.1:8787").replace(/\/+$/, "");
 
 const nextConfig: NextConfig = {
+  // The /api rewrite proxies text/event-stream. Gzip here buffers the whole SSE body
+  // when the browser sends Accept-Encoding: gzip, so tokens arrive in one chunk.
+  compress: false,
   output: "standalone",
   outputFileTracingRoot: process.cwd().endsWith("/packages/web")
     ? process.cwd().slice(0, -"/packages/web".length)

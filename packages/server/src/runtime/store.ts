@@ -3,6 +3,7 @@ import {
   AgentNotFoundError,
   ChatNotFoundError,
   ValidationError,
+  isCapability,
   type AgentRecord,
   type ChatRecord,
   type MessageRecord,
@@ -117,6 +118,15 @@ function toAgent(agent: Agent): AgentRecord {
     prompt: agent.systemPrompt,
     toolAllowlist: [...agent.toolIds],
     a2aEnabled: false,
+    createdByAgentId: agent.createdByAgentId,
+    roles: agent.roles.map((role) => ({
+      id: role.id,
+      name: role.name,
+      permissions: {
+        capabilities: role.permissions.capabilities.filter(isCapability),
+        mcp: role.permissions.mcp,
+      },
+    })),
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
   };

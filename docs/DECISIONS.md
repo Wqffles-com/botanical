@@ -55,3 +55,44 @@ Authoritative product decisions. When these conflict with earlier brainstorm not
 - [BRAINSTORM.md](./BRAINSTORM.md) — ideas; superseded bits marked
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — system sketch (aligned)
 - [BUSINESS_MODEL.md](./BUSINESS_MODEL.md) — MIT self-host vs hosted subscription; deployment mode in v0
+
+---
+
+## 2026-09-27 — MVP2 backend: CLI profiles, memory, agent creation, roles
+
+**Status:** LOCKED for this backend slice.  
+**Effect:** Adds four server capabilities. Does not change the rule that every chat names a profile and that there is no silent default model.
+
+### 1. CLI profiles (`kind: "cli"`)
+
+A profile may run a subscription coding-agent CLI on the server instead of an HTTP model API. Preset ids are `grok-build` (`grok`), `claude-code` (`claude`), and `codex` (`codex`).
+
+- Configure them in `BOTANICAL_PROFILES` (`kind`, `cli`, optional `label` / `model` / `bin` / `timeoutMs`) or with `BOTANICAL_CLI_PROFILES=grok-build,claude-code,codex`. The shortcut only adds presets that the JSON did not already declare. Explicit JSON wins.
+- `model` is passed to the CLI only when the profile sets it (`-m` or `--model`). Omitting it leaves the CLI's own default. That is not a Botanical default model, and CLI profiles are never auto-selected.
+- The CLI runs its own tools. Botanical does not forward its tool list. The working directory is the agent's folder inside the existing workspace jail.
+- Grok is invoked as `grok -p <prompt> --output-format streaming-messages-json --include-partial-messages --always-approve --cwd <dir>` because that format emits incremental text deltas. ACP `streaming-json` lines are still parsed if a binary emits them.
+- Claude Code uses `claude -p … --output-format stream-json --verbose --include-partial-messages --permission-mode bypassPermissions`. Codex uses `codex exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox -C <dir>`. The extra flags keep the process from blocking on prompts or a git repo check. The workspace jail is the external sandbox.
+- `GET /api/profiles` includes every CLI profile with `kind`, `available`, and `unavailableReason` when the binary is missing or login cannot be confirmed. A chat turn on an unavailable CLI profile fails with `profile_unavailable`. It does not crash the process.
+- Docker: `docker-compose.cli.yml` is opt-in and does not change `docker compose up`.
+
+### 2. Memory
+
+Memories have scope `shared` or `agent`. Agent scope is private to that agent. Shared rows are visible to every agent; `agentId` records the author when an agent wrote the row. The operator REST API can list every memory. Agent tools (`memory_write`, `memory_search`, `memory_list`, `memory_delete`) and the turn-start prompt only see shared rows plus that agent's own private rows. An agent cannot read or delete another agent's private memory.
+
+At the start of a turn, Botanical appends a `## Memories` section: a few of the newest visible rows plus keyword overlap with the latest user message, capped in size.
+
+### 3. Agents creating agents
+
+`agent_create` persists through the same validation path as `POST /api/agents` and sets `createdByAgentId`. `agent_list` lists id, name, and description. An agent cannot grant tools or roles outside its own ceiling (see the combination rule). `agent_create` requires capability `agent.create` when the caller has roles.
+
+### 4. Roles and the permission combination rule
+
+Roles hold capability strings plus an MCP allow list (`{ server, tools? }`; omitted tools means the whole server; server `"*"` means every server). An agent may have several roles. Effective permissions are the union.
+
+**A tool call is allowed when it matches the agent's allowlist (runtime A2A tools follow `a2aEnabled` instead) and, if the agent has one or more roles, the union of those roles permits the tool's capability.** Agents with **no roles** keep today's allowlist-only behavior, so existing agents are unchanged. `effectivePermissions.unrestricted` is true in that case.
+
+Enforcement happens at tool dispatch, not only when the tool list is built. A denied call returns a tool error to the model, for example `permission denied: agent "Ada" lacks capability "file.write" (roles: Reviewer)`. The turn does not throw. Denied tools are also omitted from the list sent to the model.
+
+Builtin roles, seeded idempotently: **Coder** (no `agent.create`), **Reviewer** (`file.read`, `web`, `memory.read`), **Orchestrator** (every capability and MCP `*`). Builtin roles can have their description and permissions edited. Their names cannot change and they cannot be deleted.
+
+`agent_list` is capability `agent.message` (same gate as sending mail). `file_delete` is `file.write`. There is no separate file-edit tool.

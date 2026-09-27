@@ -29,6 +29,8 @@ export interface ChatRequest {
   temperature?: number;
   maxTokens?: number;
   signal?: AbortSignal;
+  /** Working directory for CLI profiles. API providers ignore it. */
+  cwd?: string;
 }
 
 export type ChatEvent =

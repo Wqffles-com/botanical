@@ -38,16 +38,18 @@ export function MessageBubble({
         <div className="mb-1 text-[11.5px] font-medium uppercase tracking-wide text-muted-foreground">
           {identity.name}
         </div>
+        {/* A step's text comes before the tool calls it makes. */}
+        {message.content ? <Markdown>{message.content}</Markdown> : null}
         {calls.map((call) => (
           <ToolCallCard key={call.id || call.name} call={call} />
         ))}
-        {message.role === "tool" && message.content ? (
-          <ToolCallCard
-            call={{ id: message.id, name: "tool", arguments: {}, result: message.content, status: "done" }}
-          />
+        {streaming ? (
+          <span className="stream-dots text-muted-foreground" aria-hidden>
+            <span />
+            <span />
+            <span />
+          </span>
         ) : null}
-        {message.content ? <Markdown>{message.content}</Markdown> : null}
-        {streaming ? <span className="stream-caret" aria-hidden /> : null}
         {message.usage ? (
           <p className="mt-1 text-[11px] text-muted-foreground">
             {message.usage.inputTokens} in · {message.usage.outputTokens} out

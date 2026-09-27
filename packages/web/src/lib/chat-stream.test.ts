@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { ProfileRequiredError, type Agent, type Chat } from "@botanical/core";
+import { BotanicalApiError, ProfileRequiredError, type Agent, type Chat, type ChatMessage } from "@botanical/core";
 import { canStartChat, chatsByAgent } from "./chat-groups";
-import { applyStreamEvent, emptyDraft } from "./chat-stream";
-import { isProfileRequired, profileRequiredMessage } from "./errors";
+import { applyStreamEvent, emptyDraft, presentThread, toolResultStatus } from "./chat-stream";
+import { isProfileRequired, isProfileUnavailable, profileRequiredMessage, profileUnavailableText } from "./errors";
 
 describe("new chat gates", () => {
   test("requires both an agent and a profile, with no default", () => {
@@ -39,6 +39,55 @@ describe("applyStreamEvent", () => {
       usage: { inputTokens: 3, outputTokens: 2 },
     });
   });
+
+  test("marks a tool result as an error when the stream says so", () => {
+    let draft = emptyDraft("chat-1");
+    draft = applyStreamEvent(draft, { type: "tool-call", id: "t1", name: "file_write", arguments: {} });
+    draft = applyStreamEvent(draft, { type: "tool-result", id: "t1", content: "denied", isError: true });
+    expect(draft.toolCalls[0]?.status).toBe("error");
+    expect(toolResultStatus('{"error":"permission denied: file.write"}')).toBe("error");
+    expect(toolResultStatus("README.md")).toBe("done");
+  });
+});
+
+describe("presentThread", () => {
+  test("merges a tool result into the assistant call", () => {
+    const messages: ChatMessage[] = [
+      {
+        id: "a1",
+        chatId: "c",
+        role: "assistant",
+        content: "Done",
+        createdAt: "t",
+        toolCalls: [{ id: "t1", name: "file_list", arguments: { path: "." } }],
+      },
+      {
+        id: "r1",
+        chatId: "c",
+        role: "tool",
+        content: "README.md",
+        toolCallId: "t1",
+        name: "file_list",
+        createdAt: "t2",
+      },
+    ];
+    const rows = presentThread(messages);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.tools[0]).toMatchObject({ id: "t1", result: "README.md", status: "done" });
+  });
+});
+
+describe("profile_unavailable", () => {
+  test("turns a 422 into a profile-specific message", () => {
+    const error = new BotanicalApiError("CLI binary not found", {
+      status: 422,
+      body: { error: { code: "profile_unavailable", message: "CLI binary not found" } },
+    });
+    expect(isProfileUnavailable(error)).toBe(true);
+    expect(profileUnavailableText("Grok Build", error.message)).toBe(
+      "Grok Build is unavailable: CLI binary not found. Pick another profile.",
+    );
+  });
 });
 
 describe("profile_required", () => {
@@ -61,6 +110,10 @@ describe("chatsByAgent", () => {
     toolIds: [],
     tools: [],
     defaultProfileId: null,
+    createdByAgentId: null,
+    roleIds: [],
+    roles: [],
+    effectivePermissions: { unrestricted: true, capabilities: [], mcp: [], roleNames: [] },
     createdAt: "2026-09-23T00:00:00.000Z",
     updatedAt: "2026-09-23T00:00:00.000Z",
   };

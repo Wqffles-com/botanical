@@ -41,3 +41,22 @@ export function profileRequiredMessage(error?: unknown): string {
   if (typeof error === "string" && error.trim()) return error;
   return "Choose a model profile to write. Botanical has no default model.";
 }
+
+export function isProfileUnavailable(error: unknown): boolean {
+  if (errorCode(error) === "profile_unavailable") return true;
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  return /profile_unavailable/i.test(message);
+}
+
+export function profileUnavailableText(profileName: string, detail: string): string {
+  const reason = detail.replace(/^profile_unavailable[:\s]*/i, "").trim() || "it cannot be used right now";
+  const name = profileName.trim() || "This profile";
+  return `${name} is unavailable: ${reason}. Pick another profile.`;
+}
+
+export function roleDeleteText(error: unknown): string | null {
+  const code = errorCode(error);
+  if (code === "builtin_role") return "Built-in roles can't be deleted.";
+  if (code === "role_in_use") return "That role is still assigned to an agent. Unassign it first.";
+  return null;
+}

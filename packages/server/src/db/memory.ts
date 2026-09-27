@@ -8,6 +8,7 @@ import {
   isAgentIcon,
   type AgentColor,
 } from "@botanical/core";
+import { createPlatform } from "./platform.ts";
 import {
   AGENT_MESSAGE_STATUSES,
   type Agent,
@@ -51,6 +52,18 @@ export function createMemoryStore(options?: { seed?: boolean }): Store {
     return new Date(millis).toISOString();
   };
 
+  const platform = createPlatform(timestamp);
+
+  function presentAgent(agent: Agent): Agent {
+    const roleIds = platform.roleIds(agent.id);
+    return clone({
+      ...agent,
+      toolIds: [...agent.toolIds],
+      roleIds,
+      roles: platform.summaries(roleIds),
+    });
+  }
+
   if (options?.seed) {
     for (const example of EXAMPLE_AGENTS) {
       agents.set(example.id, {
@@ -62,6 +75,9 @@ export function createMemoryStore(options?: { seed?: boolean }): Store {
         systemPrompt: example.prompt,
         toolIds: [...example.tools],
         defaultProfileId: null,
+        createdByAgentId: null,
+        roleIds: [],
+        roles: [],
         createdAt: EXAMPLE_AGENTS_CREATED_AT,
         updatedAt: EXAMPLE_AGENTS_CREATED_AT,
       });
@@ -75,11 +91,11 @@ export function createMemoryStore(options?: { seed?: boolean }): Store {
       async list() {
         return [...agents.values()]
           .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
-          .map(clone);
+          .map(presentAgent);
       },
       async get(id) {
         const agent = agents.get(id);
-        return agent ? clone(agent) : null;
+        return agent ? presentAgent(agent) : null;
       },
       async create(input: NewAgent) {
         const now = timestamp();
@@ -92,11 +108,18 @@ export function createMemoryStore(options?: { seed?: boolean }): Store {
           systemPrompt: input.systemPrompt,
           toolIds: [...input.toolIds],
           defaultProfileId: normalizeProfileId(input.defaultProfileId),
+          createdByAgentId: input.createdByAgentId ?? null,
+          roleIds: [],
+          roles: [],
           createdAt: now,
           updatedAt: now,
         };
         agents.set(agent.id, agent);
-        return clone(agent);
+        if (input.roleIds && input.roleIds.length > 0) {
+          await platform.roles.setForAgent(agent.id, input.roleIds);
+          agent.roleIds = platform.roleIds(agent.id);
+        }
+        return presentAgent(agent);
       },
       async update(id: string, patch: AgentPatch) {
         const current = agents.get(id);
@@ -115,10 +138,18 @@ export function createMemoryStore(options?: { seed?: boolean }): Store {
           next.defaultProfileId = normalizeProfileId(patch.defaultProfileId);
         }
         agents.set(id, next);
-        return clone(next);
+        if (patch.roleIds !== undefined) {
+          await platform.roles.setForAgent(id, patch.roleIds);
+          next.roleIds = platform.roleIds(id);
+        }
+        return presentAgent(next);
       },
       async delete(id) {
         if (!agents.has(id)) return false;
+        platform.onAgentDeleted(id);
+        for (const agent of agents.values()) {
+          if (agent.createdByAgentId === id) agent.createdByAgentId = null;
+        }
         for (const message of agentMessages.values()) {
           if (message.fromAgentId === id || message.toAgentId === id) {
             agentMessages.delete(message.id);
@@ -353,6 +384,8 @@ export function createMemoryStore(options?: { seed?: boolean }): Store {
         return clone(next);
       },
     },
+    memories: platform.memories,
+    roles: platform.roles,
   };
 }
 

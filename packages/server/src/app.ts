@@ -15,16 +15,20 @@ import { emptyServerMcp, type ServerMcp } from "./mcp-host.ts";
 import { createRouter } from "./router.ts";
 import { createServerProfileResolver } from "./runtime/profiles.ts";
 import { adaptServerStore } from "./runtime/store.ts";
-import { ensureWorkspaceRoot } from "./runtime/workspace.ts";
+import { agentWorkspace, ensureWorkspaceRoot } from "./runtime/workspace.ts";
 import { registerAgentMessages } from "./routes/agent-messages.ts";
 import { registerAgents } from "./routes/agents.ts";
 import { registerAuth } from "./routes/auth.ts";
 import { registerChats } from "./routes/chats.ts";
 import { registerHealth } from "./routes/health.ts";
 import { registerMcp } from "./routes/mcp.ts";
+import { registerMemories } from "./routes/memories.ts";
 import { registerMessages } from "./routes/messages.ts";
 import { registerProfiles } from "./routes/profiles.ts";
+import { registerRoles } from "./routes/roles.ts";
 import { registerTools } from "./routes/tools.ts";
+import { createAgentAdminContributor } from "./tools/agent-admin.ts";
+import { createMemoryContributor } from "./tools/memory.ts";
 import { contributorFromServerMcp, createDefaultToolRegistry } from "./tools/catalog.ts";
 import type { Store } from "./types.ts";
 
@@ -68,6 +72,8 @@ export function createApp(deps: AppDeps): App {
   registerHealth(router);
   registerAuth(router);
   registerAgents(router);
+  registerRoles(router);
+  registerMemories(router);
   registerChats(router);
   registerMessages(router, runtime.deps);
   registerAgentMessages(router, a2a);
@@ -104,6 +110,8 @@ function createRuntime(
   if (installPlatform) {
     registry.register(sendAgentMessageContributor(a2a));
     registry.register(contributorFromServerMcp(mcp));
+    registry.register(createMemoryContributor(deps.store));
+    registry.register(createAgentAdminContributor(deps.store));
   }
   const profiles = deps.profiles ?? createServerProfileResolver(deps.config, env);
   const store = adaptServerStore(deps.store);
@@ -114,6 +122,10 @@ function createRuntime(
       store,
       bus,
       profiles,
+      workspaceFor: (agentId) => agentWorkspace(agentId),
+      memories: {
+        recall: ({ agentId }) => deps.store.memories.listVisible(agentId, { limit: 200 }),
+      },
       toolSources: registry.toToolSources((ctx) => ({
         ...ctx,
         workspaceRoot: ctx.workspaceRoot ?? ensureWorkspaceRoot(),

@@ -19,6 +19,8 @@ import {
   normalizeAgent,
   normalizeAgentMessage,
   normalizeChat,
+  normalizeMemory,
+  normalizeRoleRecord,
   normalizeHealth,
   normalizeLogin,
   normalizeMe,
@@ -31,6 +33,7 @@ import { readChatStream } from "./sse";
 import type {
   Agent,
   AgentMessage,
+  AgentRoleRef,
   Chat,
   ChatMessage,
   ChatStreamEvent,
@@ -39,7 +42,10 @@ import type {
   Health,
   LoginResult,
   Me,
+  MemoryRecord,
   ModelProfile,
+  RolePermissions,
+  RoleRecord,
   SendAgentMessageInput,
   SendMessageInput,
   UpdateAgentInput,
@@ -116,6 +122,7 @@ export class BotanicalClient {
         tools: toolIds,
         toolIds,
         defaultProfileId: readDefaultProfileId(input.defaultProfileId),
+        ...(input.roleIds ? { roleIds: input.roleIds } : {}),
       }),
     });
     return normalizeAgent(body);
@@ -138,6 +145,7 @@ export class BotanicalClient {
       patch.toolIds = toolIds;
     }
     if (input.defaultProfileId !== undefined) patch.defaultProfileId = readDefaultProfileId(input.defaultProfileId);
+    if (input.roleIds !== undefined) patch.roleIds = input.roleIds;
     const body = await this.requestJson(API.agent(id), {
       method: "PATCH",
       body: JSON.stringify(patch),
@@ -147,6 +155,110 @@ export class BotanicalClient {
 
   async deleteAgent(id: string): Promise<void> {
     await this.requestJson(API.agent(id), { method: "DELETE" });
+  }
+
+  async listMemories(query: {
+    scope?: "shared" | "agent";
+    agentId?: string;
+    q?: string;
+    tag?: string;
+    limit?: number;
+  } = {}): Promise<MemoryRecord[]> {
+    const params = new URLSearchParams();
+    if (query.scope) params.set("scope", query.scope);
+    if (query.agentId) params.set("agentId", query.agentId);
+    if (query.q) params.set("q", query.q);
+    if (query.tag) params.set("tag", query.tag);
+    if (query.limit !== undefined) params.set("limit", String(query.limit));
+    const suffix = params.size > 0 ? `?${params.toString()}` : "";
+    const body = await this.requestJson(`${API.memories}${suffix}`);
+    return unwrapList(body, ["memories"]).map(normalizeMemory);
+  }
+
+  async createMemory(input: {
+    scope: "shared" | "agent";
+    content: string;
+    agentId?: string | null;
+    tags?: string[];
+  }): Promise<MemoryRecord> {
+    const body = await this.requestJson(API.memories, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return normalizeMemory(body);
+  }
+
+  async updateMemory(
+    id: string,
+    patch: { content?: string; tags?: string[] },
+  ): Promise<MemoryRecord> {
+    const body = await this.requestJson(API.memory(id), {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+    return normalizeMemory(body);
+  }
+
+  async deleteMemory(id: string): Promise<void> {
+    await this.requestJson(API.memory(id), { method: "DELETE" });
+  }
+
+  async listRoles(): Promise<RoleRecord[]> {
+    const body = await this.requestJson(API.roles);
+    return unwrapList(body, ["roles"]).map(normalizeRoleRecord);
+  }
+
+  async createRole(input: {
+    name: string;
+    description?: string;
+    permissions: RolePermissions;
+  }): Promise<RoleRecord> {
+    const body = await this.requestJson(API.roles, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return normalizeRoleRecord(body);
+  }
+
+  async updateRole(
+    id: string,
+    patch: { name?: string; description?: string; permissions?: RolePermissions },
+  ): Promise<RoleRecord> {
+    const body = await this.requestJson(API.role(id), {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+    return normalizeRoleRecord(body);
+  }
+
+  async deleteRole(id: string): Promise<void> {
+    await this.requestJson(API.role(id), { method: "DELETE" });
+  }
+
+  async getAgentRoles(agentId: string): Promise<{ roleIds: string[]; roles: AgentRoleRef[] }> {
+    const body = await this.requestJson(API.agentRoles(agentId));
+    const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+    const agent = normalizeAgent({
+      agent: {
+        id: agentId,
+        name: "Agent",
+        prompt: "",
+        roles: record.roles,
+        roleIds: record.roleIds,
+      },
+    });
+    return { roleIds: agent.roleIds, roles: agent.roles };
+  }
+
+  async setAgentRoles(agentId: string, roleIds: string[]): Promise<{ roleIds: string[] }> {
+    const body = await this.requestJson(API.agentRoles(agentId), {
+      method: "PUT",
+      body: JSON.stringify({ roleIds }),
+    });
+    const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+    return {
+      roleIds: Array.isArray(record.roleIds) ? record.roleIds.filter((id): id is string => typeof id === "string") : [],
+    };
   }
 
   async listChats(): Promise<Chat[]> {

@@ -1,6 +1,7 @@
 import { prepareTurn, type RuntimeDeps } from "@botanical/agent-runtime";
 import { HttpError, isRecord, json, readJson } from "../http.ts";
 import { readRequestedProfileId, resolveProfile } from "../profiles.ts";
+import { assertCliProfileReady } from "./profiles.ts";
 import { collectChatTurn, streamChatTurn, turnFailure } from "../runtime/turn.ts";
 import { authed, type Router } from "../router.ts";
 import { sseStream } from "../streaming.ts";
@@ -37,6 +38,7 @@ export function registerMessages(router: Router, runtime: RuntimeDeps): void {
         readRequestedProfileId(body.profileId, true),
         chat.profileId,
       );
+      await assertCliProfileReady(profile);
       if (profile.id !== chat.profileId) {
         const updated = await ctx.store.chats.update(chat.id, { profileId: profile.id });
         if (!updated) throw new HttpError(404, "not_found", "Chat not found");

@@ -31,7 +31,9 @@ BEGIN
         'messages',
         'agent_messages',
         'settings',
-        'secret_refs'
+        'secret_refs',
+        'memories',
+        'roles'
       )
   LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', r.table_name || '_set_updated_at', r.table_name);

@@ -1,26 +1,18 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Instrument_Serif } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { cn } from "@/lib/utils";
 import "./globals.css";
 
-const sans = IBM_Plex_Sans({
+const sans = Geist({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-ibm-sans",
+  variable: "--font-geist-sans",
 });
 
-const serif = Instrument_Serif({
+const mono = Geist_Mono({
   subsets: ["latin"],
-  weight: "400",
-  variable: "--font-ibm-serif",
-});
-
-const mono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-ibm-mono",
+  variable: "--font-geist-mono",
 });
 
 export const metadata: Metadata = {
@@ -32,7 +24,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      className={cn("dark font-sans", sans.variable, serif.variable, mono.variable)}
+      className={cn("font-sans", sans.variable, mono.variable)}
       suppressHydrationWarning
     >
       <body className="min-h-svh antialiased">

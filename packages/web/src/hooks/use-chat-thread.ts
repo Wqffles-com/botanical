@@ -5,13 +5,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useWorkspace } from "@/components/workspace-provider";
 import { api } from "@/lib/api";
 import { applyStreamEvent, draftToMessage, emptyDraft, type StreamDraft } from "@/lib/chat-stream";
-import { errorText, isProfileRequired, profileRequiredMessage } from "@/lib/errors";
+import { errorText, isProfileRequired, isProfileUnavailable, profileRequiredMessage, profileUnavailableText } from "@/lib/errors";
+import { toast } from "sonner";
 
 export function useChatThread(chatId: string) {
   const { chats, profiles, agents, setChatProfile, refresh } = useWorkspace();
   const [remoteChat, setRemoteChat] = useState<Chat | null>(null);
   const chat = chats.find((item) => item.id === chatId) ?? remoteChat;
   const agent = chat ? (agents.find((item) => item.id === chat.agentId) ?? null) : null;
+  const creator = agent?.createdByAgentId
+    ? (agents.find((item) => item.id === agent.createdByAgentId) ?? null)
+    : null;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
@@ -23,30 +27,36 @@ export function useChatThread(chatId: string) {
 
   const profileId = chat?.profileId ?? null;
   const profileReady = Boolean(profileId);
-
-  useEffect(() => {
-    let cancelled = false;
+  const [loadedChatId, setLoadedChatId] = useState(chatId);
+  if (loadedChatId !== chatId) {
+    setLoadedChatId(chatId);
     setLoading(true);
     setMissing(false);
     setRemoteChat(null);
     setError(null);
     setProfileError(null);
+    setMessages([]);
+    setStreaming(null);
+    setDraft("");
+  }
+
+  useEffect(() => {
+    let cancelled = false;
     abortRef.current?.abort();
-    void (async () => {
-      try {
-        const [next, found] = await Promise.all([api.listMessages(chatId), api.getChat(chatId)]);
+    void Promise.all([api.listMessages(chatId), api.getChat(chatId)])
+      .then(([next, found]) => {
         if (cancelled) return;
         setRemoteChat(found);
         setMessages(next);
-      } catch (err) {
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
         if (cancelled || isAbortError(err)) return;
         const text = errorText(err);
         if (/not found/i.test(text)) setMissing(true);
         else setError(text);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+        setLoading(false);
+      });
     return () => {
       cancelled = true;
       abortRef.current?.abort();
@@ -67,6 +77,15 @@ export function useChatThread(chatId: string) {
       }
     },
     [chatId, setChatProfile],
+  );
+
+  const unavailableCopy = useCallback(
+    (error: unknown) => {
+      if (!isProfileUnavailable(error)) return null;
+      const profile = profiles.find((item) => item.id === profileId);
+      return profileUnavailableText(profile?.name ?? "This profile", errorText(error));
+    },
+    [profileId, profiles],
   );
 
   const send = useCallback(async () => {
@@ -98,6 +117,13 @@ export function useChatThread(chatId: string) {
         if (event.type === "error") {
           if (isProfileRequired(event.error)) {
             setProfileError(profileRequiredMessage(event.error));
+            setStreaming(null);
+            return true;
+          }
+          const unavailable = unavailableCopy(event.error);
+          if (unavailable) {
+            setProfileError(unavailable);
+            toast.error(unavailable);
             setStreaming(null);
             return true;
           }
@@ -143,12 +169,18 @@ export function useChatThread(chatId: string) {
         setProfileError(profileRequiredMessage(err));
         return false;
       }
+      const unavailable = unavailableCopy(err);
+      if (unavailable) {
+        setProfileError(unavailable);
+        toast.error(unavailable);
+        return false;
+      }
       setError(errorText(err));
       return sawEvent;
     } finally {
       if (abortRef.current === ac) abortRef.current = null;
     }
-  }, [chatId, draft, profileId, refresh, streaming]);
+  }, [chatId, draft, profileId, refresh, streaming, unavailableCopy]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -157,6 +189,7 @@ export function useChatThread(chatId: string) {
   return {
     chat,
     agent,
+    creator,
     profiles,
     profileId,
     profileReady,

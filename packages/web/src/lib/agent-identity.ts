@@ -16,11 +16,28 @@ export type AgentIdentityFields = {
   description: string;
 };
 
+export type AgentRoleBadge = {
+  id: string;
+  name: string;
+  builtin: boolean;
+};
+
+export type EffectivePermissionsView = {
+  unrestricted: boolean;
+  capabilities: string[];
+  mcp: Array<{ server: string; tools?: string[] }>;
+  roleNames: string[];
+};
+
 export type AgentIdentity = AgentIdentityFields & {
   id: string;
   prompt: string;
   tools: string[];
   defaultProfileId: string | null;
+  createdByAgentId: string | null;
+  roleIds: string[];
+  roles: AgentRoleBadge[];
+  effectivePermissions: EffectivePermissionsView;
   createdAt: string;
   updatedAt: string;
 };
@@ -33,6 +50,7 @@ export type AgentDraft = {
   color: AgentColor;
   tools: string[];
   defaultProfileId: string | null;
+  roleIds: string[];
 };
 
 export type AgentWritePayload = {
@@ -45,6 +63,7 @@ export type AgentWritePayload = {
   tools: string[];
   toolIds: string[];
   defaultProfileId: string | null;
+  roleIds: string[];
 };
 
 export type ToolInfo = {
@@ -60,6 +79,9 @@ export type ProfileInfo = {
   provider: string;
   model: string;
   description: string;
+  kind: "api" | "cli";
+  available: boolean;
+  unavailableReason: string | null;
 };
 
 export const EMPTY_AGENT_DRAFT: AgentDraft = {
@@ -70,6 +92,7 @@ export const EMPTY_AGENT_DRAFT: AgentDraft = {
   color: DEFAULT_AGENT_COLOR,
   tools: [],
   defaultProfileId: null,
+  roleIds: [],
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -115,6 +138,7 @@ export function identityFromUnknown(value: unknown): AgentIdentity {
   const tools = readTools(record.tools ?? record.toolIds ?? record.tool_ids);
   const defaultProfile =
     readString(record, ["defaultProfileId", "default_profile_id", "suggestedProfileId"]) || null;
+  const createdBy = readString(record, ["createdByAgentId", "created_by_agent_id"]);
   return {
     id: readString(record, ["id", "uuid"]),
     name: readString(record, ["name"], "Agent"),
@@ -124,6 +148,10 @@ export function identityFromUnknown(value: unknown): AgentIdentity {
     color: resolveAgentColor(record.color),
     tools,
     defaultProfileId: defaultProfile,
+    createdByAgentId: createdBy || null,
+    roleIds: readStringList(record.roleIds ?? record.role_ids),
+    roles: readRoleBadges(record.roles),
+    effectivePermissions: readEffective(record.effectivePermissions ?? record.effective_permissions),
     createdAt,
     updatedAt: readString(record, ["updatedAt", "updated_at"], createdAt),
   };
@@ -149,6 +177,7 @@ export function draftFromIdentity(agent: AgentIdentity): AgentDraft {
     color: agent.color,
     tools: [...agent.tools],
     defaultProfileId: agent.defaultProfileId,
+    roleIds: [...agent.roleIds],
   };
 }
 
@@ -170,6 +199,7 @@ export function agentWritePayload(draft: AgentDraft): AgentWritePayload {
   const prompt = draft.prompt;
   const tools = [...new Set(draft.tools.map((id) => id.trim()).filter(Boolean))];
   const defaultProfileId = draft.defaultProfileId?.trim() ? draft.defaultProfileId.trim() : null;
+  const roleIds = [...new Set(draft.roleIds.map((id) => id.trim()).filter(Boolean))];
   return {
     name,
     description,
@@ -180,6 +210,7 @@ export function agentWritePayload(draft: AgentDraft): AgentWritePayload {
     tools,
     toolIds: tools,
     defaultProfileId,
+    roleIds,
   };
 }
 
@@ -206,14 +237,65 @@ export function profilesFromUnknown(value: unknown): ProfileInfo[] {
   return list.map((item, index) => {
     const record = asRecord(item) ?? {};
     const id = readString(record, ["id"], `profile-${index}`);
+    const provider = readString(record, ["provider", "providerId", "provider_id"]);
+    const kind = record.kind === "cli" || provider === "cli" ? "cli" : "api";
     return {
       id,
       name: readString(record, ["name", "label"], id),
-      provider: readString(record, ["provider", "providerId", "provider_id"]),
+      provider,
       model: readString(record, ["model", "modelId", "model_id"]),
       description: readString(record, ["description"]) || "",
+      kind,
+      available: record.available !== false,
+      unavailableReason:
+        typeof record.unavailableReason === "string" && record.unavailableReason.trim()
+          ? record.unavailableReason
+          : null,
     };
   });
+}
+
+function readStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
+function readRoleBadges(value: unknown): AgentRoleBadge[] {
+  if (!Array.isArray(value)) return [];
+  const roles: AgentRoleBadge[] = [];
+  for (const item of value) {
+    const record = asRecord(item);
+    if (!record) continue;
+    const id = readString(record, ["id"]);
+    const name = readString(record, ["name"]);
+    if (!id && !name) continue;
+    roles.push({ id: id || name, name: name || id, builtin: record.builtin === true });
+  }
+  return roles;
+}
+
+function readEffective(value: unknown): EffectivePermissionsView {
+  const record = asRecord(value);
+  if (!record) return { unrestricted: true, capabilities: [], mcp: [], roleNames: [] };
+  const capabilities = readStringList(record.capabilities);
+  const roleNames = readStringList(record.roleNames ?? record.role_names);
+  const mcp: EffectivePermissionsView["mcp"] = [];
+  if (Array.isArray(record.mcp)) {
+    for (const item of record.mcp) {
+      const grant = asRecord(item);
+      if (!grant) continue;
+      const server = readString(grant, ["server"]);
+      if (!server) continue;
+      const tools = readStringList(grant.tools);
+      mcp.push(tools.length > 0 ? { server, tools } : { server });
+    }
+  }
+  return {
+    unrestricted: record.unrestricted !== false && roleNames.length === 0 && capabilities.length === 0,
+    capabilities,
+    mcp,
+    roleNames,
+  };
 }
 
 function unwrapList(value: unknown, keys: string[]): unknown[] {

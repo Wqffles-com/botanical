@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import type { Agent, RoleRecord } from "@botanical/core";
+import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AgentAvatar } from "@/components/agent-avatar";
+import { PermissionsSummary } from "@/components/permissions-summary";
+import { RoleBadges } from "@/components/role-badges";
 import { AgentColorPicker } from "@/components/agents/agent-color-picker";
 import { AgentIconPicker } from "@/components/agents/agent-icon-picker";
 import { AgentToolAllowlist } from "@/components/agents/agent-tool-allowlist";
@@ -20,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { previewEffective } from "@/lib/permissions";
 import { createAgent, deleteAgent, updateAgent } from "@/lib/agent-api";
 import {
   AGENT_DESCRIPTION_MAX,
@@ -38,22 +43,28 @@ export function AgentForm({
   agent,
   tools,
   profiles,
+  roles = [],
+  agents = [],
   toolsLoading,
 }: {
   agent?: AgentIdentity | null;
   tools: ToolInfo[];
   profiles: ProfileInfo[];
+  roles?: RoleRecord[];
+  agents?: Agent[];
   toolsLoading?: boolean;
 }) {
   const router = useRouter();
   const { refresh } = useWorkspace();
+  const agentKey = agent ? `${agent.id}:${agent.updatedAt}` : "new";
+  const [seenKey, setSeenKey] = useState(agentKey);
   const [draft, setDraft] = useState<AgentDraft>(agent ? draftFromIdentity(agent) : EMPTY_AGENT_DRAFT);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-
-  useEffect(() => {
+  if (seenKey !== agentKey) {
+    setSeenKey(agentKey);
     setDraft(agent ? draftFromIdentity(agent) : EMPTY_AGENT_DRAFT);
-  }, [agent]);
+  }
 
   function patch(partial: Partial<AgentDraft>) {
     setDraft((current) => ({ ...current, ...partial }));
@@ -105,6 +116,12 @@ export function AgentForm({
   }
 
   const title = agent ? agent.name || "Edit agent" : "New agent";
+  const creator = agent?.createdByAgentId ? agents.find((item) => item.id === agent.createdByAgentId) : null;
+  const rolesMatchSaved =
+    !!agent &&
+    agent.roleIds.length === draft.roleIds.length &&
+    agent.roleIds.every((id) => draft.roleIds.includes(id));
+  const effective = rolesMatchSaved ? agent.effectivePermissions : previewEffective(draft.roleIds, roles);
 
   return (
     <form onSubmit={(event) => void onSubmit(event)} className="mx-auto w-full max-w-2xl px-6 py-8">
@@ -112,10 +129,19 @@ export function AgentForm({
         <div className="flex min-w-0 items-start gap-3">
           <AgentAvatar name={draft.name || "New agent"} icon={draft.icon} color={draft.color} size="xl" />
           <div className="min-w-0">
-            <h1 className="truncate font-heading text-3xl tracking-tight">{title}</h1>
+            <h1 className="truncate text-3xl font-semibold tracking-tight">{title}</h1>
+            {agent ? <RoleBadges roles={agent.roles} /> : null}
             <p className="mt-1 text-sm text-muted-foreground">
-              Icon, color, and name show up in the picker, sidebar, chat header, and messages.
+              Icon and name show up in the picker, sidebar, chat header, and messages.
             </p>
+            {agent?.createdByAgentId ? (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Created by{" "}
+                <Link href={`/agents/${encodeURIComponent(agent.createdByAgentId)}`} className="underline-offset-2 hover:underline">
+                  {creator?.name ?? "another agent"}
+                </Link>
+              </p>
+            ) : null}
           </div>
         </div>
         <div className="flex gap-2">
@@ -188,6 +214,41 @@ export function AgentForm({
         </div>
 
         <div className="grid gap-2">
+          <Label>Roles</Label>
+          <p className="text-xs text-muted-foreground">
+            An agent with no roles is limited only by its tool allowlist. Roles add a capability ceiling.
+          </p>
+          {roles.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No roles yet. Create them in Settings.</p>
+          ) : (
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {roles.map((role) => {
+                const checked = draft.roleIds.includes(role.id);
+                return (
+                  <label key={role.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="size-3.5 accent-foreground"
+                      checked={checked}
+                      disabled={saving}
+                      onChange={(event) => {
+                        const roleIds = event.target.checked
+                          ? [...draft.roleIds, role.id]
+                          : draft.roleIds.filter((id) => id !== role.id);
+                        patch({ roleIds });
+                      }}
+                    />
+                    <span>{role.name}</span>
+                    {role.builtin ? <span className="text-xs text-muted-foreground">Built-in</span> : null}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          <PermissionsSummary permissions={effective} />
+        </div>
+
+        <div className="grid gap-2">
           <Label>Tools</Label>
           <p className="text-xs text-muted-foreground">
             Allowlist for this agent. Built-ins and MCP tools come from the server.
@@ -214,9 +275,10 @@ export function AgentForm({
           >
             <option value="">No suggestion</option>
             {profiles.map((profile) => (
-              <option key={profile.id} value={profile.id}>
+              <option key={profile.id} value={profile.id} disabled={!profile.available}>
                 {profile.name}
                 {profile.model ? ` · ${profile.model}` : ""}
+                {profile.available ? "" : ` — ${profile.unavailableReason ?? "Unavailable"}`}
               </option>
             ))}
           </select>

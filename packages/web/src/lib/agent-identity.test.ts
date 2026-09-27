@@ -47,6 +47,7 @@ describe("agent identity mapping", () => {
       color: "amber",
       tools: ["web_search", "web_search", ""],
       defaultProfileId: "",
+      roleIds: ["coder"],
     });
     expect(payload.name).toBe("Scout");
     expect(payload.prompt).toBe("Search first.");
@@ -54,6 +55,7 @@ describe("agent identity mapping", () => {
     expect(payload.tools).toEqual(["web_search"]);
     expect(payload.toolIds).toEqual(["web_search"]);
     expect(payload.defaultProfileId).toBeNull();
+    expect(payload.roleIds).toEqual(["coder"]);
     expect(payload.icon).toBe("Search");
     expect(payload.color).toBe("amber");
   });
@@ -68,6 +70,7 @@ describe("agent identity mapping", () => {
         color: "green",
         tools: [],
         defaultProfileId: null,
+        roleIds: [],
       }),
     ).toMatch(/name/i);
     expect(
@@ -79,6 +82,7 @@ describe("agent identity mapping", () => {
         color: "green",
         tools: [],
         defaultProfileId: null,
+        roleIds: [],
       }),
     ).toMatch(/40/);
     expect(
@@ -90,6 +94,7 @@ describe("agent identity mapping", () => {
         color: "amber",
         tools: [],
         defaultProfileId: null,
+        roleIds: [],
       }),
     ).toMatch(/prompt/i);
   });

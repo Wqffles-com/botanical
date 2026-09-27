@@ -72,9 +72,7 @@ function LoginForm() {
   const brand = health?.brandName ?? "Botanical";
 
   return (
-    <div className="relative flex min-h-svh items-center justify-center overflow-hidden px-4">
-      <div className="login-orb -top-24 left-1/2 -translate-x-1/2" />
-      <Vines />
+    <div className="relative flex min-h-svh items-center justify-center bg-background px-4">
       <div className="absolute top-3 right-3">
         <ThemeToggle />
       </div>
@@ -84,7 +82,7 @@ function LoginForm() {
           <Wordmark className="mt-4 text-[2.4rem]" />
           <p className="mt-2 text-sm text-muted-foreground">Personal agent server. Any brain.</p>
         </div>
-        <Card className="hairline bg-card/90 backdrop-blur-sm">
+        <Card className="bg-card">
           <CardContent className="px-5">
             <form onSubmit={(event) => void onSubmit(event)} className="grid gap-3" data-testid="login-form">
               <div className="grid gap-1.5">
@@ -136,26 +134,5 @@ function LoginForm() {
         </div>
       </div>
     </div>
-  );
-}
-
-function Vines() {
-  return (
-    <svg
-      className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.22]"
-      viewBox="0 0 1200 800"
-      preserveAspectRatio="xMidYMid slice"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      <g fill="none" stroke="#8fca7a" strokeLinecap="round">
-        <path d="M90 800C110 560 40 480 120 300c70-160-20-240 40-300" strokeWidth="1.1" />
-        <path d="M1110 800c-40-220 70-300-20-470-80-150 30-230-10-330" strokeWidth="1.1" />
-        <path d="M90 420c-50 10-70 70-40 90" strokeWidth="0.9" />
-        <path d="M120 300c40-8 62 40 28 58" strokeWidth="0.9" />
-        <path d="M1110 430c48 12 70 64 30 86" strokeWidth="0.9" />
-        <path d="M1088 280c-44-10-60 38-24 56" strokeWidth="0.9" />
-      </g>
-    </svg>
   );
 }

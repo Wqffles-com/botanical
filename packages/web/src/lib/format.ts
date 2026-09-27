@@ -22,6 +22,15 @@ export function profileLabel(profile: ModelProfile): string {
   return detail ? `${profile.name} · ${detail}` : profile.name;
 }
 
+export function profileKind(profile: { kind?: string | null; provider?: string | null }): "api" | "cli" {
+  if (profile.kind === "cli" || profile.provider === "cli") return "cli";
+  return "api";
+}
+
+export function profileIsAvailable(profile: { available?: boolean | null }): boolean {
+  return profile.available !== false;
+}
+
 export function formatJson(value: unknown, limit = 0): string {
   if (value == null || value === "") return "";
   let text: string;

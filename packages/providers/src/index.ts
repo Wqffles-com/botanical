@@ -1,3 +1,23 @@
+export {
+  buildCliArgs,
+  checkCliAvailability,
+  clearCliAvailabilityCache,
+  type CliAvailabilityProbe,
+  CLI_NAMES,
+  CLI_PROFILE_PRESET_IDS,
+  DEFAULT_CLI_TIMEOUT_MS,
+  mergeCliProfiles,
+  parseCliLine,
+  parseCliProfileShortcut,
+  renderCliPrompt,
+  runCli,
+  splitProfileDocument,
+  type CliAvailability,
+  type CliName,
+  type CliProfileSpec,
+  type CliStreamEvent,
+  type RunCliInput,
+} from "./cli/index.ts";
 export { collectChat, type CollectedChat } from "./collect.ts";
 export { DEFAULT_CAPABILITIES } from "./capabilities.ts";
 export {

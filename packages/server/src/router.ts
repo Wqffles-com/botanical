@@ -63,7 +63,7 @@ export function createRouter(): Router & {
             new Response(null, {
               status: 204,
               headers: {
-                "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
+                "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
                 "access-control-allow-headers": "Authorization, Content-Type, Accept",
                 "access-control-max-age": "600",
               },

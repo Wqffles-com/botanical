@@ -3,6 +3,9 @@
     { "id": "fast", "name": "DeepSeek chat", "provider": "deepseek", "model": "deepseek-chat" },
     { "id": "reason", "name": "Claude Sonnet", "provider": "anthropic", "model": "claude-sonnet-4-5", "maxTokens": 8192 },
     { "id": "grok", "name": "Grok", "provider": "xai", "model": "grok-4" },
-    { "id": "local", "name": "Local", "provider": "openai-compat", "model": "llama3.1", "baseUrl": "http://127.0.0.1:11434/v1" }
+    { "id": "local", "name": "Local", "provider": "openai-compat", "model": "llama3.1", "baseUrl": "http://127.0.0.1:11434/v1" },
+    { "id": "grok-build", "kind": "cli", "cli": "grok", "label": "Grok Build", "model": "grok-4.7", "timeoutMs": 600000 },
+    { "id": "claude-code", "kind": "cli", "cli": "claude", "label": "Claude Code" },
+    { "id": "codex", "kind": "cli", "cli": "codex", "label": "Codex" }
   ]
 }

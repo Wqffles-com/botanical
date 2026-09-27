@@ -117,7 +117,7 @@ export function InboxView() {
         actions={
           <div className="w-56">
             <Label className="text-xs text-muted-foreground">Filter by agent</Label>
-            <Select value={filter} onValueChange={(value) => void onFilter(value)}>
+            <Select items={[{ value: "all", label: "All agents" }, ...agents.map((agent) => ({ value: agent.id, label: agent.name }))]} value={filter} onValueChange={(value) => void onFilter(value)}>
               <SelectTrigger className="mt-1 w-full" aria-label="Filter by agent">
                 <SelectValue placeholder="All agents" />
               </SelectTrigger>
@@ -205,9 +205,9 @@ function MessageRow({
             <p className="text-sm font-medium">
               {from?.name ?? "Agent"} → {to?.name ?? "Agent"}
             </p>
-            <span className="font-mono text-[10.5px] text-muted-foreground">
+            <time className="shrink-0 font-mono text-[10.5px] whitespace-nowrap text-muted-foreground">
               {relativeTime(message.createdAt)}
-            </span>
+            </time>
           </div>
           <p className="mt-1 whitespace-pre-wrap text-[13px] text-muted-foreground">{message.body}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -248,21 +248,17 @@ function ComposeCard({
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!fromAgentId && agents[0]) setFromAgentId(agents[0].id);
-    if (!toAgentId && agents[1]) setToAgentId(agents[1].id);
-    else if (!toAgentId && agents[0] && agents[0].id !== fromAgentId) setToAgentId(agents[0].id);
-  }, [agents, fromAgentId, toAgentId]);
+  const resolvedFrom = fromAgentId || agents[0]?.id || "";
+  const resolvedTo = toAgentId || agents.find((agent) => agent.id !== resolvedFrom)?.id || "";
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     const text = body.trim();
-    if (!fromAgentId || !toAgentId) {
+    if (!resolvedFrom || !resolvedTo) {
       setError("Pick a sender and a recipient.");
       return;
     }
-    if (fromAgentId === toAgentId) {
+    if (resolvedFrom === resolvedTo) {
       setError("Pick two different agents.");
       return;
     }
@@ -273,7 +269,7 @@ function ComposeCard({
     setError(null);
     setBusy(true);
     try {
-      await onSend({ fromAgentId, toAgentId, body: text });
+      await onSend({ fromAgentId: resolvedFrom, toAgentId: resolvedTo, body: text });
       setBody("");
       toast.success("Message sent.");
     } catch (err) {
@@ -283,7 +279,7 @@ function ComposeCard({
     }
   }
 
-  const recipients = agents.filter((agent) => agent.id !== fromAgentId);
+  const recipients = agents.filter((agent) => agent.id !== resolvedFrom);
 
   return (
     <Card>
@@ -298,7 +294,7 @@ function ComposeCard({
           <form className="space-y-3" onSubmit={(event) => void onSubmit(event)}>
             <div>
               <Label>From</Label>
-              <Select value={fromAgentId || null} onValueChange={(value) => value && setFromAgentId(value)}>
+              <Select items={agents.map((agent) => ({ value: agent.id, label: agent.name }))} value={resolvedFrom || null} onValueChange={(value) => value && setFromAgentId(value)}>
                 <SelectTrigger className="mt-1 w-full" aria-label="From agent">
                   <SelectValue placeholder="Sender" />
                 </SelectTrigger>
@@ -313,7 +309,7 @@ function ComposeCard({
             </div>
             <div>
               <Label>To</Label>
-              <Select value={toAgentId || null} onValueChange={(value) => value && setToAgentId(value)}>
+              <Select items={recipients.map((agent) => ({ value: agent.id, label: agent.name }))} value={resolvedTo || null} onValueChange={(value) => value && setToAgentId(value)}>
                 <SelectTrigger className="mt-1 w-full" aria-label="To agent">
                   <SelectValue placeholder="Recipient" />
                 </SelectTrigger>

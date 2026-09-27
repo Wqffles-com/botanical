@@ -12,6 +12,9 @@ import { claimInbox } from "./inbox";
 import { newId } from "./ids";
 import type { MessageRecord, ToolCall } from "./message";
 import type { ResolvedProfile } from "./profiles";
+import type { MemorySnippet } from "./memories";
+import { selectMemories } from "./memories";
+import { toolAccess } from "./permissions";
 import { buildSystemPrompt } from "./prompt";
 import type { ChatMessage } from "./provider";
 import type { AgentMessageBus } from "./bus";
@@ -21,7 +24,6 @@ import type { ProfileResolver } from "./profiles";
 import {
   collectTools,
   normalizeToolArguments,
-  toolAllowed,
   toolResultToContent,
   type ListedTool,
   type ToolResult,
@@ -31,12 +33,21 @@ import {
 export const DEFAULT_MAX_STEPS = 8;
 const MAX_TOOL_CALLS_PER_STEP = 16;
 
+export interface MemoryRecall {
+  /** Memories visible to this agent (shared + its own). The loop ranks them. */
+  recall(input: { agentId: string; query: string }): Promise<MemorySnippet[]>;
+}
+
 export interface RuntimeDeps {
   store: Store;
   bus: AgentMessageBus;
   profiles: ProfileResolver;
   toolSources: ToolSource[];
   maxSteps?: number;
+  /** Jail directory for a CLI profile's working directory. */
+  workspaceFor?: (agentId: string) => string;
+  /** When set, relevant memories are appended to the system prompt at turn start. */
+  memories?: MemoryRecall;
 }
 
 export interface RunTurnInput {
@@ -117,7 +128,8 @@ export async function* runAgentTurn(
   }
 
   const transcript = await deps.store.messages.listByChat(chat.id);
-  const visibleTools = await visibleToolsFor(agent, deps.toolSources);
+  const recalled = await recallMemories(deps, agent.id, input.content);
+  const cwd = deps.workspaceFor?.(agent.id);
 
   for (let step = 1; step <= maxSteps; step += 1) {
     if (input.signal?.aborted) {
@@ -126,7 +138,9 @@ export async function* runAgentTurn(
     }
     yield { type: "step", step };
 
-    const requestMessages = toProviderMessages(agent, transcript);
+    const catalog = await collectTools(deps.toolSources);
+    const visibleTools = catalog.filter((tool) => toolAccess(agent, tool).ok);
+    const requestMessages = toProviderMessages(agent, transcript, recalled);
     let text = "";
     const toolCalls: ToolCall[] = [];
     let errorMessage: string | null = null;
@@ -137,6 +151,7 @@ export async function* runAgentTurn(
       messages: requestMessages,
       tools: visibleTools.map(toDefinition),
       signal: input.signal,
+      ...(cwd ? { cwd } : {}),
     })) {
       if (event.type === "text-delta") {
         text += event.text;
@@ -180,7 +195,7 @@ export async function* runAgentTurn(
         yield { type: "done", finishReason: "aborted" };
         return;
       }
-      const executed = await executeCall(deps, agent, visibleTools, call, {
+      const executed = await executeCall(deps, agent, catalog, call, {
         agentId: agent.id,
         chatId: chat.id,
         signal: input.signal,
@@ -210,14 +225,6 @@ export async function* runAgentTurn(
   yield { type: "done", finishReason: "max_steps" };
 }
 
-async function visibleToolsFor(agent: AgentRecord, sources: readonly ToolSource[]): Promise<ListedTool[]> {
-  const listed = await collectTools(sources);
-  return listed.filter((tool) => {
-    if (tool.origin === "runtime" || tool.sourceId === "runtime") return agent.a2aEnabled;
-    return toolAllowed(agent.toolAllowlist, tool.name);
-  });
-}
-
 function toDefinition(tool: ListedTool): { name: string; description: string; parameters: Record<string, unknown> } {
   return {
     name: tool.name,
@@ -226,8 +233,18 @@ function toDefinition(tool: ListedTool): { name: string; description: string; pa
   };
 }
 
-function toProviderMessages(agent: AgentRecord, records: readonly MessageRecord[]): ChatMessage[] {
-  const messages: ChatMessage[] = [{ role: "system", content: buildSystemPrompt(agent) }];
+async function recallMemories(deps: RuntimeDeps, agentId: string, query: string): Promise<MemorySnippet[]> {
+  if (!deps.memories) return [];
+  const visible = await deps.memories.recall({ agentId, query });
+  return selectMemories(visible, query);
+}
+
+function toProviderMessages(
+  agent: AgentRecord,
+  records: readonly MessageRecord[],
+  memories: readonly MemorySnippet[],
+): ChatMessage[] {
+  const messages: ChatMessage[] = [{ role: "system", content: buildSystemPrompt(agent, memories) }];
   for (const record of records) {
     const message: ChatMessage = { role: record.role, content: record.content };
     if (record.toolCallId) message.toolCallId = record.toolCallId;
@@ -246,11 +263,11 @@ interface ExecutedCall {
 async function executeCall(
   deps: RuntimeDeps,
   agent: AgentRecord,
-  visible: readonly ListedTool[],
+  catalog: readonly ListedTool[],
   call: ToolCall,
   ctx: { agentId: string; chatId: string; signal?: AbortSignal },
 ): Promise<ExecutedCall> {
-  const match = visible.find((tool) => tool.name === call.name);
+  const match = catalog.find((tool) => tool.name === call.name);
   if (!match) {
     return {
       result: {
@@ -258,6 +275,10 @@ async function executeCall(
         isError: true,
       },
     };
+  }
+  const access = toolAccess(agent, match);
+  if (!access.ok) {
+    return { result: { output: { error: access.message }, isError: true } };
   }
   let args: unknown;
   try {

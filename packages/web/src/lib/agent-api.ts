@@ -90,6 +90,7 @@ export async function createAgent(draft: AgentDraft): Promise<AgentIdentity> {
     color: payload.color,
     tools: payload.tools,
     defaultProfileId: payload.defaultProfileId,
+    roleIds: payload.roleIds,
   });
   return identityFromUnknown(created);
 }
@@ -104,6 +105,7 @@ export async function updateAgent(id: string, draft: AgentDraft): Promise<AgentI
     color: payload.color,
     tools: payload.tools,
     defaultProfileId: payload.defaultProfileId,
+    roleIds: payload.roleIds,
   });
   return identityFromUnknown(saved);
 }
@@ -130,5 +132,8 @@ export async function listProfiles(): Promise<ProfileInfo[]> {
     provider: profile.provider,
     model: profile.model,
     description: profile.description ?? "",
+    kind: profile.kind === "cli" || profile.provider === "cli" ? "cli" : "api",
+    available: profile.available !== false,
+    unavailableReason: profile.unavailableReason ?? null,
   }));
 }

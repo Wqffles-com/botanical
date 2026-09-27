@@ -17,6 +17,7 @@ export const LIMITS = {
   systemPrompt: 100_000,
   title: 200,
   content: 100_000,
+  memory: 8_000,
   toolId: 128,
   toolIds: 64,
   id: 200,
@@ -185,6 +186,7 @@ export function parseCreateAgent(body: unknown): NewAgent {
     systemPrompt,
     toolIds: readAgentTools(body) ?? [],
     defaultProfileId,
+    ...(Object.prototype.hasOwnProperty.call(body, "roleIds") ? { roleIds: readRoleIdList(body.roleIds) } : {}),
   };
 }
 
@@ -209,6 +211,9 @@ export function parseUpdateAgent(body: unknown): AgentPatch {
   if (Object.prototype.hasOwnProperty.call(body, "defaultProfileId")) {
     patch.defaultProfileId = readDefaultProfileId(body.defaultProfileId);
   }
+  if (Object.prototype.hasOwnProperty.call(body, "roleIds")) {
+    patch.roleIds = readRoleIdList(body.roleIds);
+  }
   if (
     patch.name === undefined &&
     patch.description === undefined &&
@@ -216,9 +221,24 @@ export function parseUpdateAgent(body: unknown): AgentPatch {
     patch.toolIds === undefined &&
     patch.icon === undefined &&
     patch.color === undefined &&
-    patch.defaultProfileId === undefined
+    patch.defaultProfileId === undefined &&
+    patch.roleIds === undefined
   ) {
     throw new HttpError(400, "invalid_body", "No fields to update");
   }
   return patch;
+}
+
+function readRoleIdList(value: unknown): string[] {
+  if (!Array.isArray(value)) throw new HttpError(400, "invalid_body", "roleIds must be an array");
+  if (value.length > 20) throw new HttpError(400, "invalid_body", "roleIds cannot exceed 20 entries");
+  const ids: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string" || item.trim() === "" || item.trim().length > LIMITS.id) {
+      throw new HttpError(400, "invalid_body", "roleIds must be role ids or names");
+    }
+    const id = item.trim();
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
 }
