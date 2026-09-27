@@ -166,4 +166,5 @@ export interface DeploymentEnv {
   readonly BOTANICAL_PASSWORD?: string;
   readonly BOTANICAL_PASSWORD_HASH?: string;
   readonly BOTANICAL_TENANT_ID?: string;
+  readonly [key: string]: string | undefined;
 }

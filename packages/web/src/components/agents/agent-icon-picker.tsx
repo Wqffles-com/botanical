@@ -35,6 +35,8 @@ export function AgentIconPicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         disabled={disabled}
+        aria-label={`Choose icon (current: ${value})`}
+        data-testid="icon-picker"
         render={
           <Button
             type="button"
