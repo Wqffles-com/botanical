@@ -61,6 +61,7 @@ export function setup(
     toolRegistry?: ToolRegistry;
     profiles?: ProfileResolver;
     fetch?: ProviderFetch;
+    installPlatformTools?: boolean;
   } = {},
 ): TestApp {
   const env = baseEnv(overrides);
@@ -74,6 +75,7 @@ export function setup(
     rateLimiter: options.rateLimiter,
     ...(options.toolRegistry ? { toolRegistry: options.toolRegistry } : {}),
     ...(options.profiles ? { profiles: options.profiles } : {}),
+    ...(options.installPlatformTools !== undefined ? { installPlatformTools: options.installPlatformTools } : {}),
   });
   return { app, config, store };
 }

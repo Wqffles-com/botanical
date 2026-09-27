@@ -55,6 +55,11 @@ export interface ModelProfile {
   timeoutMs?: number;
   /** When false, do not pass a model flag. Unset model is not a silent default. */
   passModel?: boolean;
+  /**
+   * CLI profiles only. `false` skips the per-run Botanical MCP server.
+   * Omitted means the tools are exposed.
+   */
+  botanicalTools?: boolean;
 }
 
 export interface RolePermissions {

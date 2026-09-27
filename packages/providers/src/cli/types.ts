@@ -17,6 +17,11 @@ export interface CliProfileSpec {
   /** Absolute path. When omitted, the CLI name is resolved on PATH. */
   bin?: string;
   timeoutMs: number;
+  /**
+   * When false, this run does not expose Botanical tools over MCP.
+   * Omitted and true both expose them. `BOTANICAL_CLI_PROFILES` presets default to true.
+   */
+  botanicalTools: boolean;
 }
 
 export interface CliAvailability {

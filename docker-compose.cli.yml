@@ -11,8 +11,9 @@
 # directory must be writable by that user (chown it to the image uid, or chmod
 # it so the container can write session files). The binary mount is read-only.
 #
-# HOME is the CLI config directory, not /tmp. Botanical tools are not sent to
-# these CLIs; each CLI uses its own tools inside the workspace volume (/data).
+# HOME is the CLI config directory, not /tmp. Each CLI runs in the agent's
+# folder on the workspace volume (/data) and reaches Botanical's tools through a
+# per-run MCP endpoint on 127.0.0.1 inside this container.
 #
 # Add claude or codex the same way: another read-only binary mount, and include
 # the id in BOTANICAL_CLI_PROFILES (grok-build,claude-code,codex).

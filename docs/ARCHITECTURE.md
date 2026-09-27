@@ -210,7 +210,7 @@ interface LLMProvider {
 | `deepseek` | OpenAI-compat; reasoning models may need special handling for “think” channels |
 | `openrouter` | OpenAI-compat + `HTTP-Referer` / `X-Title` + optional provider routing |
 | `openai-compat` | Generic: `baseURL`, `apiKey`, `defaultHeaders` — covers local and unknown hosts |
-| `cli` | Subscription coding CLIs (`grok`, `claude`, `codex`) spawned headless. They use their own tools. Botanical streams stdout back as `text-delta`. |
+| `cli` | Subscription coding CLIs (`grok`, `claude`, `codex`) spawned headless in the agent's workspace. They keep their own tools and also reach Botanical's tools and the operator's MCP tools through a per-run MCP endpoint on the server, with the same role checks. The prompt goes by file or stdin. Botanical streams stdout back as `text-delta`. |
 
 ### Config sketch (server-side)
 

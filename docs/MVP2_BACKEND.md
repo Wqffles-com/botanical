@@ -1,29 +1,13 @@
-# MVP2 backend
+# Backend: CLI profiles, memory, agents, and roles
 
-Implemented on branch `feat/mvp2-backend` (2026-09-27). This slice is server-side: CLI model profiles, memories, agents creating agents, and roles. The web package was touched only so the shared `Agent` type still typechecks.
+This page is the API reference for four server features: CLI model profiles, memories, agents that create agents, and roles. The reasoning behind them is in [DECISIONS.md](./DECISIONS.md). Running the CLIs in Docker is covered in [DEPLOY.md](./DEPLOY.md).
 
-Decisions live in [DECISIONS.md](./DECISIONS.md). Deployment of the CLIs is in [DEPLOY.md](./DEPLOY.md).
+## Overview
 
-## What was implemented
-
-1. **CLI profiles** (`kind: "cli"`) for Grok Build, Claude Code, and Codex. The server spawns the binary without a shell, renders the conversation as one prompt, and streams text back as the existing `text-delta` SSE events. Unavailable profiles stay on the profile list. A chat turn on one returns `422 profile_unavailable`.
+1. **CLI profiles** (`kind: "cli"`) for Grok Build, Claude Code, and Codex. The server spawns the binary without a shell in the agent's workspace, passes the conversation as one prompt by file or stdin, and streams text back as the usual `text-delta` SSE events. Each turn exposes Botanical's tools and the operator's MCP tools to the CLI through a per-run MCP endpoint. Unavailable profiles stay on the profile list. A chat turn on one returns `422 profile_unavailable`.
 2. **Memories** in Postgres (and the in-memory store) with `shared` and `agent` scope, a REST API, four built-in tools, and a `## Memories` section injected at turn start.
 3. **`agent_create` / `agent_list`.** Creation uses the same validation as `POST /api/agents` and stores `createdByAgentId`. The caller cannot grant tools or roles beyond its own ceiling.
-4. **Roles.** `roles` and `agent_roles`, three seeded builtin roles, CRUD, and dispatch-time enforcement. Agents with no roles keep allowlist-only behavior.
-
-## Files touched
-
-- `packages/providers/src/cli/` — spawn, JSON parsers, availability, profile config
-- `packages/providers/test/cli.test.ts` and `test/fixtures/fake-cli.ts`
-- `packages/agent-runtime/src/permissions.ts`, `memories.ts`, `loop.ts`, `prompt.ts`
-- `packages/agent-runtime/test/permissions.test.ts`
-- `packages/db/migrations/0003_mvp2.sql`, `sql/guards.sql`, schema and `src/mvp2.ts`, `src/store.ts`
-- `packages/server/src/db/platform.ts`, `memory.ts`, routes `memories.ts` and `roles.ts`, tools `memory.ts` and `agent-admin.ts`, config, profile resolver, app wiring
-- `packages/server/test/mvp2.test.ts`
-- `packages/core` types, normalizers, and client methods
-- `packages/web/src/lib/chat-stream.test.ts` (new required agent fields)
-- `docker-compose.cli.yml`, `.env.example`, `profiles.example.json`
-- `docs/DECISIONS.md`, `docs/ARCHITECTURE.md`, `docs/DEPLOY.md`
+4. **Roles.** Three seeded builtin roles, CRUD, and enforcement at tool dispatch. Agents with no roles keep allowlist-only behavior.
 
 ## API examples
 
@@ -50,7 +34,7 @@ There is still no default profile (`defaultProfileId` is always `null`).
       "name": "Grok Build",
       "provider": "cli",
       "model": "grok",
-      "description": "Grok Build headless. The CLI runs its own tools; Botanical tools are not sent.",
+      "description": "Grok Build headless. Botanical tools and your MCP servers are exposed on a per-run loopback MCP server named botanical.",
       "kind": "cli",
       "cli": "grok",
       "available": false,
@@ -174,6 +158,36 @@ Seeded roles:
 
 Fixed ids: Coder `00000000-0000-4000-8000-0000000000c1`, Reviewer `…c2`, Orchestrator `…c3`.
 
+## CLI profiles and Botanical tools
+
+A CLI turn runs the CLI in the agent's workspace directory. For the length of that turn the server also serves an MCP endpoint that only this run can use:
+
+```
+POST /internal/mcp/runs/<runId>
+Authorization: Bearer <per-run token>
+```
+
+- **Transport.** MCP over streamable HTTP with JSON responses. Supported methods: `initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call`.
+- **Tools.** `tools/list` returns exactly what an API-model turn for the same agent would get: the built-in tools on the agent's allowlist (memory, `agent_create` / `agent_list`, files, shell, web), plus the operator's MCP tools, filtered by the agent's roles. MCP tools use their model-facing names such as `mcp__notes__search`. The server is named `botanical`, so a CLI shows `mcp__botanical__memory_write` and so on.
+- **Enforcement.** `tools/call` uses the same dispatch function as the agent loop: allowlist, role capability check, then the tool itself with the agent's workspace scoping, limits, and output truncation. A denied call is a normal MCP result with `isError: true` and the same text an API turn gets, for example `permission denied: agent "Ada" lacks capability "memory.write" (roles: Reviewer)`.
+- **Identity.** The run is bound to the agent, chat, and turn when it opens. Nothing the CLI sends can change the agent.
+- **Auth and lifetime.** A fresh 32-byte random token per run, compared in constant time. Session cookies are not accepted. The token is revoked when the turn ends for any reason (finish, error, cancel, timeout). Afterwards the URL returns `404`. A live run with a missing or wrong token returns `401`.
+- **Address.** The CLI is a child process of the server, so the URL defaults to `http://127.0.0.1:<PORT>`. Set `BOTANICAL_INTERNAL_URL` if the server is reachable from its own process some other way.
+- **Chat history.** Calls made through the endpoint stream as `tool-call` / `tool-result` events and are stored as tool messages, so they show up as tool cards. The CLI's native tools (its own shell, file edits) are not recorded as Botanical tool calls.
+- **Opt out.** `"botanicalTools": false` on a CLI profile in `BOTANICAL_PROFILES` turns the endpoint off for that profile. Presets from `BOTANICAL_CLI_PROFILES` have it on.
+
+How each CLI is pointed at the endpoint and given the prompt:
+
+| CLI | Prompt | MCP configuration |
+| --- | --- | --- |
+| Grok Build (`grok`) | `--prompt-file <temp file>` (mode 0600, deleted after the run) | Grok has no MCP config flag. `[mcp_servers.botanical]` is written to `<agent dir>/.grok/config.toml` for the run and the previous file is restored (or removed) afterwards. `.mcp.json` is never touched. The header is `Authorization = "Bearer ${BOTANICAL_MCP_TOKEN}"`, expanded by Grok from the child environment. The child also gets `GROK_FOLDER_TRUST=0`, because Grok only starts project-scoped MCP servers in trusted folders and agent folders are not in the CLI's trust store. |
+| Claude Code (`claude`) | stdin, with `-p` | `--mcp-config <temp file> --strict-mcp-config --allowedTools mcp__botanical__*`. The config file uses `${BOTANICAL_MCP_TOKEN}` in the header and is deleted after the run. |
+| Codex (`codex`) | stdin, with `codex exec … -` | `-c mcp_servers.botanical.url=<endpoint>` and `-c mcp_servers.botanical.bearer_token_env_var=BOTANICAL_MCP_TOKEN`. |
+
+The token is only ever in the child's environment, never in argv or in a file. Claude Code and Codex are not in the default image; their flags follow the published CLI references ([Claude Code](https://code.claude.com/docs/en/cli-reference), [Codex](https://developers.openai.com/codex/mcp)).
+
+Chat SSE streams send a `: ping` comment after 5 seconds without an event. Bun closes connections that are idle for 10 seconds, and a CLI is often silent while it looks up or runs tools.
+
 ## Enable CLI profiles in Docker
 
 ```sh
@@ -197,9 +211,11 @@ There is no shared file directory. Agents do not see each other's files through 
 
 ## Known limitations
 
-- CLI profiles do not receive Botanical tools or MCP. The CLI's own tools run in the same per-agent directory as Botanical file tools and shell cwd: `/data/agents/<agentId>` or `BOTANICAL_WORKSPACE/agents/<agentId>`.
+- A CLI's own native tools (its shell and file edits) run in the same per-agent directory as Botanical file tools, `/data/agents/<agentId>` or `BOTANICAL_WORKSPACE/agents/<agentId>`, but they do not pass through Botanical's role checks. Roles govern the Botanical tools the CLI calls over MCP.
+- A CLI decides for itself which listed tools to call. Grok refuses to call a tool that is not in `tools/list`, so for a role without a capability the tool is simply absent; the dispatch-time denial is the backstop for clients that call unlisted names.
+- Two turns running at the same time for the same agent both write `<agent dir>/.grok/config.toml`. Cleanup restores the snapshot each run took, so a stale `botanical` entry (without a token) can be left behind until the next Grok turn in that folder.
+- For CLI turns, Botanical tool cards are shown after the assistant text of the turn, because the CLI's text and tool calls arrive as one step.
 - `shell` and `code_exec` cwd scoping is not a second filesystem sandbox. Isolation is whatever the existing jail already enforces. A command can still name paths that jail mounts.
-- Prompt text is passed as an argv argument (`-p` or the Codex positional). Very large transcripts can hit the OS argument limit.
 - Grok incremental text uses `streaming-messages-json`, not ACP `streaming-json`. Both shapes are parsed.
 - Claude and Codex are not installed in the default image. Mount them the same way as grok if you enable those presets.
 - Availability results are cached for about 15 seconds.

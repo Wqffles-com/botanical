@@ -266,6 +266,51 @@ describe("agent tool loop", () => {
     expect(await deps.store.messages.listByChat(chat.id)).toHaveLength(0);
   });
 
+  test("a settled tool call is recorded once and does not run again", async () => {
+    let calls = 0;
+    const counting: ExecutableTool = {
+      ...echoTool,
+      async execute() {
+        calls += 1;
+        return { output: "ran" };
+      },
+    };
+    const store = createMemoryStore();
+    const bus = createAgentMessageBus(store.agents, store.agentMessages);
+    const agent = await store.agents.create(
+      createAgentSchema.parse({ name: "Ada", prompt: "You are Ada.", toolAllowlist: ["echo"] }),
+    );
+    const chat = await store.chats.create({ agentId: agent.id });
+    const provider = createScriptedProvider([
+      () => [
+        {
+          type: "tool-call",
+          id: "ext1",
+          name: "echo",
+          arguments: { text: "nope" },
+          settled: { output: "already", isError: false },
+        },
+      ],
+    ]);
+    const deps: RuntimeDeps = {
+      store,
+      bus,
+      profiles: staticProfileResolver({ fast: { provider, model: "test-model" } }),
+      toolSources: [createBuiltinToolSource([counting])],
+    };
+    const events = await collect(deps, { chatId: chat.id, content: "Hi", profileId: "fast" });
+    expect(calls).toBe(0);
+    expect(provider.requests).toHaveLength(1);
+    expect(provider.requests[0]?.agentId).toBe(agent.id);
+    expect(events.filter((event) => event.type === "tool-result")).toEqual([
+      { type: "tool-result", id: "ext1", name: "echo", result: "already", isError: false },
+    ]);
+    const saved = await store.messages.listByChat(chat.id);
+    expect(saved.map((message) => message.role)).toEqual(["user", "assistant", "tool"]);
+    expect(saved[2]?.content).toBe("already");
+    expect(events.at(-1)).toEqual({ type: "done", finishReason: "stop" });
+  });
+
   test("hides A2A tools when the agent disables them", async () => {
     const { deps, chat, provider } = await harness({
       a2a: false,

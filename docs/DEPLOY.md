@@ -157,7 +157,7 @@ docker compose -f docker-compose.yml -f docker-compose.cli.yml up -d
 
 `BOTANICAL_CLI_PROFILES` accepts `grok-build`, `claude-code`, and `codex`. A full `BOTANICAL_PROFILES` entry can set `kind`, `cli`, `label`, `model`, `bin`, and `timeoutMs`. `model` is forwarded only when present. CLI profiles are never the default model. They stay on `GET /api/profiles` when the binary is missing, with `available: false` and `unavailableReason`.
 
-These CLIs run their own tools inside the workspace jail (`/data/agents/<agent id>`). Botanical tools are not passed in. Claude and Codex need the same style of read-only binary mount plus credentials under the CLI home (`~/.claude` or `~/.codex`). See `docker-compose.cli.yml`.
+These CLIs run inside the agent's workspace (`/data/agents/<agent id>`) with their own tools. Each turn also gets Botanical's tools and your MCP tools through a per-run MCP endpoint on `127.0.0.1` inside the API container (MCP server name `botanical`), with the same role and permission checks as API-model turns. Set `BOTANICAL_INTERNAL_URL` only if the API is not reachable on its own port at `127.0.0.1`. Set `"botanicalTools": false` on a profile to turn this off. Claude and Codex need the same style of read-only binary mount plus credentials under the CLI home (`~/.claude` or `~/.codex`). See `docker-compose.cli.yml`.
 
 If the Docker daemon runs on another host (for example `DOCKER_HOST=tcp://...`), host bind mounts point at the daemon's filesystem, not yours. Use named volumes instead: mount one at `/opt/cli` (read-only, prepend it to `PATH`) and one at `/home/botanical`, then seed them with `docker cp` from a throwaway container and `chown -R 100:101` the home volume (the image's `botanical` user).
 
