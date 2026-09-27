@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
 import { providerLabel } from "@/lib/format-extra";
 import { useWorkspace } from "@/components/workspace-provider";
+import { CliPanel } from "@/components/settings/cli-panel";
 import { MemoryPanel } from "@/components/settings/memory-panel";
 import { ProfilesPanel } from "@/components/settings/profiles-panel";
 import { RolesPanel } from "@/components/settings/roles-panel";
@@ -24,10 +25,10 @@ import type { AppSettings, CatalogTool, McpSnapshot, ProviderKeyStatus } from "@
 import { deriveProviderKeys } from "@/lib/parse";
 import { DeploymentBadge } from "./deployment-badge";
 
-type SettingsTab = "general" | "profiles" | "memory" | "roles";
+type SettingsTab = "general" | "profiles" | "memory" | "roles" | "cli";
 
 function normalizeTab(value: string | null): SettingsTab {
-  if (value === "profiles" || value === "memory" || value === "roles") return value;
+  if (value === "profiles" || value === "memory" || value === "roles" || value === "cli") return value;
   return "general";
 }
 
@@ -114,11 +115,12 @@ export function SettingsView() {
       ) : null}
 
       <Tabs value={tab} onValueChange={selectTab} className="mt-8">
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-5">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="profiles">Profiles</TabsTrigger>
           <TabsTrigger value="memory">Memory</TabsTrigger>
           <TabsTrigger value="roles">Roles & permissions</TabsTrigger>
+          <TabsTrigger value="cli">Coding CLIs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="mt-4 space-y-4">
@@ -141,6 +143,9 @@ export function SettingsView() {
         </TabsContent>
         <TabsContent value="roles" className="mt-4">
           <RolesPanel agents={agents} onAgentsChanged={refresh} />
+        </TabsContent>
+        <TabsContent value="cli" className="mt-4">
+          <CliPanel />
         </TabsContent>
       </Tabs>
     </div>

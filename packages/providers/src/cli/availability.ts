@@ -1,7 +1,9 @@
-import { accessSync, constants, existsSync } from "node:fs";
+import { accessSync, constants, existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { spawn } from "node:child_process";
 
+import { claudeHasLogin, grokHasLogin } from "./artifact.ts";
+import { scrubCliEnv } from "./child-env.ts";
 import type { CliAvailability, CliName, CliProfileSpec } from "./types.ts";
 
 const CACHE_TTL_MS = 15_000;
@@ -24,7 +26,11 @@ export interface CliAvailabilityProbe {
   executable(path: string): boolean;
   home(): string;
   env: Record<string, string | undefined>;
-  run(bin: string, args: readonly string[], timeoutMs: number): Promise<number>;
+  run(bin: string, args: readonly string[], timeoutMs: number): Promise<number | { code: number; stdout?: string }>;
+  /** Size > 0. When omitted, `exists` is used. */
+  nonEmpty?(path: string): boolean;
+  /** File text, or null when missing. Used to notice a Claude token without returning it. */
+  readText?(path: string): string | null;
 }
 
 export async function checkCliAvailability(
@@ -32,10 +38,10 @@ export async function checkCliAvailability(
   options?: { env?: Record<string, string | undefined>; now?: number; probe?: CliAvailabilityProbe; cacheTtlMs?: number },
 ): Promise<CliAvailability> {
   const env = options?.env ?? process.env;
-  const probe = options?.probe ?? defaultProbe(env);
+  const probe = options?.probe ?? defaultProbe(env, spec.cli);
   const now = options?.now ?? Date.now();
   const ttl = options?.cacheTtlMs ?? CACHE_TTL_MS;
-  const key = `${spec.cli}\0${spec.bin ?? ""}\0${probe.home()}\0${env.ANTHROPIC_API_KEY ? "1" : "0"}`;
+  const key = `${spec.cli}\0${spec.bin ?? ""}\0${probe.home()}\0${flag(env.ANTHROPIC_API_KEY)}\0${flag(env.CLAUDE_CODE_OAUTH_TOKEN)}\0${flag(env.XAI_API_KEY)}\0${flag(env.OPENAI_API_KEY)}`;
   const cached = cache.get(key);
   if (cached && now - cached.at < ttl) return cached.status;
   const status = await detect(spec, probe);
@@ -68,6 +74,11 @@ function resolveBinary(
   return { ok: true, path: found };
 }
 
+function credentialPresent(path: string, probe: CliAvailabilityProbe): boolean {
+  if (probe.nonEmpty) return probe.nonEmpty(path);
+  return probe.exists(path);
+}
+
 function binaryName(cli: CliName): string {
   return cli;
 }
@@ -79,39 +90,59 @@ async function loginOk(
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const home = probe.home();
   if (cli === "grok") {
-    if (probe.exists(join(home, ".grok", "auth.json"))) return { ok: true };
-    const code = await probe.run(bin, ["models"], PROBE_TIMEOUT_MS);
-    if (code === 0) return { ok: true };
-    return { ok: false, reason: "grok is not logged in (no ~/.grok/auth.json and `grok models` failed)" };
+    if (
+      grokHasLogin({
+        authNonEmpty: credentialPresent(join(home, ".grok", "auth.json"), probe),
+        apiKey: probe.env.XAI_API_KEY,
+      })
+    ) {
+      return { ok: true };
+    }
+    return { ok: false, reason: "grok is not logged in (no ~/.grok/auth.json and XAI_API_KEY is unset)" };
   }
   if (cli === "claude") {
-    const version = await probe.run(bin, ["--version"], PROBE_TIMEOUT_MS);
-    if (version !== 0) return { ok: false, reason: "claude --version failed" };
-    const key = probe.env.ANTHROPIC_API_KEY?.trim() ?? "";
-    if (key) return { ok: true };
-    const creds = [
-      join(home, ".claude", ".credentials.json"),
-      join(home, ".claude", "credentials.json"),
-      join(home, ".claude.json"),
-    ];
-    if (creds.some((path) => probe.exists(path))) return { ok: true };
+    const version = await probeRun(probe, bin, ["--version"]);
+    if (version.code !== 0) return { ok: false, reason: "claude --version failed" };
+    const settingsText = probe.readText ? probe.readText(join(home, ".claude", "settings.json")) : null;
+    const signals = {
+      apiKey: probe.env.ANTHROPIC_API_KEY,
+      oauthToken: probe.env.CLAUDE_CODE_OAUTH_TOKEN,
+      settingsText,
+      credentialsNonEmpty: credentialPresent(join(home, ".claude", ".credentials.json"), probe),
+    };
+    if (claudeHasLogin(signals)) return { ok: true };
+    const status = await probeRun(probe, bin, ["auth", "status"]);
+    if (claudeHasLogin({ ...signals, authStatus: status })) return { ok: true };
     return {
       ok: false,
-      reason: "claude has no credentials (set ANTHROPIC_API_KEY or sign in so a credentials file exists)",
+      reason: "claude is not logged in (no API key, token, or credentials; `claude auth status` did not report a login)",
     };
   }
-  if (probe.exists(join(home, ".codex", "auth.json"))) return { ok: true };
-  const code = await probe.run(bin, ["login", "status"], PROBE_TIMEOUT_MS);
-  if (code === 0) return { ok: true };
+  if (credentialPresent(join(home, ".codex", "auth.json"), probe)) return { ok: true };
+  const status = await probeRun(probe, bin, ["login", "status"]);
+  if (status.code === 0) return { ok: true };
   return { ok: false, reason: "codex is not logged in (no ~/.codex/auth.json and `codex login status` failed)" };
 }
 
-function defaultProbe(env: Record<string, string | undefined>): CliAvailabilityProbe {
+function flag(value: string | undefined): "1" | "0" {
+  return value?.trim() ? "1" : "0";
+}
+
+function defaultProbe(env: Record<string, string | undefined>, cli: CliName): CliAvailabilityProbe {
   return {
     env,
     which(name: string) {
       const found = Bun.which(name);
-      return found ?? null;
+      if (found) return found;
+      const root = env.BOTANICAL_CLI_BIN?.trim() || "/opt/botanical-cli";
+      const candidate = join(root, "bin", name);
+      if (!existsSync(candidate)) return null;
+      try {
+        accessSync(candidate, constants.X_OK);
+        return candidate;
+      } catch {
+        return null;
+      }
     },
     exists(path: string) {
       return existsSync(path);
@@ -127,10 +158,34 @@ function defaultProbe(env: Record<string, string | undefined>): CliAvailabilityP
     home() {
       return env.BOTANICAL_CLI_HOME?.trim() || env.HOME?.trim() || "/tmp";
     },
+    nonEmpty(path: string) {
+      try {
+        return statSync(path).size > 0;
+      } catch {
+        return false;
+      }
+    },
+    readText(path: string) {
+      try {
+        return readFileSync(path, "utf8");
+      } catch {
+        return null;
+      }
+    },
     run(bin, args, timeoutMs) {
-      return runProbe(bin, args, timeoutMs, env);
+      return runProbe(bin, args, timeoutMs, env, cli);
     },
   };
+}
+
+async function probeRun(
+  probe: CliAvailabilityProbe,
+  bin: string,
+  args: readonly string[],
+): Promise<{ code: number; stdout: string }> {
+  const result = await probe.run(bin, args, PROBE_TIMEOUT_MS);
+  if (typeof result === "number") return { code: result, stdout: "" };
+  return { code: result.code, stdout: result.stdout ?? "" };
 }
 
 function runProbe(
@@ -138,19 +193,25 @@ function runProbe(
   args: readonly string[],
   timeoutMs: number,
   env: Record<string, string | undefined>,
-): Promise<number> {
+  cli: CliName,
+): Promise<{ code: number; stdout: string }> {
   return new Promise((resolve) => {
     let settled = false;
+    let stdout = "";
     const finish = (code: number) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve(code);
+      resolve({ code, stdout });
     };
     const child = spawn(bin, [...args], {
-      stdio: "ignore",
-      env: stringEnv(env),
+      stdio: ["ignore", "pipe", "ignore"],
+      env: stringEnv(env, cli),
       detached: process.platform !== "win32",
+    });
+    child.stdout?.on("data", (chunk: Buffer) => {
+      if (stdout.length >= 8_000) return;
+      stdout = (stdout + chunk.toString("utf8")).slice(0, 8_000);
     });
     const timer = setTimeout(() => {
       if (child.pid && process.platform !== "win32") {
@@ -169,12 +230,9 @@ function runProbe(
   });
 }
 
-function stringEnv(env: Record<string, string | undefined>): NodeJS.ProcessEnv {
-  const next: NodeJS.ProcessEnv = {};
-  for (const [key, value] of Object.entries(env)) {
-    if (typeof value === "string") next[key] = value;
-  }
-  const home = env.BOTANICAL_CLI_HOME?.trim() || env.HOME;
+function stringEnv(env: Record<string, string | undefined>, cli: CliName): NodeJS.ProcessEnv {
+  const next: NodeJS.ProcessEnv = scrubCliEnv(env, cli);
+  const home = env.BOTANICAL_CLI_HOME?.trim() || env.HOME?.trim();
   if (home) next.HOME = home;
   return next;
 }

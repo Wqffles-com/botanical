@@ -52,6 +52,9 @@ async function main(): Promise<void> {
   console.log(
     `Botanical server listening on http://${server.hostname}:${server.port} (${config.deploymentMode}, ${store.kind}, brand=${JSON.stringify(config.brandName)})`,
   );
+  if (!cliAutoInstallDisabled(process.env.BOTANICAL_CLI_AUTO_INSTALL)) {
+    void app.cli.installEnabled();
+  }
   if (store.kind === "memory") {
     console.warn(
       "Persistence is in-memory because DATABASE_URL is unset. Data will not survive a restart.",
@@ -69,6 +72,11 @@ async function main(): Promise<void> {
   };
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
+}
+
+function cliAutoInstallDisabled(value: string | undefined): boolean {
+  const text = value?.trim().toLowerCase() ?? "";
+  return text === "0" || text === "false" || text === "off";
 }
 
 if (import.meta.main) {

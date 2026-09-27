@@ -1,5 +1,6 @@
 import type { ProfileResolver, ToolRegistry } from "@botanical/agent-runtime";
 import { createApp, type App } from "../src/app.ts";
+import type { CliService } from "../src/cli-install/service.ts";
 import { LoginRateLimiter } from "../src/auth/rate-limit.ts";
 import { loadConfig, type ServerConfig } from "../src/config.ts";
 import type { ProviderFetch } from "../src/provider-host.ts";
@@ -62,6 +63,7 @@ export function setup(
     profiles?: ProfileResolver;
     fetch?: ProviderFetch;
     installPlatformTools?: boolean;
+    cli?: CliService;
   } = {},
 ): TestApp {
   const env = baseEnv(overrides);
@@ -76,6 +78,7 @@ export function setup(
     ...(options.toolRegistry ? { toolRegistry: options.toolRegistry } : {}),
     ...(options.profiles ? { profiles: options.profiles } : {}),
     ...(options.installPlatformTools !== undefined ? { installPlatformTools: options.installPlatformTools } : {}),
+    ...(options.cli ? { cli: options.cli } : {}),
   });
   return { app, config, store };
 }

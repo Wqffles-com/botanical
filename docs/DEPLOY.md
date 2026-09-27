@@ -142,26 +142,32 @@ Do not commit tokens. Prefer `BOTANICAL_MCP_CONFIG_FILE` pointing at a file outs
 
 ### Subscription CLIs (opt-in)
 
-The default Compose file does not mount coding-agent binaries. To run Grok Build, Claude Code, or Codex as a model profile, add the override:
+The default Compose file does not install coding-agent CLIs. To run Grok Build, Claude Code, or Codex as a model profile from Docker Desktop on Windows, macOS, or Linux:
 
 ```sh
 # .env
-BOTANICAL_GROK_BIN=/absolute/path/to/grok
-BOTANICAL_CLI_HOME=/absolute/path/to/cli-home
 BOTANICAL_CLI_PROFILES=grok-build
 
-docker compose -f docker-compose.yml -f docker-compose.cli.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.cli.yml up --build -d
 ```
 
-`BOTANICAL_GROK_BIN` is mounted read-only at `/usr/local/bin/grok`. `BOTANICAL_CLI_HOME` is mounted at `/home/botanical` and becomes `HOME`, so `~/.grok/auth.json` is `${BOTANICAL_CLI_HOME}/.grok/auth.json`. The API user must be able to write that directory. The server image is Alpine; use a statically linked `grok` binary.
+Open http://localhost:3000 → Settings → Coding CLIs. Install, then log in, then pick the profile in a chat. `BOTANICAL_CLI_PROFILES` accepts `grok-build`, `claude-code`, and `codex` (comma-separated). A full `BOTANICAL_PROFILES` entry can set `kind`, `cli`, `label`, `model`, `bin`, and `timeoutMs`. `model` is forwarded only when present. CLI profiles are never the default model. They stay on `GET /api/profiles` when the binary is missing or login cannot be confirmed, with `available: false` and `unavailableReason`.
 
-`BOTANICAL_CLI_PROFILES` accepts `grok-build`, `claude-code`, and `codex`. A full `BOTANICAL_PROFILES` entry can set `kind`, `cli`, `label`, `model`, `bin`, and `timeoutMs`. `model` is forwarded only when present. CLI profiles are never the default model. They stay on `GET /api/profiles` when the binary is missing, with `available: false` and `unavailableReason`.
+The override mounts two named volumes: `cli_bin` at `/opt/botanical-cli` (binaries) and `cli_home` at `/home/botanical` (`HOME` and `BOTANICAL_CLI_HOME`). The entrypoint creates those directories and gives them to the `botanical` user. On startup the server installs each enabled CLI in the background. `BOTANICAL_CLI_AUTO_INSTALL=0` skips that. Install and Update remain on the settings page. Optional pins: `BOTANICAL_GROK_VERSION`, `BOTANICAL_CLAUDE_VERSION`, `BOTANICAL_CODEX_VERSION`. Unset means the latest stable at install time.
 
-These CLIs run inside the agent's workspace (`/data/agents/<agent id>`) with their own tools. Each turn also gets Botanical's tools and your MCP tools through a per-run MCP endpoint on `127.0.0.1` inside the API container (MCP server name `botanical`), with the same role and permission checks as API-model turns. Set `BOTANICAL_INTERNAL_URL` only if the API is not reachable on its own port at `127.0.0.1`. Set `"botanicalTools": false` on a profile to turn this off. Claude and Codex need the same style of read-only binary mount plus credentials under the CLI home (`~/.claude` or `~/.codex`). See `docker-compose.cli.yml`.
+Terminal fallback, from the repo directory:
 
-If the Docker daemon runs on another host (for example `DOCKER_HOST=tcp://...`), host bind mounts point at the daemon's filesystem, not yours. Use named volumes instead: mount one at `/opt/cli` (read-only, prepend it to `PATH`) and one at `/home/botanical`, then seed them with `docker cp` from a throwaway container and `chown -R 100:101` the home volume (the image's `botanical` user).
+```sh
+docker compose exec -u botanical server grok login --device-auth
+docker compose exec -u botanical server codex login --device-auth
+docker compose exec -it -u botanical server claude setup-token
+```
 
-The CLI's OAuth refresh may rotate the token in the copied `auth.json`. Treat the server's CLI login as its own login; prefer a dedicated sign-in for the server over copying the `auth.json` a desktop CLI is actively using, so a refresh on one side does not log the other out.
+`claude setup-token` prints a long-lived token and does not save it. Paste the token into Settings → Coding CLIs. It is stored in the CLI home and is not returned to the browser.
+
+These CLIs run inside the agent's workspace (`/data/agents/<agent id>`) with their own tools. Each turn also gets Botanical's tools and your MCP tools through a per-run MCP endpoint on `127.0.0.1` inside the API container (MCP server name `botanical`), with the same role and permission checks as API-model turns. Set `BOTANICAL_INTERNAL_URL` only if the API is not reachable on its own port at `127.0.0.1`. Set `"botanicalTools": false` on a profile to turn this off.
+
+A Linux host can still bind-mount a binary instead of using the installer. That path is a commented example in `docker-compose.cli.yml`. It is not required, and it does not work for a Docker Desktop VM that cannot see your host path. Prefer the named volumes. Treat the server's CLI login as its own login; a refresh of a copied `auth.json` can log the desktop CLI out.
 
 ## TLS
 
@@ -186,7 +192,7 @@ Leave Postgres on `127.0.0.1` and do not publish `5433` in a cloud security grou
 
 ## Data, backups, upgrades
 
-Named volumes (prefixed with the project name): `botanical-mvp_botanical_pg` and `botanical-mvp_botanical_workspace` (file and shell jail at `/data`).
+Named volumes (prefixed with the project name): `botanical-mvp_botanical_pg` and `botanical-mvp_botanical_workspace` (file and shell jail at `/data`). The coding-CLI override adds `botanical-mvp_cli_bin` and `botanical-mvp_cli_home`.
 
 ```sh
 docker compose exec postgres pg_dump -U botanical -d botanical > botanical.sql

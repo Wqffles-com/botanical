@@ -145,3 +145,38 @@ A CLI turn opens `POST /internal/mcp/runs/<runId>` on the same server process fo
 - Calls made through the endpoint stream as `tool-call` / `tool-result` events and are stored as tool messages, so they render as tool cards. The CLI's own native tools are not Botanical tool cards.
 - `botanicalTools: false` on a CLI profile skips the endpoint. Presets from `BOTANICAL_CLI_PROFILES` leave it on.
 - Chat SSE streams send a `: ping` comment after 5 seconds without an event. Bun closes idle connections after 10 seconds, and CLI turns are often silent while the CLI looks up or runs tools; without the ping that aborted the turn.
+
+---
+
+## 2026-09-27: Coding CLIs install inside the server container
+
+**Status:** Accepted.
+**Effect:** `docker-compose.cli.yml` no longer bind-mounts a host `grok` binary. The API container installs the Linux build of each enabled CLI and stores its config on named volumes, so Docker Desktop on Windows and macOS works without WSL and without a host binary. The default `docker compose up` is unchanged when the override is not used.
+
+### Install
+
+On listen, unless `BOTANICAL_CLI_AUTO_INSTALL=0`, the server installs each CLI named by an enabled profile (`BOTANICAL_CLI_PROFILES` or a `kind: "cli"` profile) in the background. A failed install is recorded on that CLI and does not stop the server or the other CLIs. Settings → Coding CLIs can install or update one CLI. One install per CLI runs at a time; a second call joins the first. Downloads land in a temp directory and move into place with rename.
+
+Versions default to the latest stable at install time. `BOTANICAL_GROK_VERSION`, `BOTANICAL_CLAUDE_VERSION`, and `BOTANICAL_CODEX_VERSION` pin one. An install is skipped when the manifest version is already present, the binary exists, and it matches the pin (or there is no pin and this is not an update). Update re-resolves latest.
+
+| CLI | Source | Check |
+| --- | --- | --- |
+| Grok Build (`grok`) | Version text at `https://x.ai/cli/stable`. Binary `grok-<version>-linux-<x86_64\|aarch64>` from `https://x.ai/cli`, falling back to `https://storage.googleapis.com/grok-build-public-artifacts/cli`. The `.gz` form is preferred; gzip is inflated in process. There is no published checksum (`.sha256` is not served). | The temp binary must exit 0 from `--version` before it is moved to `/opt/botanical-cli/bin/grok`. |
+| Claude Code (`claude`) | npm `@anthropic-ai/claude-code` for the version, then the matching platform package `@anthropic-ai/claude-code-linux-x64`, `-arm64`, `-linux-x64-musl`, or `-linux-arm64-musl`. | `dist.integrity` (sha512 SRI) is checked before extract. musl vs glibc is chosen at runtime (`/etc/alpine-release`, otherwise `ldd`). |
+| Codex (`codex`) | npm `@openai/codex`, then the platform version `@openai/codex@<version>-linux-x64` or `-linux-arm64`. The archive's vendor tree holds `x86_64-unknown-linux-musl` or `aarch64-unknown-linux-musl`. | `dist.integrity` is checked before extract. The published Linux binaries are musl builds. |
+
+A manifest under `/opt/botanical-cli/manifests/<cli>.json` records cli, version, arch, libc, source URL, sha512 when one existed, how it was verified, and `installedAt`. `x64` maps to `x86_64` and `arm64` to `aarch64`, which is what Apple Silicon containers report.
+
+The image stays Alpine (the Bun Alpine image). Grok's Linux binary is static. Claude's musl build needs `libgcc`, `libstdc++`, and system `ripgrep` (`USE_BUILTIN_RIPGREP=0`, because the bundled ripgrep is glibc). Codex ships a musl binary. Those packages are added with `apk`. A glibc base is not required.
+
+### Volumes and login
+
+`cli_bin` is mounted at `/opt/botanical-cli` (its `bin` directory is on `PATH`, and availability also looks there). `cli_home` is mounted at `/home/botanical`, which is `HOME` and `BOTANICAL_CLI_HOME`. The entrypoint, as root, creates both directories and gives them to the `botanical` user before dropping privileges.
+
+Login runs the CLI in the container with piped stdio and no PTY. Grok: `grok login --device-auth` (alias `--device-code`), which prints a URL and a code and polls. Codex: `codex login --device-auth`, same shape. Claude's supported headless method is `claude setup-token`: it opens a browser flow and prints a long-lived token, and it does not save that token. The settings page shows the URL and code, and a paste box for the Claude token (or a code if the CLI asks). The token is written into the CLI home settings file. It is not returned to the browser. Output lines are ANSI-stripped and token-shaped text is redacted before it is stored for the UI. A login times out after 15 minutes. Cancel kills the child. Only one login per CLI.
+
+Logged-in is a boolean (or `"unknown"` if the check itself fails). Grok: a non-empty `~/.grok/auth.json`, or a non-empty `XAI_API_KEY`. `grok models` exits 0 while unauthenticated, so it is not a login check. Codex: `codex login status` exit 0, or a non-empty `~/.codex/auth.json`. Claude: `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, a token in `~/.claude/settings.json`, or a non-empty `~/.claude/.credentials.json`. Otherwise `claude auth status` is authoritative (`loggedIn` in its JSON, or exit code 0 when that field is absent). `~/.claude.json` is created by any run and is not a credential. File contents are not copied into the response. Install and login clear the availability cache so `GET /api/profiles` flips without a restart.
+
+The passcode session is the only operator session. v0 has no separate admin role on that session in self-host or SaaS, so these routes use the same auth gate as the rest of the operator API. SaaS is still one tenant and one passcode.
+
+A Linux bind-mount of a host binary remains a commented example in the override. It is not required.

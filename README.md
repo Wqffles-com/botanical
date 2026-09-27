@@ -81,7 +81,18 @@ This starts Postgres, the API, and the web app. The server applies database migr
 | API | `127.0.0.1:8788` |
 | Postgres | `127.0.0.1:5433` |
 
-Open the web UI, sign in with your passcode, create an agent, and pick a model profile for the chat. On a public server, put TLS in front (for example Caddy) and set `BOTANICAL_PUBLIC_ORIGIN=https://…` and `BOTANICAL_COOKIE_SECURE=true`. See [docs/DEPLOY.md](./docs/DEPLOY.md) for TLS, backups, upgrades, MCP, and the coding-CLI override.
+Open the web UI, sign in with your passcode, create an agent, and pick a model profile for the chat. On a public server, put TLS in front (for example Caddy) and set `BOTANICAL_PUBLIC_ORIGIN=https://…` and `BOTANICAL_COOKIE_SECURE=true`. See [docs/DEPLOY.md](./docs/DEPLOY.md) for TLS, backups, upgrades, MCP, and coding CLIs.
+
+To use Grok Build, Claude Code, or Codex from Docker Desktop (Windows, macOS, or Linux) without installing the CLI on the host:
+
+```sh
+# in .env
+BOTANICAL_CLI_PROFILES=grok-build
+
+docker compose -f docker-compose.yml -f docker-compose.cli.yml up --build -d
+```
+
+Open http://localhost:3000, sign in, and go to Settings → Coding CLIs. Install the CLI, then log in. The container downloads the Linux build into a volume. Pick the Grok Build profile in a chat. Add `claude-code` or `codex` to `BOTANICAL_CLI_PROFILES` the same way. The default `docker compose up` does not install CLIs.
 
 ### Option B: Prebuilt release zip
 
@@ -121,7 +132,7 @@ Everything is configured through environment variables. The full annotated list 
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY` | Provider keys. A set key lists that provider's profiles. It never selects a model. |
 | `OPENAI_COMPAT_BASE_URL` + `OPENAI_COMPAT_API_KEY` | Any other OpenAI-compatible endpoint. |
 | `BOTANICAL_PROFILES` | JSON array of model profiles that users can pick (see [`profiles.example.json`](./profiles.example.json)). Do not put keys in it. |
-| `BOTANICAL_CLI_PROFILES` | Shortcut to add coding-CLI presets: `grok-build,claude-code,codex`. Explicit `BOTANICAL_PROFILES` entries win. The binaries must be installed and logged in on the server (see `docker-compose.cli.yml`). |
+| `BOTANICAL_CLI_PROFILES` | Shortcut to add coding-CLI presets: `grok-build,claude-code,codex`. Explicit `BOTANICAL_PROFILES` entries win. With `docker-compose.cli.yml`, the server installs and signs in those CLIs inside the container. |
 | `BOTANICAL_MCP_CONFIG` / `BOTANICAL_MCP_SERVERS` | MCP server config file or inline JSON. |
 | `BOTANICAL_WORKSPACE` | Root directory for agent files and the shell jail. Each agent gets `<root>/agents/<id>`. |
 | `BOTANICAL_A2A_AUTORUN` | `true` lets a delivered agent-to-agent message start a background turn. |

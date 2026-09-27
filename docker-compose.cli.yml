@@ -1,29 +1,45 @@
-# Opt-in subscription CLIs. This file does not change `docker compose up` by itself.
-# Use it only when you want the API container to run grok / claude / codex:
+# Opt-in coding CLIs inside the API container. This file does not change
+# `docker compose up` by itself.
 #
-#   docker compose -f docker-compose.yml -f docker-compose.cli.yml up -d
+#   BOTANICAL_CLI_PROFILES=grok-build
+#   docker compose -f docker-compose.yml -f docker-compose.cli.yml up --build -d
 #
-# Required in `.env` for the grok mount below:
-#   BOTANICAL_GROK_BIN=/absolute/path/to/grok     # statically linked binary
-#   BOTANICAL_CLI_HOME=/absolute/path/to/cli-home # writable; holds .grok/auth.json
+# The server installs the Linux build of each enabled CLI into the cli_bin
+# volume and keeps CLI config in the cli_home volume. Docker Desktop on
+# Windows and macOS needs no WSL install and no host binary. Sign in from
+# Settings → Coding CLIs, or with the terminal commands in docs/DEPLOY.md.
 #
-# The API process drops to the unprivileged `botanical` user. The CLI home
-# directory must be writable by that user (chown it to the image uid, or chmod
-# it so the container can write session files). The binary mount is read-only.
+# Optional pins (latest stable when unset):
+#   BOTANICAL_GROK_VERSION, BOTANICAL_CLAUDE_VERSION, BOTANICAL_CODEX_VERSION
+# BOTANICAL_CLI_AUTO_INSTALL=0 skips install at process start. Install still
+# works from the settings page.
 #
-# HOME is the CLI config directory, not /tmp. Each CLI runs in the agent's
-# folder on the workspace volume (/data) and reaches Botanical's tools through a
-# per-run MCP endpoint on 127.0.0.1 inside this container.
+# Linux-only alternative, not required: bind-mount a host binary and a host
+# config directory instead of the named volumes.
 #
-# Add claude or codex the same way: another read-only binary mount, and include
-# the id in BOTANICAL_CLI_PROFILES (grok-build,claude-code,codex).
+# services:
+#   server:
+#     volumes:
+#       - ${BOTANICAL_GROK_BIN}:/opt/botanical-cli/bin/grok:ro
+#       - ${BOTANICAL_CLI_HOME}:/home/botanical
 
 services:
   server:
     environment:
       HOME: /home/botanical
       BOTANICAL_CLI_HOME: /home/botanical
+      BOTANICAL_CLI_BIN: /opt/botanical-cli
       BOTANICAL_CLI_PROFILES: ${BOTANICAL_CLI_PROFILES:-grok-build}
+      BOTANICAL_CLI_AUTO_INSTALL: ${BOTANICAL_CLI_AUTO_INSTALL:-1}
+      BOTANICAL_GROK_VERSION: ${BOTANICAL_GROK_VERSION:-}
+      BOTANICAL_CLAUDE_VERSION: ${BOTANICAL_CLAUDE_VERSION:-}
+      BOTANICAL_CODEX_VERSION: ${BOTANICAL_CODEX_VERSION:-}
+      USE_BUILTIN_RIPGREP: "0"
+      PATH: /opt/botanical-cli/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     volumes:
-      - ${BOTANICAL_GROK_BIN:?set BOTANICAL_GROK_BIN to the host grok binary}:/usr/local/bin/grok:ro
-      - ${BOTANICAL_CLI_HOME:?set BOTANICAL_CLI_HOME to a writable CLI config directory}:/home/botanical
+      - cli_bin:/opt/botanical-cli
+      - cli_home:/home/botanical
+
+volumes:
+  cli_bin:
+  cli_home:

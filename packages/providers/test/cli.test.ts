@@ -193,7 +193,7 @@ describe("CLI availability", () => {
         probe: probe({
           exists: (path: string) => path === fixture,
           executable: () => true,
-          run: async () => 0,
+          run: async (_bin, args) => (args[0] === "auth" ? 1 : 0),
           env: {},
         }),
       },

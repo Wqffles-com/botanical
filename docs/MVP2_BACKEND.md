@@ -191,13 +191,34 @@ Chat SSE streams send a `: ping` comment after 5 seconds without an event. Bun c
 ## Enable CLI profiles in Docker
 
 ```sh
-BOTANICAL_GROK_BIN=/opt/grok/grok
-BOTANICAL_CLI_HOME=/var/lib/botanical/cli-home
 BOTANICAL_CLI_PROFILES=grok-build
-docker compose -f docker-compose.yml -f docker-compose.cli.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.cli.yml up --build -d
 ```
 
-Put `auth.json` at `$BOTANICAL_CLI_HOME/.grok/auth.json`. The grok binary on Alpine must be statically linked. The CLI home mount must be writable by the `botanical` user. The default `docker compose up` does not use this file.
+The API image installs the Linux build into the `cli_bin` volume (`/opt/botanical-cli`) and keeps config in `cli_home` (`/home/botanical`). Sign in from Settings → Coding CLIs (`GET/POST /api/cli`, behind the passcode session) or with:
+
+```sh
+docker compose exec -u botanical server grok login --device-auth
+docker compose exec -u botanical server codex login --device-auth
+docker compose exec -it -u botanical server claude setup-token
+```
+
+The default `docker compose up` does not use this file. Optional version pins: `BOTANICAL_GROK_VERSION`, `BOTANICAL_CLAUDE_VERSION`, `BOTANICAL_CODEX_VERSION`. `BOTANICAL_CLI_AUTO_INSTALL=0` skips install at startup.
+
+### Coding CLI HTTP API
+
+All of these require the passcode session. `:cli` is `grok`, `claude`, or `codex`, and it must be one of the enabled profiles.
+
+| Method | Path | Body |
+| --- | --- | --- |
+| GET | `/api/cli` | Enabled CLIs: id, label, cli, status (`not_installed`, `installing`, `installed`, `failed`), version, arch, `loggedIn` (`true`, `false`, or `"unknown"`), lastError |
+| POST | `/api/cli/:cli/install` | `{ "update": true }` re-resolves latest. `{}` installs when missing or when a pin does not match |
+| POST | `/api/cli/:cli/login` | Starts the CLI's headless login. 409 if one is already running |
+| GET | `/api/cli/:cli/login` | verification URL, user code, prompt, state (`idle`, `pending`, `needs_input`, `done`, `failed`, `expired`, `cancelled`) |
+| POST | `/api/cli/:cli/login/input` | `{ "input": "..." }` when the CLI is waiting for a pasted code or token |
+| DELETE | `/api/cli/:cli/login` | Cancels and kills the child |
+
+Login responses never include credential file contents. Output lines are ANSI-stripped and token-shaped strings are replaced with `[redacted]`.
 
 ## Workspace scoping
 
@@ -211,14 +232,15 @@ There is no shared file directory. Agents do not see each other's files through 
 
 ## Known limitations
 
+- A CLI child does not receive Botanical's passcode, session secret, `DATABASE_URL`, Postgres password, `BOTANICAL_MCP_SERVERS`, or provider keys that CLI does not use for its own auth. Grok may see `XAI_API_KEY`, Claude `ANTHROPIC_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN`, Codex `OPENAI_API_KEY` and `CODEX_API_KEY`. Empty values are omitted, so a blank key from Compose does not override a device login. The per-run MCP token is still added to that child's environment. `PATH`, `HOME`, `TMPDIR`, `LANG`, proxy variables, and `USE_BUILTIN_RIPGREP` are kept.
 - A CLI's own native tools (its shell and file edits) run in the same per-agent directory as Botanical file tools, `/data/agents/<agentId>` or `BOTANICAL_WORKSPACE/agents/<agentId>`, but they do not pass through Botanical's role checks. Roles govern the Botanical tools the CLI calls over MCP.
 - A CLI decides for itself which listed tools to call. Grok refuses to call a tool that is not in `tools/list`, so for a role without a capability the tool is simply absent; the dispatch-time denial is the backstop for clients that call unlisted names.
 - Two turns running at the same time for the same agent both write `<agent dir>/.grok/config.toml`. Cleanup restores the snapshot each run took, so a stale `botanical` entry (without a token) can be left behind until the next Grok turn in that folder.
 - For CLI turns, Botanical tool cards are shown after the assistant text of the turn, because the CLI's text and tool calls arrive as one step.
 - `shell` and `code_exec` cwd scoping is not a second filesystem sandbox. Isolation is whatever the existing jail already enforces. A command can still name paths that jail mounts.
 - Grok incremental text uses `streaming-messages-json`, not ACP `streaming-json`. Both shapes are parsed.
-- Claude and Codex are not installed in the default image. Mount them the same way as grok if you enable those presets.
-- Availability results are cached for about 15 seconds.
+- Claude and Codex are not in the default `docker compose up` image. `docker-compose.cli.yml` installs the Linux builds into a volume. Claude's headless login is `claude setup-token` (paste the token; the CLI does not save it). Grok and Codex use device-code login and do not need a terminal.
+- Availability results are cached for about 15 seconds. Install and login clear that cache.
 - Memory retrieval is recent rows plus substring overlap, not embeddings.
 - The operator REST API can read every memory. Isolation applies to agent tools and the prompt.
 - Builtin role permissions can be edited. A later migration will not overwrite that edit (`ON CONFLICT DO NOTHING`).

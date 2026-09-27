@@ -1,4 +1,6 @@
-import { chmodSync, existsSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "bun:test";
 import { BUILTIN_ROLE_IDS, type ToolContributor } from "@botanical/agent-runtime";
@@ -197,6 +199,13 @@ describe("per-run CLI MCP", () => {
     clearCliAvailabilityCache();
     const previousMode = process.env.FAKE_CLI_MODE;
     const previousUrl = process.env.BOTANICAL_INTERNAL_URL;
+    const previousHome = process.env.BOTANICAL_CLI_HOME;
+    // A throwaway CLI home with a credential file, so availability does not
+    // depend on the machine running the tests.
+    const cliHome = mkdtempSync(join(tmpdir(), "botanical-cli-home-"));
+    mkdirSync(join(cliHome, ".grok"), { recursive: true });
+    writeFileSync(join(cliHome, ".grok", "auth.json"), '{"test":true}\n');
+    process.env.BOTANICAL_CLI_HOME = cliHome;
     process.env.FAKE_CLI_MODE = "mcp-call";
     const profiles = [
       { id: "mock", name: "Mock", provider: "mock", model: "echo" },
@@ -271,6 +280,10 @@ describe("per-run CLI MCP", () => {
       else process.env.FAKE_CLI_MODE = previousMode;
       if (previousUrl === undefined) delete process.env.BOTANICAL_INTERNAL_URL;
       else process.env.BOTANICAL_INTERNAL_URL = previousUrl;
+      if (previousHome === undefined) delete process.env.BOTANICAL_CLI_HOME;
+      else process.env.BOTANICAL_CLI_HOME = previousHome;
+      rmSync(cliHome, { recursive: true, force: true });
+      clearCliAvailabilityCache();
     }
   });
 });
