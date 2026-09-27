@@ -31,6 +31,12 @@ Botanical is in early alpha. This page separates what already ships from what is
 - When it is off: a simpler assistant experience focused on chat, agents, memory, web, and connectors, with developer tooling hidden.
 - Today there is no such setting. All users see the same UI, and the operator controls tool access through agent allowlists and roles.
 
+### GitHub and GitLab connections
+- **Connections page**: add a GitHub or GitLab (gitlab.com or self-managed) connection with an access token, stored server-side only.
+- **Issue triggers**: a per-connection webhook endpoint with secret verification, plus routing rules such as "new issue in repo X goes to agent Y". The agent receives a message with the issue title, body, labels, and link, and a background turn starts automatically. Starts with "issue opened"; comments, pull/merge requests, and CI events can reuse the same mechanism later. Builds on the Listeners work above.
+- **Forge MCP**: the same connection registers the official GitHub or GitLab MCP server with that token, so agents (including coding-agent CLI profiles through Botanical's MCP endpoint) can read and act on issues and pull requests within their role permissions.
+- Webhooks require the server to be reachable from GitHub or GitLab; local testing needs a tunnel.
+
 ### Voice
 - **Dictation**: a mic button in the composer that turns speech into editable text before sending. Speech-to-text runs on the server through any Whisper-compatible endpoint (OpenAI, Groq, or a local Whisper), so keys stay server-side. When no speech backend is configured, it falls back to the browser's built-in speech recognition.
 - **Voice calls with an agent**: a voice mode for a chat. It transcribes what you say, sends it as a normal message to the chat's agent, and reads the reply aloud with text-to-speech. Because it goes through the normal chat pipeline, it works with any agent and profile (including coding-agent CLIs), keeps tools, memory, and roles, and saves the call as an ordinary chat.
