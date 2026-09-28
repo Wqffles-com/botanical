@@ -4,6 +4,7 @@ import { Inbox } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { WorkspaceProvider } from "@/components/workspace-provider";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ export function AppShell({
             <div className="min-w-0 flex-1 truncate text-sm font-medium">{title}</div>
             <div className="flex items-center gap-1">
               {actions}
+              <NotificationBell />
               <Button
                 nativeButton={false}
                 render={<Link href="/inbox" />}

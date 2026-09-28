@@ -16,7 +16,7 @@ This doc describes the system design, following the decisions in [DECISIONS.md](
                     │         Botanical server                 │
                     │  self-host or hosted SaaS (same code)    │
                     │  sessions · agents · agent loop ·        │
-                    │  profiles · MCP · A2A messaging · usage  │
+                    │  profiles · MCP · A2A · routines · usage │
                     └────────────┬─────────────┬───────────────┘
                                  │             │
               ┌──────────────────▼──┐   ┌──────▼────────────────┐
@@ -32,7 +32,7 @@ This doc describes the system design, following the decisions in [DECISIONS.md](
                                         └───────────────────────┘
 
 Server secrets ──▶ env / secret store (API keys never from web client)
-Postgres ────────▶ chats, agents, messages, A2A, usage
+Postgres ────────▶ chats, agents, messages, A2A, routines, listeners, notifications
 ```
 
 **Invariant:** orchestration and tools never import a vendor SDK directly. Only `packages/providers/*` talk to OpenAI, Anthropic, xAI, etc.
@@ -48,7 +48,7 @@ Postgres ────────▶ chats, agents, messages, A2A, usage
 ```
 botanical/
   packages/
-    server/         # HTTP API: auth, agents, chats, streaming turns, A2A, memory, roles
+    server/         # HTTP API: auth, agents, chats, streaming turns, A2A, routines, listeners, memory, roles
     agent-runtime/  # agent loop, tool dispatch, permission checks
     providers/      # streaming model adapters (OpenAI-compat, Anthropic, xAI, DeepSeek, OpenRouter, CLI)
     tools/          # file tools (per-agent workspace jail)
@@ -73,7 +73,7 @@ Deployment: **same codebase**, two modes — **self-host** and **hosted SaaS** �
 
 | Client | Role | When |
 |--------|------|------|
-| Web UI | Chat, agent picker, mandatory profile pick, settings, A2A activity | **v0** |
+| Web UI | Chat, agent picker, mandatory profile pick, settings, A2A activity, routines, listeners, notifications | **v0** |
 | CLI | Thin client against server API | Later |
 | Mobile | Notifications, quick replies | Later |
 
@@ -281,13 +281,29 @@ Same server, two modes. Not local-first: the runtime is always a server that cli
 | **Remote sandbox** | Optional remote sandbox for heavier computer use | Later / opt-in |
 | Local / laptop | `bun run dev` or Compose on a workstation | Development only |
 
-Botanical is designed to run always on, so agents can keep working while no client is connected. Agent-to-agent autorun works today; routines and listeners are planned.
+Botanical is designed to run always on, so agents can keep working while no client is connected. Agent-to-agent autorun, scheduled routines, and generic webhook listeners run inside the server process. Typed forge listeners are still planned.
 
 Mode is configuration (a deployment-mode setting plus env), not a compile-time fork. Core features — chat, tools, MCP, agents, Postgres — behave the same in both modes. SaaS-only concerns (tenant identity, subscription state) stay off the v0 core path so a self-host operator is not blocked on them.
 
-Always-on routines and listeners are enabled by this architecture and are planned. Multi-tenant auth for hosted SaaS is also planned; leave a seam at the auth boundary.
+Routines and generic webhook listeners run in this process. Multi-tenant auth for hosted SaaS is still planned; leave a seam at the auth boundary.
 
 Reference deploy is Docker Compose ([DEPLOY.md](./DEPLOY.md)): Postgres, server, and web from one codebase. `DEPLOYMENT_MODE=SELF_HOST` is a server you run. `DEPLOYMENT_MODE=SAAS` is the same images run as the hosted service. Multi-tenant accounts and billing stay deferred; v0 does not assume a SaaS-only runtime.
+
+### Always-on turns
+
+Background work uses the same turn as an interactive chat message: system prompt, memory injection, the agent's tool allowlist, role checks at dispatch, operator MCP servers, and CLI profiles with their per-run Botanical MCP endpoint. User, assistant, and tool messages are stored the same way, so the chat renders normally. Two turns never run in one chat at the same time. Background turns are also capped per process (instance setting `always_on.background_concurrency`, default 2).
+
+**Routines.** A row stores a 5-field cron expression, an IANA timezone, and a required profile id. The scheduler ticks inside the server process. The interval is the instance setting `always_on.scheduler_interval_ms` (default 15s) and applies on the next tick. `always_on.scheduler_enabled` (default true) skips claiming while it is false. `createApp({ scheduler: false })` keeps the interval from starting, which tests use. A tick claims due rows in one transaction: `SELECT … FOR UPDATE SKIP LOCKED`, compute the next future slot in code, advance `next_run_at`, and insert a `routine_runs` row. Schedule runs are unique on `(routine_id, scheduled_for)`, so the same slot cannot fire twice across processes or restarts. If the server was down, one catch-up run is kept and the schedule jumps to the next future slot. The process that executes a run holds a lease (`lease_owner`, `lease_expires_at`, about two minutes, renewed about every 30 seconds). Each tick reaps runs whose lease has expired, and queued runs that were never picked up and are older than that window, with `interrupted: server stopped` plus a failure notification. A live lease is left alone, so a second process does not fail a turn that is still running. Accepted webhook deliveries use the same lease. Each run opens a **new chat** owned by the routine's agent. Listener chat titles include an explicit UTC label.
+
+**Listeners.** `POST /api/hooks/:id` is outside the passcode. It checks an HMAC (`X-Botanical-Signature` or `X-Hub-Signature-256`, `sha256=<hex>`) or a bearer/token header, with a constant-time compare. Unknown ids and bad signatures share one 401. The body is capped while it is read (`always_on.listener_max_bytes`, default 65536). An accepted delivery returns 202 and starts a background turn in a new chat. `{{payload}}` is inserted inside `<untrusted_webhook_payload>` with a fixed preamble. The listener secret is stored in full so the HMAC can be recomputed; database access is secret access. List and get never return it. `kind` is text. Only `webhook` is implemented; a later kind adds a verify + buildPrompt handler.
+
+**Ownership.** `routines`, `listeners`, and `notifications` have a required `user_id` (foreign key to `users`, on delete restrict, same as agents and chats). The single operator owns those rows today, and list routes already filter by that user. The column is enforced per user when accounts land, without another migration. `routine_runs` and `listener_deliveries` do not copy `user_id`; they inherit ownership through the parent.
+
+**Tuning.** Those four values live in the `settings` table, not in environment variables. `GET` and `PATCH /api/settings/always-on` are passcode-gated and marked instance-admin, so they become admin-only when accounts land. Absent keys use the defaults. A short cache (about a minute) lets a saved value apply without a restart.
+
+**Notifications.** A row is written when a routine, listener, or A2A autorun turn finishes or fails, and when an agent calls `notify_user` (allowlist plus the `notify` capability when the agent has roles). The web UI polls the list.
+
+The in-memory store implements the same claim, so unit tests do not need Postgres. Postgres is what makes the lease safe across processes.
 
 ---
 
@@ -305,6 +321,10 @@ Reference deploy is Docker Compose ([DEPLOY.md](./DEPLOY.md)): Postgres, server,
 | Tool audit | Postgres or JSONL | Redact secrets |
 | Memories | Postgres | `shared` or per-agent; tags; injected into the system prompt |
 | Roles | Postgres | Capability union plus MCP allow list; `agent_roles` join |
+| Routines / routine runs | Postgres | Cron schedule plus one row per run. `routines.user_id` is the operator today and the account owner later. Runs inherit the routine. A partial unique index stops a schedule slot from firing twice |
+| Listeners / deliveries | Postgres | Generic webhooks. `listeners.user_id` matches routines. Deliveries inherit the listener. The HMAC secret is stored retrievable |
+| Notifications | Postgres | Background run results and `notify_user`. `user_id`, indexed with `created_at`, plus an unread partial index |
+| Always-on tuning | Postgres `settings` | Instance-admin keys `always_on.scheduler_enabled`, `always_on.scheduler_interval_ms`, `always_on.background_concurrency`, `always_on.listener_max_bytes`. Not per user, and not environment variables |
 
 `agents.created_by_agent_id` is set when `agent_create` persists an agent and stays null for operator-created agents.
 
@@ -343,7 +363,9 @@ Runnable v0 smoke (health, passcode auth, create agent, create chat, mock provid
 - [x] Built-ins: web search/fetch, shell/code exec, file read/write
 - [x] MCP servers callable from the agent loop
 - [x] Multi-agent create + one-agent-per-chat + async A2A path
+- [x] Routines (cron, lease, new chat per run) and generic webhook listeners
+- [x] Notifications for background runs and `notify_user`
 - [x] Documented portable deploy (host-agnostic): [DEPLOY.md](./DEPLOY.md)
 - [x] Shell jail limits: [packages/tools-shell/SECURITY.md](../packages/tools-shell/SECURITY.md)
 - [ ] UI approvals and tool audit log
-- [ ] Routines, listeners, developer mode ([ROADMAP.md](./ROADMAP.md))
+- [ ] Typed forge listeners, developer mode ([ROADMAP.md](./ROADMAP.md))

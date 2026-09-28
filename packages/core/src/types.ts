@@ -243,4 +243,141 @@ export type ChatStreamEvent =
   | { type: "error"; error: string }
   | { type: "done"; messageId?: string };
 
+export type RoutineRunStatus = "queued" | "running" | "succeeded" | "failed" | "skipped";
+export type RoutineRunTrigger = "schedule" | "manual";
+export type ListenerDeliveryStatus = "accepted" | "rejected" | "succeeded" | "failed";
+export type NotificationKind = "run_succeeded" | "run_failed" | "attention";
+
+export interface RoutineRun {
+  id: string;
+  routineId: string;
+  trigger: RoutineRunTrigger;
+  scheduledFor: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  status: RoutineRunStatus;
+  error: string | null;
+  chatId: string | null;
+  createdAt: string;
+}
+
+export interface Routine {
+  id: string;
+  /** Owner. The single operator until accounts exist. */
+  userId: string;
+  agentId: string;
+  name: string;
+  prompt: string;
+  cron: string;
+  timezone: string;
+  profileId: string;
+  enabled: boolean;
+  nextRunAt: string;
+  lastRunAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastRun?: RoutineRun | null;
+}
+
+export interface RoutineInput {
+  agentId: string;
+  name: string;
+  prompt: string;
+  cron: string;
+  timezone: string;
+  profileId: string;
+  enabled?: boolean;
+}
+
+export interface RoutinePatch {
+  name?: string;
+  prompt?: string;
+  cron?: string;
+  timezone?: string;
+  profileId?: string;
+  enabled?: boolean;
+}
+
+export interface SchedulePreview {
+  valid: boolean;
+  error?: string;
+  next: string[];
+}
+
+export interface Listener {
+  id: string;
+  /** Owner. The single operator until accounts exist. */
+  userId: string;
+  agentId: string;
+  name: string;
+  kind: string;
+  profileId: string;
+  promptTemplate: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+}
+
+export interface ListenerInput {
+  agentId: string;
+  name: string;
+  profileId: string;
+  promptTemplate?: string;
+  enabled?: boolean;
+}
+
+export interface ListenerPatch {
+  name?: string;
+  profileId?: string;
+  promptTemplate?: string;
+  enabled?: boolean;
+}
+
+export interface ListenerCreated {
+  listener: Listener;
+  secret: string;
+  url: string;
+}
+
+export interface ListenerDelivery {
+  id: string;
+  listenerId: string;
+  receivedAt: string;
+  status: ListenerDeliveryStatus;
+  httpStatus: number;
+  error: string | null;
+  payloadBytes: number;
+  payloadPreview: string;
+  chatId: string | null;
+}
+
+export interface AppNotification {
+  id: string;
+  /** Owner. The single operator until accounts exist. */
+  userId: string;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  agentId: string | null;
+  chatId: string | null;
+  routineRunId: string | null;
+  listenerDeliveryId: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationPage {
+  notifications: AppNotification[];
+  unreadCount: number;
+}
+
+/** Instance-admin tuning for routines, listeners, and background turns. */
+export interface AlwaysOnSettings {
+  schedulerEnabled: boolean;
+  schedulerIntervalMs: number;
+  backgroundConcurrency: number;
+  listenerMaxBytes: number;
+}
+
 export const CLIENT_CONTRACT_VERSION = "1";

@@ -8,6 +8,7 @@ import {
   isAgentIcon,
   type AgentColor,
 } from "@botanical/core";
+import { createAlwaysOn } from "./always-on.ts";
 import { createPlatform } from "./platform.ts";
 import {
   AGENT_MESSAGE_STATUSES,
@@ -36,8 +37,12 @@ const PROFILE_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
  * Data does not survive a restart.
  * Pass `{ seed: true }` for the three example agents (Gardener, Builder, Scout).
  */
-export function createMemoryStore(options?: { seed?: boolean }): Store {
+export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }): Store {
   const agents = new Map<string, Agent>();
+  const alwaysOn = createAlwaysOn({
+    now: options?.now ?? (() => new Date()),
+    hasAgent: (id) => agents.has(id),
+  });
   const chats = new Map<string, Chat>();
   const messages: Message[] = [];
   const agentMessages = new Map<string, AgentMessage>();
@@ -147,6 +152,7 @@ export function createMemoryStore(options?: { seed?: boolean }): Store {
       async delete(id) {
         if (!agents.has(id)) return false;
         platform.onAgentDeleted(id);
+        alwaysOn.onAgentDeleted(id);
         for (const agent of agents.values()) {
           if (agent.createdByAgentId === id) agent.createdByAgentId = null;
         }
@@ -386,6 +392,12 @@ export function createMemoryStore(options?: { seed?: boolean }): Store {
     },
     memories: platform.memories,
     roles: platform.roles,
+    routines: alwaysOn.routines,
+    routineRuns: alwaysOn.routineRuns,
+    listeners: alwaysOn.listeners,
+    listenerDeliveries: alwaysOn.listenerDeliveries,
+    notifications: alwaysOn.notifications,
+    alwaysOnSettings: alwaysOn.alwaysOnSettings,
   };
 }
 

@@ -52,10 +52,15 @@ describe('v0 postgres schema', () => {
       'agent_roles',
       'agents',
       'chats',
+      'listener_deliveries',
+      'listeners',
       'memories',
       'messages',
       'model_profiles',
+      'notifications',
       'roles',
+      'routine_runs',
+      'routines',
       'secret_refs',
       'sessions',
       'settings',
@@ -71,7 +76,8 @@ describe('v0 postgres schema', () => {
        where table_schema = 'public'
          and column_name ~* '(secret|api_key|apikey|passcode|token|password)$'`,
     );
-    expect(sensitive.rows).toEqual([]);
+    // Listener HMAC secrets are stored retrievable. Every other secret-shaped column stays forbidden.
+    expect(sensitive.rows).toEqual([{ table_name: 'listeners', column_name: 'secret' }]);
 
     const secretColumns = await client.query<{ column_name: string }>(
       `select column_name from information_schema.columns

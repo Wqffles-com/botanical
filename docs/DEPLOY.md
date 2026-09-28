@@ -103,7 +103,8 @@ Copy from [.env.example](../.env.example). Do not commit `.env`.
 | `BOTANICAL_PASSCODE` | yes | Web → server gate. Copied to `BOTANICAL_PASSWORD` when that is empty |
 | `DATABASE_URL` | yes for Postgres | Host `postgres`, port `5432`, on the Compose network |
 | `BOTANICAL_SESSION_SECRET` | no | Reserved. The current API does not read it |
-| `BOTANICAL_PUBLIC_ORIGIN` | recommended | Public web origin. Pair `https://` with `BOTANICAL_COOKIE_SECURE=true` |
+| `BOTANICAL_PUBLIC_ORIGIN` | recommended | Public web origin, and the origin used in webhook URLs. Pair `https://` with `BOTANICAL_COOKIE_SECURE=true` |
+| Always-on tuning | no | Not environment variables. `always_on.scheduler_enabled`, `always_on.scheduler_interval_ms`, `always_on.background_concurrency`, and `always_on.listener_max_bytes` are instance settings. Edit them from Settings → Background work. Absent rows use the defaults (on, 15000 ms, 2, 65536). |
 | `OPENAI_API_KEY` | no | GPT |
 | `ANTHROPIC_API_KEY` | no | Claude |
 | `XAI_API_KEY` | no | Grok. Also the xAI speech-to-text fallback |

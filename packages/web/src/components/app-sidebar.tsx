@@ -1,7 +1,7 @@
 "use client";
 
 import type { Agent, Chat } from "@botanical/core";
-import { Inbox, Plus, Search, Settings } from "lucide-react";
+import { CalendarClock, Inbox, Plus, Search, Settings, Webhook } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -146,6 +146,18 @@ export function AppSidebar() {
             <SidebarMenuButton render={<Link href="/inbox" />} isActive={pathname.startsWith("/inbox")} tooltip="Inbox">
               <Inbox />
               <span>Inbox</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton render={<Link href="/routines" />} isActive={pathname.startsWith("/routines")} tooltip="Routines">
+              <CalendarClock />
+              <span>Routines</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton render={<Link href="/listeners" />} isActive={pathname.startsWith("/listeners")} tooltip="Listeners">
+              <Webhook />
+              <span>Listeners</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

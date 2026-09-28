@@ -18,13 +18,11 @@ Botanical is in early alpha. This page separates what already ships from what is
 - Docker Compose deploy, and a prebuilt release zip from CI
 - `DEPLOYMENT_MODE` switch (`SELF_HOST` / `SAAS`) on one codebase
 - Dictation in the composer: speech becomes editable text before send, via a Whisper-compatible server endpoint, or the browser's speech recognition when no backend is configured
+- **Routines**: cron schedules that run an agent on the server. Each run opens a new chat.
+- **Listeners**: generic inbound webhooks (`POST /api/hooks/:id`) that start an agent turn. Typed forge listeners are still planned.
+- **Notifications** when a background run finishes or fails, plus a `notify_user` tool when an agent needs attention.
 
 ## Planned
-
-### Always-on work
-- **Routines**: scheduled agent runs (cron-style) that execute on the server while no one is connected.
-- **Listeners**: event triggers (webhooks, incoming messages, connector events) that start agent turns.
-- Notifications when background work finishes or needs attention.
 
 ### Developer mode
 - A **per-user "I'm a developer" setting**.
@@ -34,7 +32,7 @@ Botanical is in early alpha. This page separates what already ships from what is
 
 ### GitHub and GitLab connections
 - **Connections page**: add a GitHub or GitLab (gitlab.com or self-managed) connection with an access token, stored server-side only.
-- **Issue triggers**: a per-connection webhook endpoint with secret verification, plus routing rules such as "new issue in repo X goes to agent Y". The agent receives a message with the issue title, body, labels, and link, and a background turn starts automatically. Starts with "issue opened"; comments, pull/merge requests, and CI events can reuse the same mechanism later. Builds on the Listeners work above.
+- **Issue triggers**: a per-connection webhook endpoint with secret verification, plus routing rules such as "new issue in repo X goes to agent Y". The agent receives a message with the issue title, body, labels, and link, and a background turn starts automatically. Starts with "issue opened"; comments, pull/merge requests, and CI events can reuse the same mechanism later. Generic webhook listeners already ship; these typed kinds do not.
 - **Forge MCP**: the same connection registers the official GitHub or GitLab MCP server with that token, so agents (including coding-agent CLI profiles through Botanical's MCP endpoint) can read and act on issues and pull requests within their role permissions.
 - Webhooks require the server to be reachable from GitHub or GitLab; local testing needs a tunnel.
 

@@ -3,12 +3,13 @@ import { HttpError, isRecord, json, readJson } from "../http.ts";
 import { readRequestedProfileId, resolveProfile } from "../profiles.ts";
 import { assertCliProfileReady } from "./profiles.ts";
 import { collectChatTurn, streamChatTurn, turnFailure } from "../runtime/turn.ts";
+import type { TurnCoordinator } from "../runtime/turns.ts";
 import { authed, type Router } from "../router.ts";
 import { sseStream } from "../streaming.ts";
 import type { Chat } from "../types.ts";
 import { LIMITS, readBoundedString, requireParam } from "../validate.ts";
 
-export function registerMessages(router: Router, runtime: RuntimeDeps): void {
+export function registerMessages(router: Router, runtime: RuntimeDeps, turns: TurnCoordinator): void {
   router.add(
     "GET",
     "/api/chats/:id/messages",
@@ -53,7 +54,7 @@ export function registerMessages(router: Router, runtime: RuntimeDeps): void {
 
       const turn = { chat, content, profile, signal: ctx.request.signal };
       if (!stream) {
-        const result = await collectChatTurn(ctx.store, runtime, turn);
+        const result = await turns.exclusive(chat.id, () => collectChatTurn(ctx.store, runtime, turn));
         return json(201, {
           userMessage: result.userMessage,
           assistantMessage: result.assistantMessage,
@@ -63,7 +64,7 @@ export function registerMessages(router: Router, runtime: RuntimeDeps): void {
           ...(result.error ? { error: result.error } : {}),
         });
       }
-      return sseStream(streamChatTurn(ctx.store, runtime, turn));
+      return sseStream(turns.stream(chat.id, () => streamChatTurn(ctx.store, runtime, turn)));
     }),
   );
 }

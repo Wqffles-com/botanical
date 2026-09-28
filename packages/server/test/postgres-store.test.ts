@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createApp } from "../src/app.ts";
 import { loadConfig } from "../src/config.ts";
 import { createStore } from "../src/db/store.ts";
-import { PASSWORD, bearer, login, readJson } from "./helpers.ts";
+import { PASSWORD, bearer, defaultProviderFetch, login, readJson } from "./helpers.ts";
 
 const baseUrl = process.env.BOTANICAL_TEST_DATABASE_URL;
 const integration = baseUrl ? test : test.skip;
@@ -22,11 +22,13 @@ describe("postgres server boot", () => {
       const config = loadConfig({
         BOTANICAL_PASSWORD: PASSWORD,
         DATABASE_URL: databaseUrl,
+        XAI_API_KEY: "test-xai-key",
+        DEEPSEEK_API_KEY: "test-deepseek-key",
         BOTANICAL_PROFILES: JSON.stringify([
           { id: "grok", name: "Grok", provider: "xai", model: "grok-4" },
           { id: "fast", name: "Fast", provider: "deepseek", model: "deepseek-chat" },
         ]),
-      });
+      }, { fetch: defaultProviderFetch });
       const store = await createStore(config);
       expect(store.kind).toBe("postgres");
       const app = createApp({ config, store });

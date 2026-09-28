@@ -21,6 +21,7 @@ export const CAPABILITIES = [
   "memory.write",
   "agent.create",
   "agent.message",
+  "notify",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -133,6 +134,7 @@ const TOOL_CAPABILITIES: Readonly<Record<string, Capability>> = {
   send_agent_message: "agent.message",
   agent_send: "agent.message",
   agent_inbox: "agent.message",
+  notify_user: "notify",
 };
 
 export function isCapability(value: string): value is Capability {

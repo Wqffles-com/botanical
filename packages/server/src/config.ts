@@ -91,6 +91,8 @@ export interface ServerConfig {
    * Request handlers go through `resolveSttConfig` so a later settings layer can replace this.
    */
   dictation: DictationSettings;
+  /** Public origin used to build webhook URLs. Null uses the request origin. */
+  publicOrigin: string | null;
 }
 
 export type DictationSettings =
@@ -183,6 +185,7 @@ export function loadConfig(
     }),
     a2aAutorun: parseBool(env.BOTANICAL_A2A_AUTORUN, "BOTANICAL_A2A_AUTORUN", false),
     dictation: loadDictation(env),
+    publicOrigin: parsePublicOrigin(env.BOTANICAL_PUBLIC_ORIGIN),
   };
 }
 
@@ -266,6 +269,30 @@ function parseCorsOrigin(raw: string | undefined): string | null {
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new ConfigError("BOTANICAL_CORS_ORIGIN must be http or https");
+  }
+  return url.origin;
+}
+
+function parsePublicOrigin(raw: string | undefined): string | null {
+  const text = raw?.trim() ?? "";
+  if (!text) return null;
+  let url: URL;
+  try {
+    url = new URL(text);
+  } catch {
+    throw new ConfigError("BOTANICAL_PUBLIC_ORIGIN must be an absolute http(s) origin");
+  }
+  if (url.username || url.password) {
+    throw new ConfigError("BOTANICAL_PUBLIC_ORIGIN must not include credentials");
+  }
+  if (url.pathname !== "/" && url.pathname !== "") {
+    throw new ConfigError("BOTANICAL_PUBLIC_ORIGIN must be an origin without a path");
+  }
+  if (url.search || url.hash) {
+    throw new ConfigError("BOTANICAL_PUBLIC_ORIGIN must be an origin without a query or hash");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new ConfigError("BOTANICAL_PUBLIC_ORIGIN must be http or https");
   }
   return url.origin;
 }

@@ -8,6 +8,8 @@ function apiOrigin(): string {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  // `/api/*` is proxied to the API, including public webhooks at `/api/hooks/*`.
+  // Those requests authenticate with the listener secret, not the login cookie.
   if (pathname.startsWith("/api") || pathname.startsWith("/_next")) {
     return NextResponse.next();
   }

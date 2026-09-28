@@ -1,3 +1,4 @@
+import type { AlwaysOnSettingsRepository } from "@botanical/db";
 import type { AgentColor } from "@botanical/core";
 
 /**
@@ -359,6 +360,254 @@ export interface ProfileRepository {
   delete(id: string): Promise<boolean>;
 }
 
+export type RoutineRunStatus = "queued" | "running" | "succeeded" | "failed" | "skipped";
+export type RoutineRunTrigger = "schedule" | "manual";
+export type ListenerDeliveryStatus = "accepted" | "rejected" | "succeeded" | "failed";
+export type NotificationKind = "run_succeeded" | "run_failed" | "attention";
+
+export interface Routine {
+  id: string;
+  /** Owner. The single operator until accounts exist. */
+  userId: string;
+  agentId: string;
+  name: string;
+  prompt: string;
+  cron: string;
+  timezone: string;
+  profileId: string;
+  enabled: boolean;
+  nextRunAt: string;
+  lastRunAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewRoutine {
+  agentId: string;
+  name: string;
+  prompt: string;
+  cron: string;
+  timezone: string;
+  profileId: string;
+  enabled: boolean;
+  nextRunAt: string;
+}
+
+export interface RoutinePatch {
+  name?: string;
+  prompt?: string;
+  cron?: string;
+  timezone?: string;
+  profileId?: string;
+  enabled?: boolean;
+  nextRunAt?: string;
+  lastRunAt?: string | null;
+}
+
+export interface RoutineRun {
+  id: string;
+  routineId: string;
+  trigger: RoutineRunTrigger;
+  scheduledFor: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  status: RoutineRunStatus;
+  error: string | null;
+  chatId: string | null;
+  /** Set while a process is executing the run. */
+  leaseOwner: string | null;
+  leaseExpiresAt: string | null;
+  createdAt: string;
+}
+
+export interface NewRoutineRun {
+  routineId: string;
+  trigger: RoutineRunTrigger;
+  scheduledFor: string;
+  status?: RoutineRunStatus;
+  chatId?: string | null;
+}
+
+export interface RoutineRunPatch {
+  status?: RoutineRunStatus;
+  error?: string | null;
+  chatId?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  leaseOwner?: string | null;
+  leaseExpiresAt?: string | null;
+}
+
+export interface ClaimedRoutine {
+  routine: Routine;
+  run: RoutineRun;
+}
+
+/** Computes the next future slot strictly after `after`. */
+export type NextSlot = (routine: { cron: string; timezone: string }, after: Date) => Date;
+
+export interface RoutineRepository {
+  list(query?: { agentId?: string }): Promise<Routine[]>;
+  get(id: string): Promise<Routine | null>;
+  create(input: NewRoutine): Promise<Routine>;
+  update(id: string, patch: RoutinePatch): Promise<Routine | null>;
+  delete(id: string): Promise<boolean>;
+  /**
+   * Claim up to `limit` due routines. Safe for overlapping callers:
+   * the same schedule slot is inserted at most once, and `nextRunAt`
+   * moves to the next future slot (one catch-up, then skip the gap).
+   */
+  claimDue(limit: number, now: Date, nextSlot: NextSlot): Promise<ClaimedRoutine[]>;
+}
+
+export interface RoutineRunRepository {
+  list(routineId: string, opts?: { limit?: number; offset?: number }): Promise<RoutineRun[]>;
+  get(id: string): Promise<RoutineRun | null>;
+  create(input: NewRoutineRun): Promise<RoutineRun>;
+  update(id: string, patch: RoutineRunPatch): Promise<RoutineRun | null>;
+  latest(routineId: string): Promise<RoutineRun | null>;
+  /**
+   * Take the run for this process. Fails when another process holds an unexpired lease.
+   * Sets status to running.
+   */
+  claimLease(id: string, owner: string, expiresAt: string): Promise<boolean>;
+  /** Extend the lease. No-op unless `owner` still holds it and the run is open. */
+  renewLease(id: string, owner: string, expiresAt: string): Promise<boolean>;
+  /** Finish the run only if `owner` still holds the lease. */
+  finishOwned(id: string, owner: string, patch: RoutineRunPatch): Promise<RoutineRun | null>;
+  /**
+   * Fail open runs whose lease has expired, and queued runs that were never
+   * picked up and are older than the lease window. Writes a failure notification.
+   */
+  reapExpired(now: Date): Promise<number>;
+}
+
+/**
+ * Inbound webhook (and, later, typed) listener.
+ * `secret` is stored in full so HMAC can be recomputed. Database access is secret access.
+ * HTTP list/get must omit it.
+ */
+export interface Listener {
+  id: string;
+  userId: string;
+  agentId: string;
+  name: string;
+  kind: string;
+  profileId: string;
+  promptTemplate: string;
+  secret: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewListener {
+  agentId: string;
+  name: string;
+  kind: string;
+  profileId: string;
+  promptTemplate: string;
+  secret: string;
+  enabled: boolean;
+}
+
+export interface ListenerPatch {
+  name?: string;
+  profileId?: string;
+  promptTemplate?: string;
+  enabled?: boolean;
+}
+
+export interface ListenerRepository {
+  list(query?: { agentId?: string }): Promise<Listener[]>;
+  get(id: string): Promise<Listener | null>;
+  create(input: NewListener): Promise<Listener>;
+  update(id: string, patch: ListenerPatch): Promise<Listener | null>;
+  setSecret(id: string, secret: string): Promise<Listener | null>;
+  delete(id: string): Promise<boolean>;
+}
+
+export interface ListenerDelivery {
+  id: string;
+  listenerId: string;
+  receivedAt: string;
+  status: ListenerDeliveryStatus;
+  httpStatus: number;
+  error: string | null;
+  payloadBytes: number;
+  payloadPreview: string;
+  chatId: string | null;
+  leaseOwner: string | null;
+  leaseExpiresAt: string | null;
+}
+
+export interface NewListenerDelivery {
+  listenerId: string;
+  status: ListenerDeliveryStatus;
+  httpStatus: number;
+  error?: string | null;
+  payloadBytes: number;
+  payloadPreview: string;
+  chatId?: string | null;
+}
+
+export interface ListenerDeliveryPatch {
+  status?: ListenerDeliveryStatus;
+  error?: string | null;
+  chatId?: string | null;
+  leaseOwner?: string | null;
+  leaseExpiresAt?: string | null;
+}
+
+export interface ListenerDeliveryRepository {
+  list(listenerId: string, opts?: { limit?: number; offset?: number }): Promise<ListenerDelivery[]>;
+  get(id: string): Promise<ListenerDelivery | null>;
+  create(input: NewListenerDelivery): Promise<ListenerDelivery>;
+  update(id: string, patch: ListenerDeliveryPatch): Promise<ListenerDelivery | null>;
+  /** Hold an accepted delivery. Fails when another process holds an unexpired lease. */
+  claimLease(id: string, owner: string, expiresAt: string): Promise<boolean>;
+  renewLease(id: string, owner: string, expiresAt: string): Promise<boolean>;
+  finishOwned(id: string, owner: string, patch: ListenerDeliveryPatch): Promise<ListenerDelivery | null>;
+  /**
+   * Fail accepted deliveries whose lease expired, and accepted rows that were
+   * never picked up and are older than the lease window. Writes a failure notification.
+   */
+  reapExpired(now: Date): Promise<number>;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  agentId: string | null;
+  chatId: string | null;
+  routineRunId: string | null;
+  listenerDeliveryId: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NewNotification {
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  agentId?: string | null;
+  chatId?: string | null;
+  routineRunId?: string | null;
+  listenerDeliveryId?: string | null;
+}
+
+export interface NotificationRepository {
+  list(opts?: { limit?: number; offset?: number }): Promise<Notification[]>;
+  unreadCount(): Promise<number>;
+  get(id: string): Promise<Notification | null>;
+  create(input: NewNotification): Promise<Notification>;
+  markRead(id: string, now: Date): Promise<Notification | null>;
+  markAllRead(now: Date): Promise<number>;
+}
+
 export interface Store {
   /** "memory" is process-local. "postgres" is packages/db. */
   readonly kind: "memory" | "postgres";
@@ -370,6 +619,16 @@ export interface Store {
   readonly agentMessages: AgentMessageRepository;
   readonly memories: MemoryRepository;
   readonly roles: RoleRepository;
+  readonly routines: RoutineRepository;
+  readonly routineRuns: RoutineRunRepository;
+  readonly listeners: ListenerRepository;
+  readonly listenerDeliveries: ListenerDeliveryRepository;
+  readonly notifications: NotificationRepository;
+  /**
+   * Instance-admin settings for background work.
+   * One value per deployment today. Becomes admin-only when accounts land.
+   */
+  readonly alwaysOnSettings: AlwaysOnSettingsRepository;
   /** Release the backing pool. Memory stores resolve immediately. */
   close(): Promise<void>;
 }

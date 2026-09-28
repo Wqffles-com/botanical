@@ -62,7 +62,8 @@ Full name lists are on each package page. Summary of readers:
 
 | What | Where |
 |------|--------|
-| API listen, auth, profiles, STT, body limit, A2A autorun | `packages/server/src/config.ts` (called from `packages/server/src/serve.ts`) |
+| API listen, auth, profiles, STT, body limit, A2A autorun, public origin | `packages/server/src/config.ts` (called from `packages/server/src/serve.ts`) |
+| Scheduler, background concurrency, webhook body cap | `packages/db/src/always-on-settings.ts` (`always_on.*` in the `settings` table). Not environment variables |
 | Profile JSON and compat base URL | `packages/providers/src/catalog.ts` |
 | Provider API keys | `packages/providers/src/env.ts` |
 | Coding CLIs | `packages/providers/src/cli/install.ts`, `packages/providers/src/cli/availability.ts` |

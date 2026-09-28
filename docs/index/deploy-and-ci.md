@@ -85,4 +85,4 @@ Issue forms: `.github/ISSUE_TEMPLATE/bug_report.yml`, `.github/ISSUE_TEMPLATE/fe
 - **Change the web image.** `web.Dockerfile` and `packages/web/next.config.ts` (`BOTANICAL_API_URL` is a build arg).
 - **Change the release zip.** `scripts/release/package.sh` and `scripts/release/start.sh`.
 - **Change CI.** `.github/workflows/ci.yml`. Keep e2e off the default jobs unless a live stack is an explicit decision.
-- **Add an env var to the image.** Read it in the owning package, document it in `.env.example`, and add a compose `environment` entry if the container must receive it.
+- **Add an env var to the image.** Read it in the owning package, document it in `.env.example`, and add a compose `environment` entry if the container must receive it. `docker-compose.yml` already passes `BOTANICAL_PUBLIC_ORIGIN` (webhook URLs). Scheduler on/off, tick interval, background concurrency, and webhook size are `always_on.*` rows in `settings`, edited from the web Settings page, not compose env. See [db](db.md).

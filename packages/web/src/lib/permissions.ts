@@ -10,6 +10,7 @@ export const CAPABILITY_OPTIONS = [
   { id: "memory.write", label: "Write memory" },
   { id: "agent.create", label: "Create agents" },
   { id: "agent.message", label: "Message agents" },
+  { id: "notify", label: "Notify the operator" },
 ] as const;
 
 export type CapabilityId = (typeof CAPABILITY_OPTIONS)[number]["id"];

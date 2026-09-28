@@ -1,7 +1,14 @@
-import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
 
+import {
+  ALWAYS_ON_SETTING_KEYS,
+  alwaysOnToRaw,
+  createAlwaysOnSettingsAccessor,
+  type AlwaysOnSettingsRepository,
+} from './always-on-settings.ts';
 import { createDb, ensureDatabase, type BotanicalDb } from './client.ts';
 import { migrateDatabase } from './migrate.ts';
+import { createAlwaysOn, type AlwaysOn } from './always-on.ts';
 import {
   createMvp2,
   type AgentRoleSummary,
@@ -17,6 +24,7 @@ import { chats } from './schema/chats.ts';
 import { messages } from './schema/messages.ts';
 import { modelProfiles } from './schema/model-profiles.ts';
 import { sessions } from './schema/sessions.ts';
+import { settings } from './schema/settings.ts';
 import { users } from './schema/users.ts';
 import type { AgentToolBinding, ModelProfileConfig, StoredToolCall } from './types.ts';
 
@@ -228,6 +236,13 @@ export interface Store {
     delete(id: string): Promise<boolean>;
     deleteVisible(id: string, agentId: string): Promise<'deleted' | 'missing' | 'forbidden'>;
   };
+  readonly routines: AlwaysOn['routines'];
+  readonly routineRuns: AlwaysOn['routineRuns'];
+  readonly listeners: AlwaysOn['listeners'];
+  readonly listenerDeliveries: AlwaysOn['listenerDeliveries'];
+  readonly notifications: AlwaysOn['notifications'];
+  /** Instance-admin tuning for background work. Not per-user. */
+  readonly alwaysOnSettings: AlwaysOnSettingsRepository;
   readonly roles: {
     list(): Promise<RoleRecord[]>;
     get(id: string): Promise<RoleRecord | null>;
@@ -282,6 +297,28 @@ async function ensureOperator(db: BotanicalDb): Promise<string> {
 function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<void>): Store {
   let closed = false;
   const mvp2 = createMvp2(db, userId);
+  const alwaysOn = createAlwaysOn(db, userId);
+  const alwaysOnKeys = Object.values(ALWAYS_ON_SETTING_KEYS);
+  const alwaysOnSettings = createAlwaysOnSettingsAccessor({
+    async read() {
+      const rows = await db.select().from(settings).where(inArray(settings.key, alwaysOnKeys));
+      const raw: Record<string, unknown> = {};
+      for (const row of rows) raw[row.key] = row.value;
+      return raw;
+    },
+    async write(value) {
+      const raw = alwaysOnToRaw(value);
+      for (const [key, stored] of Object.entries(raw)) {
+        await db
+          .insert(settings)
+          .values({ key, value: stored })
+          .onConflictDoUpdate({
+            target: settings.key,
+            set: { value: stored, updatedAt: new Date() },
+          });
+      }
+    },
+  });
 
   async function hydrate(rows: AgentRow[]): Promise<Agent[]> {
     const grouped = await mvp2.loadRoles(rows.map((row) => row.id));
@@ -725,6 +762,12 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
     },
     memories: mvp2.memories,
     roles: mvp2.roles,
+    routines: alwaysOn.routines,
+    routineRuns: alwaysOn.routineRuns,
+    listeners: alwaysOn.listeners,
+    listenerDeliveries: alwaysOn.listenerDeliveries,
+    notifications: alwaysOn.notifications,
+    alwaysOnSettings,
   };
 }
 
