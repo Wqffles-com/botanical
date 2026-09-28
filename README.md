@@ -17,19 +17,22 @@ What ships today:
 - **Coding-agent CLIs as profiles.** Grok Build (`grok`), Claude Code (`claude`), and Codex (`codex`) can run headless on the server, streaming their output into the chat. They use their own tools inside the agent's workspace directory.
 - **Unlimited custom agents.** Each agent has a name, icon, color, prompt, and tool allowlist. Each chat belongs to one agent.
 - **Async agent-to-agent messaging.** Agents send each other messages that land in the recipient's inbox. With `BOTANICAL_A2A_AUTORUN=true`, a delivered message starts a background turn for the recipient, with no browser needed.
+- **Routines.** Cron schedules run an agent on the server. Each run opens a new chat and records success or failure.
+- **Listeners.** A generic webhook starts an agent turn. The payload is passed as untrusted data. Typed issue listeners are still planned.
+- **Notifications.** The UI shows a badge when background work finishes or an agent calls `notify_user`.
 - **Memory.** Shared memories visible to every agent, plus private per-agent memories. Relevant memories are added to the prompt at the start of each turn.
 - **Agents that create agents.** `agent_create` and `agent_list` tools, limited so an agent can never grant tools or roles beyond its own.
 - **Roles and permissions.** Roles bundle capabilities (file, shell, web, memory, agent admin) and an MCP server/tool allow list. They are enforced when each tool is dispatched. Built-in roles: Coder, Reviewer, Orchestrator.
 - **Core tools.** `file_read` / `file_write` / `file_list` / `file_delete` (confined to the agent's own directory), `shell` and `code_exec` (inside a Linux namespace jail), and `web_search` / `web_fetch` (Brave, Tavily, Serper, or SearXNG).
 - **Opt-in MCP.** Connect stdio or HTTP MCP servers from a JSON config. The default config has no servers.
-- **Web UI.** Next.js App Router + shadcn/ui: agents, chats with streamed replies and tool-call cards, agent inbox, and settings (profiles, tools, MCP, memory, roles, deployment).
+- **Web UI.** Next.js App Router + shadcn/ui: agents, chats with streamed replies and tool-call cards, agent inbox, routines, listeners, notifications, and settings (profiles, tools, MCP, memory, roles, deployment).
 - **Dictation.** A microphone button in the composer turns speech into text you can edit before sending. Speech-to-text runs on the server through a selectable provider (OpenAI-compatible, OpenRouter, xAI, or Qwen). When no speech backend is configured, the browser's built-in speech recognition is used instead. The message is not sent until you press Send.
 - **Postgres persistence** with migrations applied automatically on boot.
 - **One codebase, two deployment modes.** `SELF_HOST` (default) or `SAAS`, selected by `DEPLOYMENT_MODE`. Chat, tools, and MCP behave the same in both modes.
 
 On the roadmap (**not implemented yet**; see [docs/ROADMAP.md](./docs/ROADMAP.md)):
 
-- **Routines and listeners.** Scheduled jobs and event triggers that start agent turns while you are away.
+- **Typed forge listeners.** Per-connection rules that turn a new issue into an agent turn. Generic webhooks already ship.
 - **Developer mode.** A per-user setting that unlocks the coding-agent base (coding CLIs, shell/code_exec, terminals). Everyone else gets a simpler assistant experience. Today every user sees the same UI, and the operator controls tools through agent allowlists and roles.
 - Multi-tenant accounts and billing for the hosted mode.
 
@@ -45,7 +48,7 @@ TypeScript throughout, on [Bun](https://bun.sh). A monorepo under `packages/`:
 
 | Package | Role |
 |---------|------|
-| `server` | HTTP API: auth, agents, chats, streaming turns, A2A, memory, roles |
+| `server` | HTTP API: auth, agents, chats, streaming turns, A2A, routines, listeners, memory, roles |
 | `agent-runtime` | Agent loop, tool dispatch, permission checks |
 | `providers` | Streaming adapters (OpenAI-compatible, Anthropic, xAI, DeepSeek, OpenRouter, CLI) |
 | `tools`, `tools-shell`, `tools-web` | Built-in file, shell/code_exec, and web tools |
@@ -137,6 +140,8 @@ Everything is configured through environment variables. The full annotated list 
 | `BOTANICAL_MCP_CONFIG` / `BOTANICAL_MCP_SERVERS` | MCP server config file or inline JSON. |
 | `BOTANICAL_WORKSPACE` | Root directory for agent files and the shell jail. Each agent gets `<root>/agents/<id>`. |
 | `BOTANICAL_A2A_AUTORUN` | `true` lets a delivered agent-to-agent message start a background turn. |
+| Always-on tuning | Scheduler on/off, tick interval, background concurrency, and webhook size live in the settings table (`always_on.*`). Edit them from Settings → Background work. They are not environment variables. Defaults: on, 15000 ms, 2 turns, 65536 bytes. |
+| `BOTANICAL_PUBLIC_ORIGIN` | Public origin used in webhook URLs. Falls back to the request origin. |
 | `BRAVE_SEARCH_API_KEY`, `TAVILY_API_KEY`, `SERPER_API_KEY`, `SEARXNG_URL` | Web search backend (optional). |
 
 Profile example:

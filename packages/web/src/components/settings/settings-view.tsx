@@ -23,6 +23,7 @@ import { RolesPanel } from "@/components/settings/roles-panel";
 import { fetchMcpServers, fetchProfiles, fetchSettings, fetchTools } from "@/lib/mvp-api";
 import type { AppSettings, CatalogTool, McpSnapshot, ProviderKeyStatus } from "@/lib/mvp-types";
 import { deriveProviderKeys } from "@/lib/parse";
+import { BackgroundWorkCard } from "./background-work-card";
 import { DeploymentBadge } from "./deployment-badge";
 
 type SettingsTab = "general" | "profiles" | "memory" | "roles" | "cli";
@@ -129,6 +130,7 @@ export function SettingsView() {
           ) : (
             <>
               <DeploymentTab settings={settings} />
+              <BackgroundWorkCard />
               <ProfilesTab profiles={[]} providers={providers} keysOnly />
               <ToolsTab tools={tools} />
               <McpTab snapshot={mcp} />

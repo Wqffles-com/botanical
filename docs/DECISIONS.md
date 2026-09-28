@@ -107,7 +107,7 @@ Botanical is meant to run **always on, on a server the user controls** (their ow
 The point is that agents keep working while the user is away:
 
 - **Today:** agent-to-agent messages can start background turns for the recipient (`BOTANICAL_A2A_AUTORUN=true`), and all state lives in Postgres on the server.
-- **Planned:** routines (scheduled runs) and listeners (event triggers) that start agent turns with no browser connected. See [ROADMAP.md](./ROADMAP.md).
+- **Shipped 2026-09-28:** routines and generic webhook listeners. Typed forge listeners stay planned. See the entry below and [ROADMAP.md](./ROADMAP.md).
 
 Consequences: docs and quickstarts lead with deploying to a server. Features should assume a long-running process and must not depend on an open browser tab.
 
@@ -180,3 +180,36 @@ Logged-in is a boolean (or `"unknown"` if the check itself fails). Grok: a non-e
 The passcode session is the only operator session. v0 has no separate admin role on that session in self-host or SaaS, so these routes use the same auth gate as the rest of the operator API. SaaS is still one tenant and one passcode.
 
 A Linux bind-mount of a host binary remains a commented example in the override. It is not required.
+
+---
+
+## 2026-09-28: Routines, generic webhooks, and notifications
+
+**Status:** Accepted.
+**Effect:** Scheduled runs and inbound webhooks start full agent turns while no browser is connected. Typed forge listeners are not part of this slice.
+
+### New chat per run
+
+Each routine run and each accepted webhook delivery creates a new chat owned by that agent, titled with the routine or listener name and the local time, using the configured profile. The run or delivery row stores the chat id.
+
+A single long-lived chat would mix unrelated slots and grow without a bound. A new chat keeps each run's context to that prompt or payload, and the history link stays obvious. The operator opens that chat to see the same transcript an interactive turn would have written.
+
+### Lease
+
+The scheduler lives in the server process and ticks about every 15 seconds by default. The interval and the on/off switch are instance settings, so a change applies on a later tick without a restart. Claiming is a transaction: lock due routines with `FOR UPDATE SKIP LOCKED`, insert the schedule run, then set `next_run_at` to the next slot strictly after now. The unique index on `(routine_id, scheduled_for)` where `trigger = 'schedule'` is the second guard, so two processes cannot record the same slot. Missed time while the process was down becomes one catch-up run; intermediate slots are skipped. Resume after a pause also jumps to the next future slot, so a paused routine does not replay the gap. A process marks a run failed with `interrupted: server stopped` only when its lease has expired, or when a queued run was never picked up and is older than the lease window (about two minutes). The executing process sets `lease_owner` and `lease_expires_at` when it starts the turn and renews the lease about every 30 seconds. A live lease is not reaped by another process. Accepted deliveries follow the same rule. The failure also writes a notification.
+
+### Secret storage
+
+Listener secrets are generated on the server (at least 32 random bytes, url-safe) and stored as the raw value. HMAC-SHA256 needs that value, so the column is not a hash. Anyone who can read the database can verify or forge deliveries for that listener. List and get responses omit the secret. It is returned only from create and from rotate.
+
+### Untrusted payload
+
+`{{payload}}` is replaced with a fixed preamble plus the body inside `<untrusted_webhook_payload>`. The preamble tells the model the block is external data and must not be followed as instructions. A closing tag inside the body is neutralized, and the inserted text is capped. The default template includes the placeholder. JSON bodies are pretty-printed; anything else is passed as text.
+
+### Ownership
+
+`routines`, `listeners`, and `notifications` have a required `user_id` foreign key to `users`, on delete restrict, matching agents and chats. v0 writes the single operator (a notification uses the owning agent's user). List routes already filter by that id. The rows are operator-owned now, and enforced per user when accounts land, without a schema change. `routine_runs` and `listener_deliveries` do not store `user_id`; they inherit the parent.
+
+### Instance settings
+
+Scheduler on/off, tick interval, background-turn cap, and webhook body cap are rows in `settings` (`always_on.scheduler_enabled`, `always_on.scheduler_interval_ms`, `always_on.background_concurrency`, `always_on.listener_max_bytes`), not environment variables. Absent rows use the defaults (on, 15000 ms, 2, 65536). `GET` and `PATCH /api/settings/always-on` are passcode-gated and marked instance-admin, so they become admin-only when accounts land. They are one value for the deployment, not per user. A short cache lets a saved value apply without a restart. Tests that need the interval to stay stopped pass `createApp({ scheduler: false })`.

@@ -64,6 +64,8 @@ export function setup(
     fetch?: ProviderFetch;
     installPlatformTools?: boolean;
     cli?: CliService;
+    /** Passed to createApp. False keeps serve from starting the scheduler interval. */
+    scheduler?: boolean;
   } = {},
 ): TestApp {
   const env = baseEnv(overrides);
@@ -79,6 +81,7 @@ export function setup(
     ...(options.profiles ? { profiles: options.profiles } : {}),
     ...(options.installPlatformTools !== undefined ? { installPlatformTools: options.installPlatformTools } : {}),
     ...(options.cli ? { cli: options.cli } : {}),
+    ...(options.scheduler !== undefined ? { scheduler: options.scheduler } : {}),
   });
   return { app, config, store };
 }

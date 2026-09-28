@@ -25,7 +25,8 @@
     "@botanical/providers": "workspace:*",
     "@botanical/tools": "workspace:*",
     "@botanical/tools-shell": "workspace:*",
-    "@botanical/tools-web": "workspace:*"
+    "@botanical/tools-web": "workspace:*",
+    "croner": "^10.0.1"
   },
   "devDependencies": {
     "@types/bun": "^1.2.0",

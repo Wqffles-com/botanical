@@ -15,6 +15,16 @@ import {
   safeJson,
 } from "./errors";
 import {
+  normalizeDelivery,
+  normalizeListener,
+  normalizeAlwaysOnSettings,
+  normalizeNotification,
+  normalizeNotificationPage,
+  normalizeRoutine,
+  normalizeRoutineRun,
+  normalizeSchedulePreview,
+} from "./always";
+import {
   eventsFromFinalMessage,
   normalizeAgent,
   normalizeAgentMessage,
@@ -26,6 +36,7 @@ import {
   normalizeMe,
   normalizeMessage,
   normalizeProfile,
+  unwrapEntity,
   unwrapList,
 } from "./normalize";
 import { API } from "./paths";
@@ -42,10 +53,23 @@ import type {
   Health,
   LoginResult,
   Me,
+  Listener,
+  ListenerCreated,
+  ListenerDelivery,
+  ListenerInput,
+  ListenerPatch,
   MemoryRecord,
   ModelProfile,
+  NotificationPage,
+  AlwaysOnSettings,
+  AppNotification,
   RolePermissions,
   RoleRecord,
+  Routine,
+  RoutineInput,
+  RoutinePatch,
+  RoutineRun,
+  SchedulePreview,
   SendAgentMessageInput,
   SendMessageInput,
   UpdateAgentInput,
@@ -397,6 +421,128 @@ export class BotanicalClient {
     }
     // Server tsc pulls this file in with Bun's stream types, which disagree with DOM ReadableStream.
     yield* readChatStream(response.body as ReadableStream<Uint8Array>, contentType);
+  }
+
+  async listRoutines(agentId?: string): Promise<Routine[]> {
+    const query = agentId ? `?agentId=${encodeURIComponent(agentId)}` : "";
+    const body = await this.requestJson(`${API.routines}${query}`);
+    return unwrapList(body, ["routines"]).map(normalizeRoutine);
+  }
+
+  async createRoutine(input: RoutineInput): Promise<Routine> {
+    const body = await this.requestJson(API.routines, { method: "POST", body: JSON.stringify(input) });
+    return normalizeRoutine(unwrapEntity(body, ["routine"]));
+  }
+
+  async updateRoutine(id: string, input: RoutinePatch): Promise<Routine> {
+    const body = await this.requestJson(API.routine(id), { method: "PATCH", body: JSON.stringify(input) });
+    return normalizeRoutine(unwrapEntity(body, ["routine"]));
+  }
+
+  async deleteRoutine(id: string): Promise<void> {
+    await this.requestJson(API.routine(id), { method: "DELETE" });
+  }
+
+  async pauseRoutine(id: string): Promise<Routine> {
+    const body = await this.requestJson(API.routinePause(id), { method: "POST", body: "{}" });
+    return normalizeRoutine(unwrapEntity(body, ["routine"]));
+  }
+
+  async resumeRoutine(id: string): Promise<Routine> {
+    const body = await this.requestJson(API.routineResume(id), { method: "POST", body: "{}" });
+    return normalizeRoutine(unwrapEntity(body, ["routine"]));
+  }
+
+  async runRoutine(id: string): Promise<RoutineRun> {
+    const body = await this.requestJson(API.routineRun(id), { method: "POST", body: "{}" });
+    return normalizeRoutineRun(unwrapEntity(body, ["run"]));
+  }
+
+  async listRoutineRuns(id: string, page?: { limit?: number; offset?: number }): Promise<RoutineRun[]> {
+    const params = new URLSearchParams();
+    if (page?.limit !== undefined) params.set("limit", String(page.limit));
+    if (page?.offset !== undefined) params.set("offset", String(page.offset));
+    const query = params.toString() ? `?${params.toString()}` : "";
+    const body = await this.requestJson(`${API.routineRuns(id)}${query}`);
+    return unwrapList(body, ["runs"]).map(normalizeRoutineRun);
+  }
+
+  async previewRoutine(cron: string, timezone: string): Promise<SchedulePreview> {
+    const body = await this.requestJson(API.routinePreview, {
+      method: "POST",
+      body: JSON.stringify({ cron, timezone }),
+    });
+    return normalizeSchedulePreview(body);
+  }
+
+  async listListeners(agentId?: string): Promise<Listener[]> {
+    const query = agentId ? `?agentId=${encodeURIComponent(agentId)}` : "";
+    const body = await this.requestJson(`${API.listeners}${query}`);
+    return unwrapList(body, ["listeners"]).map(normalizeListener);
+  }
+
+  async createListener(input: ListenerInput): Promise<ListenerCreated> {
+    const body = await this.requestJson(API.listeners, { method: "POST", body: JSON.stringify(input) });
+    const row = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+    const secret = typeof row.secret === "string" ? row.secret : "";
+    const url = typeof row.url === "string" ? row.url : "";
+    return { listener: normalizeListener(unwrapEntity(body, ["listener"])), secret, url };
+  }
+
+  async updateListener(id: string, input: ListenerPatch): Promise<Listener> {
+    const body = await this.requestJson(API.listener(id), { method: "PATCH", body: JSON.stringify(input) });
+    return normalizeListener(unwrapEntity(body, ["listener"]));
+  }
+
+  async deleteListener(id: string): Promise<void> {
+    await this.requestJson(API.listener(id), { method: "DELETE" });
+  }
+
+  async rotateListenerSecret(id: string): Promise<{ secret: string; url: string }> {
+    const body = await this.requestJson(API.listenerSecret(id), { method: "POST", body: "{}" });
+    const row = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+    return {
+      secret: typeof row.secret === "string" ? row.secret : "",
+      url: typeof row.url === "string" ? row.url : "",
+    };
+  }
+
+  async listListenerDeliveries(id: string): Promise<ListenerDelivery[]> {
+    const body = await this.requestJson(API.listenerDeliveries(id));
+    return unwrapList(body, ["deliveries"]).map(normalizeDelivery);
+  }
+
+  async getAlwaysOnSettings(): Promise<AlwaysOnSettings> {
+    const body = await this.requestJson(API.alwaysOnSettings);
+    return normalizeAlwaysOnSettings(unwrapEntity(body, ["settings"]));
+  }
+
+  async updateAlwaysOnSettings(patch: Partial<AlwaysOnSettings>): Promise<AlwaysOnSettings> {
+    const body = await this.requestJson(API.alwaysOnSettings, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+    return normalizeAlwaysOnSettings(unwrapEntity(body, ["settings"]));
+  }
+
+  async listNotifications(page?: { limit?: number; offset?: number }): Promise<NotificationPage> {
+    const params = new URLSearchParams();
+    if (page?.limit !== undefined) params.set("limit", String(page.limit));
+    if (page?.offset !== undefined) params.set("offset", String(page.offset));
+    const query = params.toString() ? `?${params.toString()}` : "";
+    const body = await this.requestJson(`${API.notifications}${query}`);
+    return normalizeNotificationPage(body);
+  }
+
+  async markNotificationRead(id: string): Promise<AppNotification> {
+    const body = await this.requestJson(API.notificationRead(id), { method: "POST", body: "{}" });
+    return normalizeNotification(unwrapEntity(body, ["notification"]));
+  }
+
+  async markAllNotificationsRead(): Promise<number> {
+    const body = await this.requestJson(API.notificationsReadAll, { method: "POST", body: "{}" });
+    const row = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+    return typeof row.updated === "number" ? row.updated : 0;
   }
 
   private url(path: string): string {

@@ -21,7 +21,7 @@ Botanical treats the brain as a **swappable plug**. The agent runtime, tools, me
 ## Product principles
 
 1. **Cloud, always on**
-   Botanical runs on a server: a VPS or dedicated host you control, or the hosted service. It is not a desktop app, and it is not meant to run on a personal PC or laptop except during development. Because the server is always up, agents can keep working while you are away. Agent-to-agent messages can already trigger background turns, and routines and listeners are next ([ROADMAP.md](./ROADMAP.md)).
+   Botanical runs on a server: a VPS or dedicated host you control, or the hosted service. It is not a desktop app, and it is not meant to run on a personal PC or laptop except during development. Because the server is always up, agents can keep working while you are away. Agent-to-agent messages, routines, and webhook listeners start turns with no browser connected ([ROADMAP.md](./ROADMAP.md)).
 
 2. **Provider is a config choice, not a rewrite**
    Changing a profile from `anthropic` to `openrouter` (or a custom base URL) must not break tools, agents, or the conversation.
@@ -61,7 +61,7 @@ Botanical treats the brain as a **swappable plug**. The agent runtime, tools, me
 
 ## North-star experience
 
-You open the Botanical web UI against your server or the hosted service and sign in. You pick an agent and an explicit model profile. You talk; the agent streams, uses built-in tools and MCP, remembers what matters, and messages other agents asynchronously. You can switch profiles mid-conversation when a task needs a different brain, and the tools and context stay. When you close the tab, the server keeps going: agents answer each other's messages now, and in the future they will run routines and react to events. If one provider is down or too expensive, another takes the job. You configure a base URL and a server-held key, and you keep going.
+You open the Botanical web UI against your server or the hosted service and sign in. You pick an agent and an explicit model profile. You talk; the agent streams, uses built-in tools and MCP, remembers what matters, and messages other agents asynchronously. You can switch profiles mid-conversation when a task needs a different brain, and the tools and context stay. When you close the tab, the server keeps going: agents answer each other's messages, run routines, and react to webhooks. If one provider is down or too expensive, another takes the job. You configure a base URL and a server-held key, and you keep going.
 
 ## Related docs
 

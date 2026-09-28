@@ -28,6 +28,17 @@ describe("loadConfig", () => {
     expect(() => loadConfig(baseEnv({ BOTANICAL_A2A_AUTORUN: "yes" }))).toThrow(/BOTANICAL_A2A_AUTORUN/);
   });
 
+  test("public origin is optional and must be an origin", () => {
+    const config = loadConfig(baseEnv());
+    expect(config.publicOrigin).toBeNull();
+    expect(loadConfig(baseEnv({ BOTANICAL_PUBLIC_ORIGIN: "http://localhost:3000" })).publicOrigin).toBe(
+      "http://localhost:3000",
+    );
+    expect(() => loadConfig(baseEnv({ BOTANICAL_PUBLIC_ORIGIN: "http://localhost:3000/hooks" }))).toThrow(
+      /BOTANICAL_PUBLIC_ORIGIN/,
+    );
+  });
+
   test("saas mode changes the default brand only", () => {
     const config = loadConfig(baseEnv({ BOTANICAL_DEPLOYMENT_MODE: "SAAS" }));
     expect(config.deploymentMode).toBe("SAAS");

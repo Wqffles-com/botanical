@@ -10,6 +10,7 @@ import type { ToolRegistry as McpToolRegistry } from "@botanical/tools";
 import { createA2AService, type A2AService } from "./a2a/service.ts";
 import { createSendAgentMessageTool } from "./a2a/tool.ts";
 import { LoginRateLimiter } from "./auth/rate-limit.ts";
+import { SlidingWindowLimiter } from "./listeners/limit.ts";
 import type { ServerConfig } from "./config.ts";
 import { createCliToolHost, registerCliMcp, type CliToolHost } from "./cli-mcp.ts";
 import { createCliService, type CliService } from "./cli-install/service.ts";
@@ -19,20 +20,28 @@ import { createServerProfileResolver } from "./runtime/profiles.ts";
 import { adaptServerStore } from "./runtime/store.ts";
 import { agentWorkspace, ensureWorkspaceRoot } from "./runtime/workspace.ts";
 import { registerAgentMessages } from "./routes/agent-messages.ts";
+import { registerAlwaysOnSettings } from "./routes/always-on-settings.ts";
 import { registerAgents } from "./routes/agents.ts";
 import { registerAuth } from "./routes/auth.ts";
 import { registerChats } from "./routes/chats.ts";
 import { registerCli } from "./routes/cli.ts";
 import { registerHealth } from "./routes/health.ts";
 import { registerMcp } from "./routes/mcp.ts";
+import { registerListeners, registerHooks } from "./routes/listeners.ts";
 import { registerMemories } from "./routes/memories.ts";
 import { registerMessages } from "./routes/messages.ts";
+import { registerNotifications } from "./routes/notifications.ts";
 import { registerProfiles } from "./routes/profiles.ts";
 import { registerRoles } from "./routes/roles.ts";
+import { registerRoutines } from "./routes/routines.ts";
 import { registerTools } from "./routes/tools.ts";
 import { registerTranscription } from "./routes/transcription.ts";
+import { createBackgroundJobs } from "./runtime/jobs.ts";
+import { createTurnCoordinator, type TurnCoordinator } from "./runtime/turns.ts";
+import { createScheduler, type Scheduler } from "./routines/scheduler.ts";
 import { createAgentAdminContributor } from "./tools/agent-admin.ts";
 import { createMemoryContributor } from "./tools/memory.ts";
+import { createNotifyContributor } from "./tools/notify.ts";
 import { contributorFromServerMcp, createDefaultToolRegistry } from "./tools/catalog.ts";
 import type { Store } from "./types.ts";
 
@@ -55,6 +64,13 @@ export interface AppDeps {
   installPlatformTools?: boolean;
   /** Coding-CLI install and login. Tests pass a fake so nothing is downloaded. */
   cli?: CliService;
+  /**
+   * When false, `serve` does not start the scheduler interval.
+   * Tests pass `{ scheduler: false }` instead of an environment variable.
+   * A started scheduler still checks `always_on.scheduler_enabled` on each tick.
+   * Default true.
+   */
+  scheduler?: boolean;
 }
 
 export interface App {
@@ -68,13 +84,23 @@ export interface App {
   cliTools: CliToolHost;
   /** Install and device-login for coding CLIs. */
   cli: CliService;
+  /** Routine scheduler. `serve` calls `start` only when `scheduleOnBoot` is true. */
+  scheduler: Scheduler;
+  /** False when `createApp({ scheduler: false })`. */
+  scheduleOnBoot: boolean;
+  /** Per-chat turn lock and the background concurrency cap. */
+  turns: TurnCoordinator;
 }
 
 export function createApp(deps: AppDeps): App {
+  const turns = createTurnCoordinator({
+    concurrency: () => deps.store.alwaysOnSettings.peek().backgroundConcurrency,
+  });
   const a2a = createA2AService({
     store: deps.store,
     autorun: deps.config.a2aAutorun,
     profiles: deps.config.profiles,
+    exclusive: (chatId, fn) => turns.exclusive(chatId, fn),
   });
   const mcp = deps.mcp ?? emptyServerMcp();
   let runtimeDeps: RuntimeDeps | undefined;
@@ -88,6 +114,19 @@ export function createApp(deps: AppDeps): App {
   });
   const runtime = createRuntime(deps, a2a, mcp, cliTools);
   runtimeDeps = runtime.deps;
+  const jobs = createBackgroundJobs({
+    store: deps.store,
+    runtime: runtime.deps,
+    config: deps.config,
+    turns,
+  });
+  const scheduler = createScheduler({
+    store: deps.store,
+    turns,
+    executeRun: (runId) => jobs.executeRoutineRun(runId),
+    now: deps.now,
+  });
+  const hookLimiter = new SlidingWindowLimiter(60, 60_000);
   const cli =
     deps.cli ??
     createCliService({
@@ -101,7 +140,12 @@ export function createApp(deps: AppDeps): App {
   registerRoles(router);
   registerMemories(router);
   registerChats(router);
-  registerMessages(router, runtime.deps);
+  registerMessages(router, runtime.deps, turns);
+  registerRoutines(router, jobs);
+  registerListeners(router);
+  registerHooks(router, { jobs, limiter: hookLimiter });
+  registerNotifications(router);
+  registerAlwaysOnSettings(router);
   registerAgentMessages(router, a2a);
   registerProfiles(router);
   registerTranscription(router);
@@ -114,12 +158,16 @@ export function createApp(deps: AppDeps): App {
   return {
     tools: mcp.registry,
     close: async () => {
+      scheduler.stop();
       cli.close();
       await mcp.close();
     },
     a2a,
     cliTools,
     cli,
+    scheduler,
+    scheduleOnBoot: deps.scheduler !== false,
+    turns,
     fetch(request, extras) {
       return router.handle(request, {
         config: deps.config,
@@ -147,6 +195,7 @@ function createRuntime(
     registry.register(contributorFromServerMcp(mcp));
     registry.register(createMemoryContributor(deps.store));
     registry.register(createAgentAdminContributor(deps.store));
+    registry.register(createNotifyContributor(deps.store));
   }
   const profiles = deps.profiles ?? createServerProfileResolver(deps.config, env, cliTools);
   const store = adaptServerStore(deps.store);

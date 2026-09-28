@@ -40,6 +40,7 @@ async function main(): Promise<void> {
   if (contributors.length > 0) {
     console.log(`[botanical] tool contributors: ${contributors.join(", ")}`);
   }
+  await store.alwaysOnSettings.get();
   const server = Bun.serve({
     hostname: config.host,
     port: config.port,
@@ -52,6 +53,8 @@ async function main(): Promise<void> {
   console.log(
     `Botanical server listening on http://${server.hostname}:${server.port} (${config.deploymentMode}, ${store.kind}, brand=${JSON.stringify(config.brandName)})`,
   );
+  await app.scheduler.recover();
+  if (app.scheduleOnBoot) await app.scheduler.start();
   if (!cliAutoInstallDisabled(process.env.BOTANICAL_CLI_AUTO_INSTALL)) {
     void app.cli.installEnabled();
   }

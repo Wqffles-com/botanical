@@ -144,6 +144,7 @@ Ids or unique names are accepted.
 | `memory_write`, `memory_delete` | `memory.write` |
 | `agent_create` | `agent.create` |
 | `agent_list`, `send_agent_message`, `agent_send`, `agent_inbox` | `agent.message` |
+| `notify_user` | `notify` |
 | `mcp.<server>.<tool>` | MCP grant for that server and tool |
 
 A call is allowed when the allowlist matches (or `a2aEnabled` for runtime A2A tools) **and**, when the agent has roles, the role union permits the capability. Dispatch returns `permission denied: agent "Ada" lacks capability "file.write" (roles: Reviewer)` instead of throwing.
@@ -154,7 +155,7 @@ Seeded roles:
 | --- | --- | --- |
 | Coder | file.read, file.write, shell, code_exec, web, memory.read, memory.write, agent.message | none |
 | Reviewer | file.read, web, memory.read | none |
-| Orchestrator | all of the above plus agent.create | `{ "server": "*" }` |
+| Orchestrator | all of the above plus agent.create and notify | `{ "server": "*" }` |
 
 Fixed ids: Coder `00000000-0000-4000-8000-0000000000c1`, Reviewer `…c2`, Orchestrator `…c3`.
 
@@ -229,6 +230,80 @@ The agent id is the one running the turn. It is copied onto the tool context at 
 There is no shared file directory. Agents do not see each other's files through these tools. Shared memory rows are unchanged; that scope is for memories, not files.
 
 `shell` and `code_exec` are not an extra filesystem sandbox. Their cwd is the agent directory, and a `cwd` argument must stay there, but a command can still refer to any path the existing jail mounts (for example read-only `/usr`). If the jail cannot start, the tool errors and does not fall back to an unjailed process. CLI profiles use this same agent directory as their cwd.
+
+## Always-on API
+
+Passcode session, same as the other operator routes, except `POST /api/hooks/:listenerId`. That path is public and checks the listener secret. There is still no default profile: create requires `profileId`.
+
+`routines`, `listeners`, and `notifications` store a required `user_id`. v0 fills the single operator (a notification follows the owning agent's user). List and get already filter by that user. `routine_runs` and `listener_deliveries` inherit ownership through the parent. When accounts land, the same columns are enforced per user. They are operator-owned now, not a later migration.
+
+### Routines
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/routines?agentId=` | Each item includes `lastRun` |
+| POST | `/api/routines/preview` | `{ cron, timezone }` → `{ valid, error?, next }` (five ISO times) |
+| POST | `/api/routines` | `{ agentId, name, prompt, cron, timezone, profileId, enabled? }` |
+| GET | `/api/routines/:id` | |
+| PATCH | `/api/routines/:id` | Profile, cron, timezone, prompt, name, enabled |
+| DELETE | `/api/routines/:id` | |
+| POST | `/api/routines/:id/pause` | |
+| POST | `/api/routines/:id/resume` | Next run jumps to the next future slot |
+| POST | `/api/routines/:id/run` | Manual trigger. Works while paused. Returns the run |
+| GET | `/api/routines/:id/runs?limit=&offset=` | Newest first |
+
+Cron is five fields. Anything faster than once a minute is rejected. Timezone is an IANA name.
+
+A schedule run inserts `routine_runs` with `trigger: "schedule"` and opens a new chat. Status moves `queued` → `running` → `succeeded` or `failed`. `error` is set on failure. `chatId` links the transcript.
+
+### Listeners
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/listeners?agentId=` | No `secret`. Includes `url` |
+| POST | `/api/listeners` | Returns `listener`, `secret`, and `url` once |
+| GET | `/api/listeners/:id` | No `secret` |
+| PATCH | `/api/listeners/:id` | Name, profile, template, enabled |
+| DELETE | `/api/listeners/:id` | |
+| POST | `/api/listeners/:id/rotate-secret` | Returns the new `secret` and `url` once |
+| GET | `/api/listeners/:id/deliveries?limit=&offset=` | Newest first |
+| POST | `/api/hooks/:listenerId` | **No passcode.** 202 `{ deliveryId }` |
+
+Verification is `X-Botanical-Signature: sha256=<hex>` or `X-Hub-Signature-256` with the same HMAC-SHA256 of the raw body, or `Authorization: Bearer <secret>`, or `X-Botanical-Token`. Unknown listener and bad signature are both 401 with the same body. Disabled, after a valid secret, is 403. A body over `always_on.listener_max_bytes` (default 65536) is 413. Rejected attempts are stored when the listener exists.
+
+`kind` is `webhook`. The prompt template may use `{{payload}}`, `{{listener}}`, and `{{received_at}}`. `{{payload}}` is wrapped in `<untrusted_webhook_payload>` under a fixed preamble. Empty template uses that default.
+
+### Notifications
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/notifications?limit=&offset=` | Unread first, then newest. Includes `unreadCount` |
+| POST | `/api/notifications/:id/read` | |
+| POST | `/api/notifications/read-all` | `{ updated }` |
+
+Kinds include `run_succeeded`, `run_failed`, and `attention` (`notify_user`). `notify_user` is a built-in with capability `notify`. It follows the allowlist, and role checks when the agent has roles. Orchestrator includes `notify`. Coder and Reviewer do not, until an operator adds it.
+
+### Instance settings
+
+Instance-admin. Passcode-gated today. When accounts land, restrict these routes to admins. They are not per-user settings. Values live in the `settings` table. Absent keys use the defaults. Numbers outside the range are clamped. A wrong type is 400. A saved value applies without a restart, within about a minute. The scheduler interval applies on the next tick.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/settings/always-on` | `{ settings }` |
+| PATCH | `/api/settings/always-on` | Partial `{ schedulerEnabled?, schedulerIntervalMs?, backgroundConcurrency?, listenerMaxBytes? }` |
+
+| Key | Default | Range |
+| --- | --- | --- |
+| `always_on.scheduler_enabled` | `true` | boolean |
+| `always_on.scheduler_interval_ms` | `15000` | 1000–3600000 |
+| `always_on.background_concurrency` | `2` | 1–32 |
+| `always_on.listener_max_bytes` | `65536` | 1–5000000 |
+
+`createApp({ scheduler: false })` keeps the process from starting the interval. That is an app option, not an environment variable.
+
+### Background turns
+
+Routine runs, webhook deliveries, and interactive chat messages share one turn function: agent prompt, memories, allowlist, role enforcement, MCP, and CLI profiles with the per-run Botanical MCP endpoint. Messages are stored as a normal chat. A2A autorun still uses its tool-less inbox turn and writes a notification when that turn finishes or fails.
 
 ## Known limitations
 

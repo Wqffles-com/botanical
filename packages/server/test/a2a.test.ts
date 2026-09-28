@@ -354,5 +354,10 @@ describe("agent messages", () => {
     );
     const assistant = transcript.messages.find((message) => message.role === "assistant");
     expect(assistant?.content).toBe("Acknowledged 1 inbox message(s).");
+    const notes = await readJson<{ notifications: { kind: string }[]; unreadCount: number }>(
+      await app.fetch(new Request("http://localhost/api/notifications", { headers: bearer(token) })),
+    );
+    expect(notes.unreadCount).toBeGreaterThan(0);
+    expect(notes.notifications.some((item) => item.kind === "run_succeeded")).toBe(true);
   });
 });

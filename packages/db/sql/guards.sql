@@ -33,7 +33,9 @@ BEGIN
         'settings',
         'secret_refs',
         'memories',
-        'roles'
+        'roles',
+        'routines',
+        'listeners'
       )
   LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', r.table_name || '_set_updated_at', r.table_name);

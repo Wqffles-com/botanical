@@ -49,6 +49,8 @@ export interface A2AServiceOptions {
   store: Store;
   autorun: boolean;
   profiles: readonly ModelProfile[];
+  /** Serialize inbox writes with any other turn on the same chat. */
+  exclusive?: <T>(chatId: string, fn: () => Promise<T>) => Promise<T>;
 }
 
 /**
@@ -58,14 +60,14 @@ export interface A2AServiceOptions {
  * That turn does not call tools, so it cannot fan out more mail.
  */
 export function createA2AService(options: A2AServiceOptions): A2AService {
-  const { store, autorun, profiles } = options;
+  const { store, autorun, profiles, exclusive } = options;
   const bus = createAgentMessageBus(runtimeAgents(store), store.agentMessages);
   let tail: Promise<void> = Promise.resolve();
 
   function schedule(agentId: string): void {
     if (!autorun) return;
     tail = tail
-      .then(() => runInboxTurn(store, bus, profiles, agentId))
+      .then(() => runInboxTurn(store, bus, profiles, agentId, exclusive))
       .catch((error: unknown) => {
         console.error("[a2a] inbox turn failed", error);
       });
@@ -181,6 +183,7 @@ async function runInboxTurn(
   bus: AgentMessageBus,
   profiles: readonly ModelProfile[],
   agentId: string,
+  exclusive?: <T>(chatId: string, fn: () => Promise<T>) => Promise<T>,
 ): Promise<void> {
   const agent = await store.agents.get(agentId);
   if (!agent) return;
@@ -190,28 +193,61 @@ async function runInboxTurn(
   const names = new Map((await store.agents.list()).map((row) => [row.id, row.name]));
   const seen = new Set<string>();
   let chatId: string | null = null;
+  let wrote = false;
 
-  for (let batch = 0; batch < 20; batch += 1) {
-    await bus.deliverPending({ toAgentId: agentId, limit: DELIVER_BATCH });
-    const waiting = (await bus.listInbox(agentId, { status: ["delivered"], limit: INBOX_BATCH })).filter(
-      (message) => !seen.has(message.id),
-    );
-    if (waiting.length === 0) return;
-    for (const message of waiting) seen.add(message.id);
+  try {
+    for (let batch = 0; batch < 20; batch += 1) {
+      await bus.deliverPending({ toAgentId: agentId, limit: DELIVER_BATCH });
+      const waiting = (await bus.listInbox(agentId, { status: ["delivered"], limit: INBOX_BATCH })).filter(
+        (message) => !seen.has(message.id),
+      );
+      if (waiting.length === 0) break;
+      for (const message of waiting) seen.add(message.id);
 
-    if (!chatId) {
-      const chat = await ensureInboxChat(store, agentId, profile.id);
-      chatId = chat.id;
+      if (!chatId) {
+        const chat = await ensureInboxChat(store, agentId, profile.id);
+        chatId = chat.id;
+      }
+      const claimed = await bus.markRead(waiting.map((message) => message.id));
+      if (claimed.length === 0) break;
+      claimed.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+
+      const content = renderInbox(claimed, names);
+      const write = async () => {
+        await store.messages.create({ chatId: chatId!, role: "user", content });
+        const reply = await completeInbox(profile, content, claimed.length);
+        await store.messages.create({ chatId: chatId!, role: "assistant", content: reply });
+        await store.chats.update(chatId!, {});
+      };
+      if (exclusive) await exclusive(chatId, write);
+      else await write();
+      wrote = true;
     }
-    const claimed = await bus.markRead(waiting.map((message) => message.id));
-    if (claimed.length === 0) return;
-    claimed.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
-
-    const content = renderInbox(claimed, names);
-    await store.messages.create({ chatId, role: "user", content });
-    const reply = await completeInbox(profile, content, claimed.length);
-    await store.messages.create({ chatId, role: "assistant", content: reply });
-    await store.chats.update(chatId, {});
+    if (wrote && chatId) {
+      await store.notifications
+        .create({
+          kind: "run_succeeded",
+          title: `Inbox · ${agent.name}`,
+          body: "Background inbox turn finished.",
+          agentId,
+          chatId,
+        })
+        .catch((error: unknown) => {
+          console.error("[a2a] notification failed", error);
+        });
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Inbox turn failed";
+    await store.notifications
+      .create({
+        kind: "run_failed",
+        title: `Inbox · ${agent.name}`,
+        body: message.slice(0, 2_000),
+        agentId,
+        ...(chatId ? { chatId } : {}),
+      })
+      .catch(() => undefined);
+    throw error;
   }
 }
 
