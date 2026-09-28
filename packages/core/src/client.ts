@@ -41,19 +41,22 @@ import {
   normalizeHealth,
   normalizeLogin,
   normalizeMe,
+  normalizeChatEvent,
   normalizeMessage,
   normalizeProfile,
+  normalizeQueuedMessage,
   unwrapEntity,
   unwrapList,
 } from "./normalize";
 import { API } from "./paths";
-import { readChatStream } from "./sse";
+import { readChatStream, readSseMessages } from "./sse";
 import type {
   Agent,
   Appearance,
   AgentMessage,
   AgentRoleRef,
   Chat,
+  ChatEvent,
   ChatMessage,
   ChatStreamEvent,
   CreateAgentInput,
@@ -78,6 +81,8 @@ import type {
   RoutinePatch,
   RoutineRun,
   SchedulePreview,
+  QueueMessageInput,
+  QueuedMessage,
   SendAgentMessageInput,
   SendMessageInput,
   UpdateAgentInput,
@@ -469,6 +474,54 @@ export class BotanicalClient {
     }
     // Server tsc pulls this file in with Bun's stream types, which disagree with DOM ReadableStream.
     yield* readChatStream(response.body as ReadableStream<Uint8Array>, contentType);
+  }
+
+  /**
+   * Send without waiting for the reply. The server queues the message and answers
+   * everything queued so far in one turn. Replies arrive on `chatEvents`.
+   */
+  async queueMessage(chatId: string, input: QueueMessageInput): Promise<QueuedMessage> {
+    const profileId = requireProfileId(input.profileId);
+    const content = input.content.trim();
+    if (!content) {
+      throw new BotanicalApiError("Write a message before sending.", { status: 400 });
+    }
+    const body = await this.requestJson(API.messages(chatId), {
+      method: "POST",
+      body: JSON.stringify({
+        content,
+        profileId,
+        async: true,
+        ...(input.clientId ? { clientId: input.clientId } : {}),
+      }),
+    });
+    return normalizeQueuedMessage(body);
+  }
+
+  /** Stop the chat's running turn. False when nothing was running. */
+  async stopChat(chatId: string): Promise<boolean> {
+    const body = await this.requestJson(API.chatStop(chatId), { method: "POST", body: "{}" });
+    const row = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+    return row.stopped === true;
+  }
+
+  /** Live queue status and finished messages for one chat, until `signal` aborts or the server closes. */
+  async *chatEvents(chatId: string, options: { signal?: AbortSignal } = {}): AsyncGenerator<ChatEvent> {
+    const response = await this.request(API.chatEvents(chatId), {
+      headers: { accept: "text/event-stream" },
+      signal: options.signal,
+    });
+    if (!response.ok) {
+      const raw = await response.text();
+      const body = raw ? safeJson(raw) : null;
+      throw new BotanicalApiError(errorMessage(body, raw, response.status), { status: response.status, body });
+    }
+    if (!response.body) return;
+    // Server tsc pulls this file in with Bun's stream types, which disagree with DOM ReadableStream.
+    for await (const frame of readSseMessages(response.body as ReadableStream<Uint8Array>)) {
+      const event = normalizeChatEvent(frame.event, safeJson(frame.data));
+      if (event) yield event;
+    }
   }
 
   async listRoutines(agentId?: string): Promise<Routine[]> {

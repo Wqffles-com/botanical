@@ -10,7 +10,8 @@ import { MessageBubble } from "@/components/chat/message-bubble";
 import { ProfileRequiredBanner } from "@/components/chat/profile-required-banner";
 import { ChatThreadSkeleton } from "@/components/chat/skeletons";
 import { identityFromUnknown } from "@/lib/agent-identity";
-import { draftToMessage, presentThread, type StreamDraft } from "@/lib/chat-stream";
+import { pendingToMessage, type PendingMessage } from "@/lib/chat-queue";
+import { presentThread } from "@/lib/chat-stream";
 
 export function ChatThread({
   chat,
@@ -23,7 +24,8 @@ export function ChatThread({
   missing,
   draft,
   onDraft,
-  streaming,
+  pending,
+  working,
   error,
   profileError,
   onProfile,
@@ -41,7 +43,8 @@ export function ChatThread({
   missing: boolean;
   draft: string;
   onDraft: (value: string) => void;
-  streaming: StreamDraft | null;
+  pending: PendingMessage[];
+  working: boolean;
   error: string | null;
   profileError: string | null;
   onProfile: (profileId: string | null) => void;
@@ -57,7 +60,7 @@ export function ChatThread({
     const el = scroller.current;
     if (!el || !stick.current) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages, streaming]);
+  }, [messages, pending, working]);
 
   if (loading) return <ChatThreadSkeleton />;
   if (missing || !chat) {
@@ -71,7 +74,6 @@ export function ChatThread({
     );
   }
 
-  const live = streaming && streaming.chatId === chat.id ? streaming : null;
   const rows = presentThread(messages);
   const unavailable = Boolean(profileError && /unavailable/i.test(profileError));
 
@@ -104,7 +106,7 @@ export function ChatThread({
         }}
         className="min-h-0 flex-1 overflow-y-auto"
       >
-        {messages.length === 0 && !live ? (
+        {messages.length === 0 && pending.length === 0 ? (
           <div className="mx-auto flex h-full max-w-3xl flex-col items-center justify-center px-6 text-center">
             <h2 className="text-2xl font-semibold tracking-tight">{identity?.name ?? "New chat"}</h2>
             <p className="mt-2 max-w-md text-sm text-muted-foreground">
@@ -121,16 +123,18 @@ export function ChatThread({
                 toolCalls={row.tools.length > 0 ? row.tools : undefined}
               />
             ))}
-            {live ? (
+            {working ? (
               <MessageBubble
-                message={draftToMessage(live)}
+                message={{ id: "working", chatId: chat.id, role: "assistant", content: "", createdAt: "" }}
                 agent={agent}
-                streaming
-                toolCalls={live.toolCalls}
+                working
               />
             ) : null}
+            {pending.map((row) => (
+              <MessageBubble key={row.id} message={pendingToMessage(chat.id, row)} queued />
+            ))}
             <p className="sr-only" aria-live="polite">
-              {live ? "Assistant is responding" : ""}
+              {working ? `${identity?.name ?? "The agent"} is working` : ""}
             </p>
           </div>
         )}
@@ -141,7 +145,7 @@ export function ChatThread({
         onChange={onDraft}
         onSubmit={onSend}
         onStop={onStop}
-        streaming={Boolean(live)}
+        working={working}
         disabled={!profileReady}
         placeholder={profileReady ? `Message ${identity?.name ?? "this agent"}…` : "Choose a model profile to write"}
         profiles={profiles}

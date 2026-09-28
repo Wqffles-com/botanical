@@ -21,7 +21,7 @@ HTTP API: account auth, agents, chats, streaming turns, agent-to-agent mail, rou
 | `packages/server/src/provider-keys.ts` | Resolves a provider key from the user, then the global row |
 | `packages/server/src/db/memory-accounts.ts` | In-memory accounts, secrets, and settings |
 | `packages/server/src/db` | In-memory store and Postgres adapter. Routines, listeners, and notifications: `packages/server/src/db/always-on.ts` |
-| `packages/server/src/runtime` | Turn runner, profile resolver, workspace path, store adapter. Background turns: `packages/server/src/runtime/jobs.ts`, `packages/server/src/runtime/turns.ts` |
+| `packages/server/src/runtime` | Turn runner, profile resolver, workspace path, store adapter. Background turns: `packages/server/src/runtime/jobs.ts`, `packages/server/src/runtime/turns.ts`. Async chat queue and events: `packages/server/src/runtime/chat-queue.ts` |
 | `packages/server/src/routines` | Cron check (`cron.ts`) and in-process scheduler (`scheduler.ts`) |
 | `packages/server/src/listeners` | Webhook signature, body cap, and prompt framing |
 | `packages/server/src/streaming.ts` | SSE encode and heartbeat |
@@ -42,7 +42,7 @@ From `packages/server/src/index.ts`: `createApp`, `loadConfig`, `createStore`, `
 
 Registered only through `router.add` in the handler file. `packages/server/src/app.ts` calls each `register*`. `OPTIONS` on any path returns 204 from `packages/server/src/router.ts` (not a registered route). No WebSocket handler.
 
-`POST /api/chats/:id/messages` is SSE when the JSON body has `stream: true`, or when `stream` is omitted and `Accept` contains `text/event-stream` (`packages/server/src/streaming.ts`).
+`POST /api/chats/:id/messages` with `async: true` queues the message and returns `202 { queued }` (optional `clientId` becomes the queue id). The turn runs detached from the request in `packages/server/src/runtime/chat-queue.ts`; everything queued during a turn is answered by the next one. `GET /api/chats/:id/events` is an SSE feed of `status` (`running`, `queued`), whole `message` rows, and `error`. `POST /api/chats/:id/stop` aborts the running queued turn. Without `async`, the route is SSE when the JSON body has `stream: true`, or when `stream` is omitted and `Accept` contains `text/event-stream` (`packages/server/src/streaming.ts`), and blocking JSON otherwise.
 
 | Method | Path | Handler |
 |--------|------|---------|
@@ -79,6 +79,8 @@ Registered only through `router.add` in the handler file. `packages/server/src/a
 | DELETE | `/api/chats/:id` | `packages/server/src/routes/chats.ts` |
 | GET | `/api/chats/:id/messages` | `packages/server/src/routes/messages.ts` |
 | POST | `/api/chats/:id/messages` | `packages/server/src/routes/messages.ts` |
+| GET | `/api/chats/:id/events` | `packages/server/src/routes/messages.ts` |
+| POST | `/api/chats/:id/stop` | `packages/server/src/routes/messages.ts` |
 | GET | `/api/routines` | `packages/server/src/routes/routines.ts` |
 | POST | `/api/routines/preview` | `packages/server/src/routes/routines.ts` |
 | POST | `/api/routines` | `packages/server/src/routes/routines.ts` |
@@ -170,4 +172,5 @@ Profile documents are stored in the database. Provider keys are decrypted from `
 - **Change a routine or webhook.** `packages/server/src/routes/routines.ts`, `packages/server/src/routes/listeners.ts`, `packages/server/src/routines`, `packages/server/src/listeners`, and `packages/server/src/runtime/jobs.ts`. The lease is `packages/db/src/run-lease.ts`.
 - **Change auth.** `packages/server/src/routes/auth.ts`, `packages/server/src/auth/session.ts`, `packages/server/src/auth/password.ts`.
 - **Change streaming.** `packages/server/src/routes/messages.ts` and `packages/server/src/streaming.ts`.
+- **Change async chat (queue, batching, events, stop).** `packages/server/src/runtime/chat-queue.ts` and `packages/server/src/routes/messages.ts`. Tests: `packages/server/test/chat-queue.test.ts`.
 - **Add an env var the API reads.** `packages/server/src/config.ts` (or the specific module above), then `.env.example` and this page.

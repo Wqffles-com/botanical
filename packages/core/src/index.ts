@@ -46,7 +46,7 @@ export {
   normalizeProfile,
 } from "./normalize";
 export { API } from "./paths";
-export { parseNdjsonLine, parseSseFrame, readChatStream } from "./sse";
+export { parseNdjsonLine, parseSseFrame, readChatStream, readSseMessages } from "./sse";
 export { AGENT_MESSAGE_STATUSES, CLIENT_CONTRACT_VERSION, INBOX_CHAT_TITLE } from "./types";
 export type {
   Agent,
@@ -54,6 +54,7 @@ export type {
   AgentMessage,
   AgentMessageStatus,
   Chat,
+  ChatEvent,
   ChatMessage,
   ChatStreamEvent,
   CreateAgentInput,
@@ -88,6 +89,8 @@ export type {
   RoutineRunTrigger,
   SchedulePreview,
   SendAgentMessageInput,
+  QueueMessageInput,
+  QueuedMessage,
   SendMessageInput,
   TokenUsage,
   ToolCall,

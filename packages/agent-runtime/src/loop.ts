@@ -58,6 +58,11 @@ export interface RunTurnInput {
   agentId?: string;
   signal?: AbortSignal;
   maxSteps?: number;
+  /**
+   * False when the caller already stored the user messages for this turn
+   * (a queued batch). `content` is then only used for memory recall and the title.
+   */
+  appendUserMessage?: boolean;
 }
 
 export interface PreparedTurn {
@@ -101,12 +106,14 @@ export async function* runAgentTurn(
   const profileId = profile.profileId;
   const maxSteps = input.maxSteps ?? deps.maxSteps ?? DEFAULT_MAX_STEPS;
 
-  await deps.store.messages.append({
-    chatId: chat.id,
-    role: "user",
-    content: input.content.trim(),
-    profileId,
-  });
+  if (input.appendUserMessage !== false) {
+    await deps.store.messages.append({
+      chatId: chat.id,
+      role: "user",
+      content: input.content.trim(),
+      profileId,
+    });
+  }
   if (!chat.title.trim()) {
     await deps.store.chats.updateTitle(chat.id, input.content.trim().slice(0, 80));
   } else {

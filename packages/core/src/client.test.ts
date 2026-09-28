@@ -224,6 +224,58 @@ describe("BotanicalClient", () => {
     }
   });
 
+  test("queues a message, stops the chat, and reads chat events", async () => {
+    const posted: unknown[] = [];
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const url = new URL(request.url);
+        if (url.pathname === "/api/chats/c1/messages") {
+          posted.push(await request.json());
+          return Response.json(
+            { queued: { id: "q1", content: "Hi", profileId: "grok", createdAt: "2026-09-28T00:00:00.000Z" } },
+            { status: 202 },
+          );
+        }
+        if (url.pathname === "/api/chats/c1/stop") return Response.json({ stopped: true });
+        if (url.pathname === "/api/chats/c1/events") {
+          const body = [
+            ": ping\n\n",
+            'event: status\ndata: {"running":true,"queued":[]}\n\n',
+            'event: message\ndata: {"message":{"id":"m1","chatId":"c1","role":"user","content":"Hi","createdAt":"2026-09-28T00:00:00.000Z"},"queuedId":"q1"}\n\n',
+            'event: error\ndata: {"error":"Rate limited","code":"rate_limited"}\n\n',
+            "event: text-delta\ndata: {}\n\n",
+          ].join("");
+          return new Response(body, { headers: { "content-type": "text/event-stream" } });
+        }
+        return Response.json({ error: "missing" }, { status: 404 });
+      },
+    });
+    try {
+      const client = new BotanicalClient({ baseUrl: `http://127.0.0.1:${server.port}` });
+      await expect(client.queueMessage("c1", { content: " ", profileId: "grok" })).rejects.toBeInstanceOf(Error);
+      const queued = await client.queueMessage("c1", { content: " Hi ", profileId: "grok", clientId: "q1" });
+      expect(queued).toEqual({ id: "q1", content: "Hi", profileId: "grok", createdAt: "2026-09-28T00:00:00.000Z" });
+      expect(posted).toEqual([{ content: "Hi", profileId: "grok", async: true, clientId: "q1" }]);
+      expect(await client.stopChat("c1")).toBe(true);
+
+      const events = [];
+      for await (const event of client.chatEvents("c1")) events.push(event);
+      expect(events).toEqual([
+        { type: "status", running: true, queued: [] },
+        {
+          type: "message",
+          queuedId: "q1",
+          message: expect.objectContaining({ id: "m1", role: "user", content: "Hi" }),
+        },
+        { type: "error", error: "Rate limited", code: "rate_limited" },
+      ]);
+      await expect(client.chatEvents("missing").next()).rejects.toBeInstanceOf(Error);
+    } finally {
+      server.stop(true);
+    }
+  });
+
   test("normalizes snake_case rows", () => {
     expect(normalizeProfile({ id: "p", name: "Fast", provider: "deepseek", model_id: "deepseek-chat" }).model).toBe(
       "deepseek-chat",

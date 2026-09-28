@@ -231,6 +231,25 @@ export interface SendMessageInput {
   profileId: string;
 }
 
+export interface QueueMessageInput extends SendMessageInput {
+  /** Echoed back as the queue id, so a retry does not double-send and the UI can match its bubble. */
+  clientId?: string;
+}
+
+/** A message the server accepted and has not written to the transcript yet. */
+export interface QueuedMessage {
+  id: string;
+  content: string;
+  profileId: string;
+  createdAt: string;
+}
+
+/** `GET /api/chats/:id/events`. Replies arrive as whole messages, never as deltas. */
+export type ChatEvent =
+  | { type: "status"; running: boolean; queued: QueuedMessage[] }
+  | { type: "message"; message: ChatMessage; queuedId?: string }
+  | { type: "error"; error: string; code: string };
+
 /** Async agent-to-agent mail. Status moves pending → delivered → read, or failed. */
 export const AGENT_MESSAGE_STATUSES = ["pending", "delivered", "read", "failed"] as const;
 export type AgentMessageStatus = (typeof AGENT_MESSAGE_STATUSES)[number];

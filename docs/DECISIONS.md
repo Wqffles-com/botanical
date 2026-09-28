@@ -375,3 +375,20 @@ Short entries. Earlier entries still hold unless a status line here changes them
 **Reason:** The index is how changes find the right files. CRLF checkouts break shell scripts inside image builds.
 
 **Status:** Shipped. `bun run check:index` runs in CI. `.gitattributes` forces LF for shell scripts, Dockerfiles, and the other listed types. `*.ps1` follows Git's autocrlf setting.
+
+---
+
+## 2026-09-28: Async chat messaging
+
+**Status:** Accepted. Shipped in the web client.
+**Effect:** A person can keep sending messages while the agent works. Replies arrive whole instead of token by token.
+
+- The web client posts with `async: true`. The server queues the message and answers `202` at once. It does not hold the request open for the turn.
+- Turns run on the server, detached from the request, one at a time per chat (the same per-chat lock as every other turn). Closing the tab does not stop the agent.
+- Everything queued while a turn runs is answered by the next turn together: the messages are stored as separate user rows and the agent gives one reply for the batch.
+- Queued messages are written to the transcript only when their turn starts, so a message sent mid-turn never lands between a tool call and its result.
+- `GET /api/chats/:id/events` pushes the queue status and each stored message whole. Text deltas are not sent. `POST /api/chats/:id/stop` aborts the running turn; messages queued after it still get their turn.
+- The queue lives in the API process, like the per-chat lock. A restart drops messages that were still waiting.
+- The streaming (`stream: true`) and blocking JSON forms of `POST /api/chats/:id/messages` stay for other clients.
+
+**Considered:** A visible agent that answers at once and hands the work to a hidden background agent on the same profile. Not built: the chat's own turn already runs in the background on that profile, and a second agent would need a hidden chat, a way to report back, and rules for two agents writing one transcript. It can be layered on later as a delegation tool if replies during long work matter.

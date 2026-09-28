@@ -114,3 +114,43 @@ export async function* readChatStream(
     reader.releaseLock();
   }
 }
+
+/** Named SSE messages from a response body. Comments (`: ping`) and frames without data are skipped. */
+export async function* readSseMessages(
+  body: ReadableStream<Uint8Array>,
+): AsyncGenerator<{ event: string; data: string }> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const parse = (frame: string): { event: string; data: string } | null => {
+    let event = "message";
+    const data: string[] = [];
+    for (const line of frame.split(/\r?\n/)) {
+      if (!line || line.startsWith(":")) continue;
+      const colon = line.indexOf(":");
+      const field = colon === -1 ? line : line.slice(0, colon);
+      const value = colon === -1 ? "" : line.slice(colon + 1).replace(/^ /, "");
+      if (field === "event") event = value.trim();
+      else if (field === "data") data.push(value);
+    }
+    return data.length > 0 ? { event, data: data.join("\n") } : null;
+  };
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split(/\r?\n\r?\n/);
+      buffer = frames.pop() ?? "";
+      for (const frame of frames) {
+        const message = parse(frame);
+        if (message) yield message;
+      }
+    }
+    buffer += decoder.decode();
+    const message = parse(buffer);
+    if (message) yield message;
+  } finally {
+    reader.releaseLock();
+  }
+}

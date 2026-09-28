@@ -21,7 +21,8 @@ export default function ChatPage() {
       missing={thread.missing}
       draft={thread.draft}
       onDraft={thread.setDraft}
-      streaming={thread.streaming}
+      pending={thread.pending}
+      working={thread.working}
       error={thread.error}
       profileError={thread.profileError}
       onProfile={(profileId) => void thread.setProfile(profileId)}

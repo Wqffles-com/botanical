@@ -16,6 +16,7 @@ import type {
   AgentMessage,
   AgentMessageStatus,
   Chat,
+  ChatEvent,
   ChatMessage,
   ChatStreamEvent,
   DeploymentMode,
@@ -25,6 +26,7 @@ import type {
   Me,
   MessageRole,
   ModelProfile,
+  QueuedMessage,
   TokenUsage,
   ToolCall,
 } from "./types";
@@ -589,6 +591,37 @@ function readBrandName(value: unknown): string | null {
   if (value && typeof value === "object" && typeof (value as { name?: unknown }).name === "string") {
     const name = (value as { name: string }).name.trim();
     return name || null;
+  }
+  return null;
+}
+
+export function normalizeQueuedMessage(body: unknown): QueuedMessage {
+  const record = unwrapEntity(body, ["queued"]);
+  return {
+    id: stringField(record, ["id"]),
+    content: stringField(record, ["content"]),
+    profileId: stringField(record, ["profileId", "profile_id"]),
+    createdAt: stringField(record, ["createdAt", "created_at"]),
+  };
+}
+
+/** One `GET /api/chats/:id/events` message. Unknown names return null. */
+export function normalizeChatEvent(event: string, data: unknown): ChatEvent | null {
+  const record = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : {};
+  if (event === "status") {
+    const queued = Array.isArray(record.queued) ? record.queued.map(normalizeQueuedMessage) : [];
+    return { type: "status", running: record.running === true, queued };
+  }
+  if (event === "message" && record.message) {
+    const queuedId = stringField(record, ["queuedId"]);
+    return { type: "message", message: normalizeMessage(record.message), ...(queuedId ? { queuedId } : {}) };
+  }
+  if (event === "error") {
+    return {
+      type: "error",
+      error: stringField(record, ["error", "message"], "The model request failed"),
+      code: stringField(record, ["code"], "error"),
+    };
   }
   return null;
 }

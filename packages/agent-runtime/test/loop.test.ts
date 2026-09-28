@@ -91,6 +91,23 @@ describe("agent tool loop", () => {
     expect(titled?.title).toBe("Hi");
   });
 
+  test("answers user messages the caller already stored", async () => {
+    const { deps, chat, store, provider } = await harness({
+      script: [() => [{ type: "text-delta", text: "Both done" }, { type: "done" }]],
+    });
+    await store.messages.append({ chatId: chat.id, role: "user", content: "first", profileId: "fast" });
+    await store.messages.append({ chatId: chat.id, role: "user", content: "second", profileId: "fast" });
+    await collect(deps, { chatId: chat.id, content: "first\n\nsecond", profileId: "fast", appendUserMessage: false });
+    const saved = await store.messages.listByChat(chat.id);
+    expect(saved.map((message) => [message.role, message.content])).toEqual([
+      ["user", "first"],
+      ["user", "second"],
+      ["assistant", "Both done"],
+    ]);
+    const sent = provider.requests[0]?.messages.filter((message) => message.role === "user");
+    expect(sent?.map((message) => message.content)).toEqual(["first", "second"]);
+  });
+
   test("executes an allowed tool and feeds the result back", async () => {
     const { deps, chat, store, provider } = await harness({
       script: [

@@ -46,10 +46,19 @@ export function turnFailure(error: unknown): HttpError {
   return new HttpError(500, "internal_error", "Internal server error");
 }
 
+export interface ChatTurnInput {
+  chat: Chat;
+  content: string;
+  profile: ModelProfile;
+  signal?: AbortSignal;
+  /** False when the user messages were stored before the turn (a queued batch). */
+  appendUserMessage?: boolean;
+}
+
 export async function* streamChatTurn(
   store: Store,
   runtime: RuntimeDeps,
-  input: { chat: Chat; content: string; profile: ModelProfile; signal?: AbortSignal },
+  input: ChatTurnInput,
 ): AsyncGenerator<SseEvent> {
   const { chat, content, profile } = input;
   let announced = false;
@@ -66,6 +75,7 @@ export async function* streamChatTurn(
       content,
       profileId: profile.id,
       ...(input.signal ? { signal: input.signal } : {}),
+      ...(input.appendUserMessage === false ? { appendUserMessage: false } : {}),
     })) {
       if (event.type === "step" || event.type === "inbox" || event.type === "a2a-sent") {
         yield* announce();
@@ -95,6 +105,11 @@ export async function* streamChatTurn(
     yield { event: "done", data: { type: "done" } };
   } catch (error) {
     yield* announce();
+    if (input.signal?.aborted) {
+      await retitle(store, chat, content);
+      yield { event: "done", data: { type: "done", finishReason: "aborted" } };
+      return;
+    }
     const body = publicTurnError(error);
     yield { event: "error", data: { type: "error", error: body.message, code: body.code } };
     await retitle(store, chat, content);
@@ -105,7 +120,7 @@ export async function* streamChatTurn(
 export async function collectChatTurn(
   store: Store,
   runtime: RuntimeDeps,
-  input: { chat: Chat; content: string; profile: ModelProfile; signal?: AbortSignal },
+  input: ChatTurnInput,
 ): Promise<TurnResult> {
   let toolCall: TurnResult["toolCall"];
   let toolResult: string | undefined;
