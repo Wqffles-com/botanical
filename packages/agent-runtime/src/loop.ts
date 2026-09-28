@@ -15,6 +15,7 @@ import type { ResolvedProfile } from "./profiles";
 import type { MemorySnippet } from "./memories";
 import { selectMemories } from "./memories";
 import { toolAccess } from "./permissions";
+import { trimToBudget } from "./context";
 import { buildSystemPrompt } from "./prompt";
 import type { ChatMessage } from "./provider";
 import type { AgentMessageBus } from "./bus";
@@ -140,7 +141,8 @@ export async function* runAgentTurn(
 
     const catalog = await collectTools(deps.toolSources);
     const visibleTools = catalog.filter((tool) => toolAccess(agent, tool).ok);
-    const requestMessages = toProviderMessages(agent, transcript, recalled);
+    const budget = profile.provider.capabilities(profile.model).maxContext;
+    const requestMessages = trimToBudget(toProviderMessages(agent, transcript, recalled), budget);
     let text = "";
     const toolCalls: ToolCall[] = [];
     let errorMessage: string | null = null;

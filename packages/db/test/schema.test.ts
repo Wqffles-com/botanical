@@ -52,6 +52,7 @@ describe('v0 postgres schema', () => {
       'agent_roles',
       'agents',
       'chats',
+      'invites',
       'listener_deliveries',
       'listeners',
       'memories',
@@ -62,11 +63,13 @@ describe('v0 postgres schema', () => {
       'routine_runs',
       'routines',
       'secret_refs',
+      'secrets',
       'sessions',
       'settings',
       'tenants',
       'tool_audit',
       'usage_events',
+      'user_settings',
       'users',
     ]);
 

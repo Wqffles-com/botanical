@@ -58,7 +58,7 @@ export class ConfigError extends Error {
   }
 }
 
-/** Argon2 hash wins when both values are set. The plaintext is then discarded. */
+/** @deprecated Passcode auth was replaced by accounts. Kept so older imports still typecheck. */
 export type PasswordAuth =
   | { method: "hash"; hash: string }
   | { method: "password"; password: string };
@@ -70,7 +70,8 @@ export interface ServerConfig {
   brandName: string;
   host: string;
   port: number;
-  auth: PasswordAuth;
+  /** AES-256-GCM key material. Required to store provider keys. */
+  encryptionKey: string | null;
   sessionTtlSeconds: number;
   cookieName: string;
   cookieSecure: boolean;
@@ -142,20 +143,7 @@ export function loadConfig(
     throw new ConfigError("BOTANICAL_BRAND_NAME must be at most 80 characters");
   }
 
-  const password = env.BOTANICAL_PASSWORD === "" ? undefined : env.BOTANICAL_PASSWORD;
-  const passwordHash = env.BOTANICAL_PASSWORD_HASH === "" ? undefined : env.BOTANICAL_PASSWORD_HASH;
-  if (!password && !passwordHash) {
-    throw new ConfigError("Set BOTANICAL_PASSWORD or BOTANICAL_PASSWORD_HASH");
-  }
-  if (passwordHash && !passwordHash.startsWith("$argon2")) {
-    throw new ConfigError(
-      "BOTANICAL_PASSWORD_HASH must be an argon2 hash produced by Bun.password.hash",
-    );
-  }
-
-  const auth: PasswordAuth = passwordHash
-    ? { method: "hash", hash: passwordHash }
-    : { method: "password", password: requiredPassword(password) };
+  const encryptionKey = env.BOTANICAL_ENCRYPTION_KEY?.trim() ?? "";
   const databaseUrl = parseDatabaseUrl(env.DATABASE_URL);
   const { profiles, providers } = loadProfiles(env, options);
 
@@ -165,7 +153,7 @@ export function loadConfig(
     brandName: brandRaw || defaultBrandName(deploymentMode),
     host: parseHost(env.BOTANICAL_HOST),
     port: parsePort(env.BOTANICAL_PORT ?? env.PORT),
-    auth,
+    encryptionKey: encryptionKey || null,
     sessionTtlSeconds: parsePositiveInt(env.BOTANICAL_SESSION_TTL_SECONDS, SESSION_TTL_DEFAULT, {
       min: 60,
       max: 60 * 60 * 24 * 365,
@@ -187,13 +175,6 @@ export function loadConfig(
     dictation: loadDictation(env),
     publicOrigin: parsePublicOrigin(env.BOTANICAL_PUBLIC_ORIGIN),
   };
-}
-
-function requiredPassword(password: string | undefined): string {
-  if (!password) {
-    throw new ConfigError("Set BOTANICAL_PASSWORD or BOTANICAL_PASSWORD_HASH");
-  }
-  return password;
 }
 
 function parseDeploymentMode(raw: string | undefined): DeploymentMode {

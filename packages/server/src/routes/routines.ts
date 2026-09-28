@@ -163,7 +163,7 @@ async function readRoutineBody(
   if (!name || !prompt) throw new HttpError(400, "invalid_body", "name and prompt are required");
   const cron = normalizeCron(readBoundedString(body.cron, "cron", { required: true, max: 80 }) ?? "");
   const timezone = readBoundedString(body.timezone, "timezone", { required: true, max: 120 }) ?? "";
-  const profile = resolveProfile(config, readRequestedProfileId(body.profileId, true), undefined);
+  const profile = await resolveProfile(store, readRequestedProfileId(body.profileId, true), undefined);
   const enabled = readOptionalBoolean(body.enabled, "enabled") ?? true;
   const checked = checkSchedule(cron, timezone, now, 1);
   if (!checked.ok || !checked.next[0]) {
@@ -188,7 +188,6 @@ async function readRoutinePatch(
   now: Date,
   existing: Routine,
 ): Promise<Partial<Routine> & { nextRunAt?: string }> {
-  void store;
   const body = await readJson(request, config);
   if (!isRecord(body)) throw new HttpError(400, "invalid_body", "JSON object expected");
   const patch: {
@@ -211,7 +210,7 @@ async function readRoutinePatch(
     patch.prompt = prompt;
   }
   if (body.profileId !== undefined) {
-    patch.profileId = resolveProfile(config, readRequestedProfileId(body.profileId, true), undefined).id;
+    patch.profileId = (await resolveProfile(store, readRequestedProfileId(body.profileId, true), undefined)).id;
   }
   if (body.enabled !== undefined) patch.enabled = readOptionalBoolean(body.enabled, "enabled") ?? existing.enabled;
   const cron = body.cron === undefined ? existing.cron : normalizeCron(readBoundedString(body.cron, "cron", { required: true, max: 80 }) ?? "");

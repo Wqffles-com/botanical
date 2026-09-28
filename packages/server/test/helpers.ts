@@ -8,6 +8,7 @@ import { createMemoryStore } from "../src/db/memory.ts";
 import type { Store } from "../src/types.ts";
 
 export const PASSWORD = "correct horse";
+export const ADMIN_EMAIL = "admin@example.com";
 
 export const PROFILES = [
   { id: "grok", name: "Grok", provider: "xai", model: "grok-4" },
@@ -22,7 +23,7 @@ export interface TestApp {
 
 export function baseEnv(overrides: Record<string, string> = {}): Record<string, string> {
   return {
-    BOTANICAL_PASSWORD: PASSWORD,
+    BOTANICAL_ENCRYPTION_KEY: "test-encryption-key",
     BOTANICAL_PROFILES: JSON.stringify(PROFILES),
     XAI_API_KEY: "test-xai-key",
     DEEPSEEK_API_KEY: "test-deepseek-key",
@@ -70,7 +71,7 @@ export function setup(
 ): TestApp {
   const env = baseEnv(overrides);
   const config = loadConfig(env, { fetch: options.fetch ?? defaultProviderFetch });
-  const store = options.store ?? createMemoryStore();
+  const store = options.store ?? createMemoryStore({ ...(config.encryptionKey ? { encryptionKey: config.encryptionKey } : {}) });
   const app = createApp({
     config,
     store,
@@ -97,13 +98,26 @@ export async function readJson<T>(response: Response): Promise<T> {
 export async function login(
   app: App,
   password = PASSWORD,
-  extras?: { clientKey?: string; body?: Record<string, unknown> },
+  extras?: { clientKey?: string; body?: Record<string, unknown>; email?: string },
 ): Promise<{ response: Response; token: string; expiresAt: string }> {
+  const email = extras?.email ?? ADMIN_EMAIL;
+  const signup = await app.fetch(
+    new Request("http://localhost/api/auth/signup", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password, displayName: "Admin" }),
+    }),
+    extras?.clientKey ? { clientKey: extras.clientKey } : undefined,
+  );
+  if (signup.status === 200) {
+    const body = await readJson<{ token: string; expiresAt: string }>(signup);
+    return { response: signup, token: body.token, expiresAt: body.expiresAt };
+  }
   const response = await app.fetch(
     new Request("http://localhost/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(extras?.body ?? { password }),
+      body: JSON.stringify(extras?.body ?? { email, password }),
     }),
     extras?.clientKey ? { clientKey: extras.clientKey } : undefined,
   );

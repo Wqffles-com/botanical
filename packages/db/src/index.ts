@@ -1,4 +1,17 @@
+export { currentUserId, pinStore, runAsUser } from './actor.ts';
+export { createAccountServices } from './accounts.ts';
+export type {
+  AccountRepository,
+  AuthUser,
+  InviteRecord,
+  PrefsRepository,
+  SecretMeta,
+  SecretRepository,
+  StoredUser,
+  UserRole,
+} from './account-types.ts';
 export { createDb, ensureDatabase, pingDb } from './client.ts';
+export { decryptSecret, encryptSecret, encryptionKeyBytes, EncryptionKeyMissing, last4 } from './crypto.ts';
 export type { BotanicalDb, CreateDbOptions } from './client.ts';
 export {
   DEPLOYMENT_MODE_ENV_VARS,
@@ -6,9 +19,12 @@ export {
   PASSCODE_ENV_VARS,
   PASSCODE_HASH_ENV_VAR,
   PROVIDER_SECRET_REFS,
+  SECRET_NAMES,
   SETTING_KEYS,
+  SIGNUP_MODES,
+  STT_SETTING_KEYS,
 } from './constants.ts';
-export type { SettingKey } from './constants.ts';
+export type { SecretName, SettingKey, SignupMode } from './constants.ts';
 export {
   ALWAYS_ON_CACHE_MS,
   ALWAYS_ON_DEFAULTS,

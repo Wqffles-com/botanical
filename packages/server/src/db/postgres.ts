@@ -22,17 +22,17 @@ export const POSTGRES_NOT_WIRED =
   "TODO: wire Postgres through packages/db. Unset DATABASE_URL to use the in-memory store.";
 
 interface DbModule {
-  createStore?: (options: { connectionString: string }) => Promise<Store> | Store;
+  createStore?: (options: { connectionString: string; encryptionKey?: string }) => Promise<Store> | Store;
 }
 
-export async function openPostgresStore(connectionString: string): Promise<Store> {
+export async function openPostgresStore(connectionString: string, encryptionKey?: string): Promise<Store> {
   const loaded = await loadDbModule();
   if (!loaded?.createStore) {
     throw new Error(POSTGRES_NOT_WIRED);
   }
   let created: Store;
   try {
-    created = await loaded.createStore({ connectionString });
+    created = await loaded.createStore({ connectionString, ...(encryptionKey ? { encryptionKey } : {}) });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`packages/db createStore() failed: ${message}`);

@@ -140,7 +140,7 @@ describe("BotanicalClient", () => {
     try {
       let token = "";
       const client = new BotanicalClient({ baseUrl: url, getToken: () => token });
-      const session = await client.login("sprout");
+      const session = await client.login({ email: "ada@example.com", password: "sprout" });
       expect(session.token).toBe("secret-token");
       expect(session.mode).toBe("SELF_HOST");
       token = session.token;
@@ -264,7 +264,7 @@ describe("BotanicalClient", () => {
     const { server, calls, url } = startStub();
     try {
       const authed = new BotanicalClient({ baseUrl: url, getToken: () => "secret-token" });
-      await authed.login("sprout");
+      await authed.login({ email: "ada@example.com", password: "sprout" });
       const agent = await authed.createAgent({
         name: "Scout",
         prompt: "Look it up.",

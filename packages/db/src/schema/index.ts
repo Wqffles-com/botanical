@@ -19,9 +19,12 @@ export {
   tenantsRelations,
   usersRelations,
 } from './relations.ts';
+export { invites } from './invites.ts';
 export { secretRefs } from './secret-refs.ts';
+export { secrets } from './secrets.ts';
 export { sessions } from './sessions.ts';
 export { settings } from './settings.ts';
+export { userSettings } from './user-settings.ts';
 export { tenants } from './tenants.ts';
 export { toolAudit } from './tool-audit.ts';
 export { usageEvents } from './usage-events.ts';
@@ -37,9 +40,12 @@ import { messages } from './messages.ts';
 import { notifications } from './notifications.ts';
 import { routineRuns, routines } from './routines.ts';
 import { modelProfiles } from './model-profiles.ts';
+import { invites } from './invites.ts';
 import { secretRefs } from './secret-refs.ts';
+import { secrets } from './secrets.ts';
 import { sessions } from './sessions.ts';
 import { settings } from './settings.ts';
+import { userSettings } from './user-settings.ts';
 import { tenants } from './tenants.ts';
 import { toolAudit } from './tool-audit.ts';
 import { usageEvents } from './usage-events.ts';
@@ -61,6 +67,9 @@ export type AgentMessage = typeof agentMessages.$inferSelect;
 export type NewAgentMessage = typeof agentMessages.$inferInsert;
 export type Setting = typeof settings.$inferSelect;
 export type NewSetting = typeof settings.$inferInsert;
+export type Invite = typeof invites.$inferSelect;
+export type SecretRow = typeof secrets.$inferSelect;
+export type UserSetting = typeof userSettings.$inferSelect;
 export type SecretRef = typeof secretRefs.$inferSelect;
 export type NewSecretRef = typeof secretRefs.$inferInsert;
 export type Session = typeof sessions.$inferSelect;

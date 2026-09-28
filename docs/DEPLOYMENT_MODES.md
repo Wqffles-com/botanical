@@ -2,7 +2,7 @@
 
 One MIT codebase, two deployment modes: **self-host** and **hosted (SaaS)**. Neither mode charges anyone today.
 
-> **Which setting does what.** The running API server (`packages/server`) reads `BOTANICAL_DEPLOYMENT_MODE` = `SELF_HOST` | `SAAS`. The Docker entrypoint fills it in from `DEPLOYMENT_MODE` and accepts `self_host` / `saas` in any case. In the server, both modes share routes, passcode auth (plaintext or an argon2 `BOTANICAL_PASSWORD_HASH`), and storage, and SaaS mode changes the brand name. The `@botanical/core` deployment module described below is the stricter seam for future tenancy and billing. It has its own aliases and a `sha256:` passcode hash, and the API server does not use it yet.
+> **Which setting does what.** The running API server (`packages/server`) reads `BOTANICAL_DEPLOYMENT_MODE` = `SELF_HOST` | `SAAS`. The Docker entrypoint fills it in from `DEPLOYMENT_MODE` and accepts `self_host` / `saas` in any case. Both modes share routes, email/password accounts, and storage. SaaS mode changes the brand name. Signup mode (open, invite-only, or closed) is an admin setting in the database. The `@botanical/core` deployment module below is an unused seam for future tenancy and billing. It still models a single passcode and a `sha256:` hash. The API server does not call it.
 
 ## The split (as modeled in `@botanical/core`)
 
@@ -11,7 +11,7 @@ One MIT codebase, two deployment modes: **self-host** and **hosted (SaaS)**. Nei
 | Code license | **MIT** — use, modify, redistribute | **Same MIT code**. A subscription would pay for running that code as a service, not for a separate license |
 | Mode | `self-host` (default) | `saas` |
 | Who runs it | You, on any host | The Botanical project, on its servers. Not offered for purchase yet |
-| Auth | One passcode for the single operator | Account login is **not** built. The single-tenant passcode is rejected in this mode |
+| Auth | Email and password. First account is admin | Same accounts. Signup mode is an admin setting |
 | Tenant | Fixed id `self` | Fixed placeholder id `placeholder` — not a customer, not isolation |
 | Billing | Not applicable | Hooks exist and are stubs. They do not check a subscription, record usage, or block work |
 | Model keys | Yours, server-side | Same rule when a hosted process exists: keys stay on the server |
@@ -42,7 +42,7 @@ The mode flag exists so the code does not assume a single hosting model.
 ## What does not exist yet
 
 - A payment provider, checkout, plans, invoices, seats, or quotas
-- Signup, real `tenant_id` issuance, or per-tenant data isolation
+- Real `tenant_id` issuance. Accounts isolate rows by user on one database; they are not separate tenants
 - A hosted plan you can buy
 - Metering a self-hosted install
 - Different chat, tools, or MCP behavior per mode

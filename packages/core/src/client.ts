@@ -99,14 +99,33 @@ export class BotanicalClient {
     return this.requestJson(API.health).then(normalizeHealth);
   }
 
-  async login(password: string): Promise<LoginResult> {
-    const passcode = password.trim();
-    if (!passcode) {
-      throw new BotanicalApiError("Enter the server passcode.", { status: 400 });
-    }
+  async login(input: { email: string; password: string } | string): Promise<LoginResult> {
+    const email = typeof input === "string" ? "" : input.email.trim();
+    const password = typeof input === "string" ? input.trim() : input.password;
+    if (!email) throw new BotanicalApiError("Enter your email.", { status: 400 });
+    if (!password) throw new BotanicalApiError("Enter your password.", { status: 400 });
     const body = await this.requestJson(API.login, {
       method: "POST",
-      body: JSON.stringify({ password: passcode }),
+      body: JSON.stringify({ email, password }),
+    });
+    return normalizeLogin(body);
+  }
+
+  async signup(input: { email: string; password: string; displayName: string; inviteToken?: string }): Promise<LoginResult> {
+    const email = input.email.trim();
+    const password = input.password;
+    const displayName = input.displayName.trim();
+    if (!email) throw new BotanicalApiError("Enter your email.", { status: 400 });
+    if (!displayName) throw new BotanicalApiError("Enter a display name.", { status: 400 });
+    if (password.length < 8) throw new BotanicalApiError("Password must be at least 8 characters.", { status: 400 });
+    const body = await this.requestJson("/api/auth/signup", {
+      method: "POST",
+      body: JSON.stringify({
+        email,
+        password,
+        displayName,
+        ...(input.inviteToken ? { inviteToken: input.inviteToken } : {}),
+      }),
     });
     return normalizeLogin(body);
   }

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { RuntimeDeps } from "@botanical/agent-runtime";
-import { RUN_LEASE_MS, RUN_LEASE_RENEW_MS } from "@botanical/db";
+import { RUN_LEASE_MS, RUN_LEASE_RENEW_MS, runAsUser } from "@botanical/db";
 
 import type { ServerConfig } from "../config.ts";
 import { HttpError } from "../http.ts";
@@ -31,9 +31,6 @@ export function createBackgroundJobs(deps: {
     await deps.turns.runInBackground(async () => {
       const run = await deps.store.routineRuns.get(runId);
       if (!run || (run.status !== "queued" && run.status !== "running")) return;
-      const held = await deps.store.routineRuns.claimLease(runId, PROCESS_ID, leaseExpiry());
-      if (!held) return;
-      const release = holdLease(() => deps.store.routineRuns.renewLease(runId, PROCESS_ID, leaseExpiry()));
       const routine = await deps.store.routines.get(run.routineId);
       if (!routine) {
         await deps.store.routineRuns.finishOwned(runId, PROCESS_ID, {
@@ -41,12 +38,15 @@ export function createBackgroundJobs(deps: {
           error: "Routine no longer exists",
           finishedAt: new Date().toISOString(),
         });
-        release();
         return;
       }
+      await runAsUser(routine.userId, async () => {
+      const held = await deps.store.routineRuns.claimLease(runId, PROCESS_ID, leaseExpiry());
+      if (!held) return;
+      const release = holdLease(() => deps.store.routineRuns.renewLease(runId, PROCESS_ID, leaseExpiry()));
       let chatId = run.chatId;
       try {
-        const profile = resolveProfile(deps.config, routine.profileId, undefined);
+        const profile = await resolveProfile(deps.store, routine.profileId, undefined);
         await assertCliProfileReady(profile);
         if (!chatId) {
           const chat = await deps.store.chats.create({
@@ -83,6 +83,7 @@ export function createBackgroundJobs(deps: {
       } finally {
         release();
       }
+      });
     });
   }
 
@@ -118,25 +119,25 @@ export function createBackgroundJobs(deps: {
     await deps.turns.runInBackground(async () => {
       const delivery = await deps.store.listenerDeliveries.get(deliveryId);
       if (!delivery || delivery.status !== "accepted") return;
-      const held = await deps.store.listenerDeliveries.claimLease(deliveryId, PROCESS_ID, leaseExpiry());
-      if (!held) return;
-      const release = holdLease(() =>
-        deps.store.listenerDeliveries.renewLease(deliveryId, PROCESS_ID, leaseExpiry()),
-      );
       const listener = await deps.store.listeners.get(delivery.listenerId);
       if (!listener) {
         await deps.store.listenerDeliveries.finishOwned(deliveryId, PROCESS_ID, {
           status: "failed",
           error: "Listener no longer exists",
         });
-        release();
         return;
       }
+      await runAsUser(listener.userId, async () => {
+      const held = await deps.store.listenerDeliveries.claimLease(deliveryId, PROCESS_ID, leaseExpiry());
+      if (!held) return;
+      const release = holdLease(() =>
+        deps.store.listenerDeliveries.renewLease(deliveryId, PROCESS_ID, leaseExpiry()),
+      );
       const handler = listenerHandler(listener.kind);
       let chatId: string | null = delivery.chatId;
       try {
         if (!handler) throw new Error(`No handler for listener kind ${listener.kind}`);
-        const profile = resolveProfile(deps.config, listener.profileId, undefined);
+        const profile = await resolveProfile(deps.store, listener.profileId, undefined);
         await assertCliProfileReady(profile);
         const chat = await deps.store.chats.create({
           agentId: listener.agentId,
@@ -177,6 +178,7 @@ export function createBackgroundJobs(deps: {
       } finally {
         release();
       }
+      });
     });
   }
 

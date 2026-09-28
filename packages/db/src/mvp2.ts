@@ -51,7 +51,8 @@ export interface MemoryQuery {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function createMvp2(db: BotanicalDb, userId: string) {
+export function createMvp2(db: BotanicalDb, userIdOf: () => string) {
+  const userId = (): string => userIdOf();
   async function loadRoles(agentIds: readonly string[]): Promise<Map<string, AgentRoleSummary[]>> {
     const ids = agentIds.filter((id) => UUID_PATTERN.test(id));
     const grouped = new Map<string, AgentRoleSummary[]>();
@@ -104,7 +105,7 @@ export function createMvp2(db: BotanicalDb, userId: string) {
     loadRoles,
     memories: {
       async list(query: MemoryQuery = {}): Promise<MemoryRecord[]> {
-        const filters = [eq(memories.userId, userId)];
+        const filters = [eq(memories.userId, userId())];
         if (query.scope) filters.push(eq(memories.scope, query.scope));
         if (query.agentId) {
           if (!UUID_PATTERN.test(query.agentId)) return [];
@@ -128,7 +129,7 @@ export function createMvp2(db: BotanicalDb, userId: string) {
           .from(memories)
           .where(
             and(
-              eq(memories.userId, userId),
+              eq(memories.userId, userId()),
               or(eq(memories.scope, 'shared'), and(eq(memories.scope, 'agent'), eq(memories.agentId, agentId))),
             ),
           )
@@ -141,7 +142,7 @@ export function createMvp2(db: BotanicalDb, userId: string) {
         const rows = await db
           .select()
           .from(memories)
-          .where(and(eq(memories.id, id), eq(memories.userId, userId)))
+          .where(and(eq(memories.id, id), eq(memories.userId, userId())))
           .limit(1);
         return rows[0] ? toMemory(rows[0]) : null;
       },
@@ -162,14 +163,14 @@ export function createMvp2(db: BotanicalDb, userId: string) {
           const owner = await db
             .select({ id: agents.id })
             .from(agents)
-            .where(and(eq(agents.id, agentId), eq(agents.userId, userId)))
+            .where(and(eq(agents.id, agentId), eq(agents.userId, userId())))
             .limit(1);
           if (!owner[0]) throw new Error('agent not found');
         }
         const inserted = await db
           .insert(memories)
           .values({
-            userId,
+            userId: userId(),
             scope,
             agentId,
             content,
@@ -195,7 +196,7 @@ export function createMvp2(db: BotanicalDb, userId: string) {
         const updated = await db
           .update(memories)
           .set(values)
-          .where(and(eq(memories.id, id), eq(memories.userId, userId)))
+          .where(and(eq(memories.id, id), eq(memories.userId, userId())))
           .returning();
         return updated[0] ? toMemory(updated[0]) : null;
       },
@@ -203,7 +204,7 @@ export function createMvp2(db: BotanicalDb, userId: string) {
         if (!UUID_PATTERN.test(id)) return false;
         const removed = await db
           .delete(memories)
-          .where(and(eq(memories.id, id), eq(memories.userId, userId)))
+          .where(and(eq(memories.id, id), eq(memories.userId, userId())))
           .returning({ id: memories.id });
         return removed.length > 0;
       },

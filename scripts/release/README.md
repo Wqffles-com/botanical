@@ -11,7 +11,7 @@ Prebuilt Botanical: the Bun API (`server/`) and the Next.js standalone web app (
 ## Run
 
 ```sh
-cp .env.example .env        # set BOTANICAL_PASSWORD, provider keys, DATABASE_URL
+cp .env.example .env        # set BOTANICAL_ENCRYPTION_KEY and DATABASE_URL
 docker compose up -d        # Postgres on 127.0.0.1:5433 (skip if you have one)
 ./start.sh                  # API on 127.0.0.1:8787, web on http://localhost:3000
 ```

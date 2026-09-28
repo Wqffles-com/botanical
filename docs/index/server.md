@@ -2,7 +2,7 @@
 
 [Index](README.md)
 
-HTTP API: passcode auth, agents, chats, streaming turns, agent-to-agent mail, routines, listeners, notifications, memory, roles, MCP listing, CLI install/login, dictation.
+HTTP API: account auth, agents, chats, streaming turns, agent-to-agent mail, routines, listeners, notifications, memory, roles, MCP listing, CLI install/login, dictation.
 
 - Package: `@botanical/server`
 - Library entry: `packages/server/src/index.ts` (`package.json` `exports`)
@@ -17,7 +17,9 @@ HTTP API: passcode auth, agents, chats, streaming turns, agent-to-agent mail, ro
 | `packages/server/src/routes` | One `register*` function per area |
 | `packages/server/src/http.ts` | JSON helpers, body limit, CORS finish |
 | `packages/server/src/config.ts` | `loadConfig` |
-| `packages/server/src/auth` | Passcode verify, session cookie, login rate limit |
+| `packages/server/src/auth` | Session cookie, login rate limit. Actor scope is `packages/db/src/actor.ts` |
+| `packages/server/src/secrets/keys.ts` | Resolves a provider key from the user, then the global row |
+| `packages/server/src/db/memory-accounts.ts` | In-memory accounts, secrets, and settings |
 | `packages/server/src/db` | In-memory store and Postgres adapter. Routines, listeners, and notifications: `packages/server/src/db/always-on.ts` |
 | `packages/server/src/runtime` | Turn runner, profile resolver, workspace path, store adapter. Background turns: `packages/server/src/runtime/jobs.ts`, `packages/server/src/runtime/turns.ts` |
 | `packages/server/src/routines` | Cron check (`cron.ts`) and in-process scheduler (`scheduler.ts`) |
@@ -48,6 +50,8 @@ Registered only through `router.add` in the handler file. `packages/server/src/a
 | GET | `/api/health` | `packages/server/src/routes/health.ts` |
 | GET | `/health` | `packages/server/src/routes/health.ts` |
 | GET | `/ready` | `packages/server/src/routes/health.ts` |
+| GET | `/api/auth/config` | `packages/server/src/routes/auth.ts` |
+| POST | `/api/auth/signup` | `packages/server/src/routes/auth.ts` |
 | POST | `/api/auth/login` | `packages/server/src/routes/auth.ts` |
 | POST | `/api/auth/logout` | `packages/server/src/routes/auth.ts` |
 | GET | `/api/auth/me` | `packages/server/src/routes/auth.ts` |
@@ -96,6 +100,22 @@ Registered only through `router.add` in the handler file. `packages/server/src/a
 | GET | `/api/notifications` | `packages/server/src/routes/notifications.ts` |
 | POST | `/api/notifications/read-all` | `packages/server/src/routes/notifications.ts` |
 | POST | `/api/notifications/:id/read` | `packages/server/src/routes/notifications.ts` |
+| GET | `/api/admin/settings` | `packages/server/src/routes/account-settings.ts` |
+| PATCH | `/api/admin/settings` | `packages/server/src/routes/account-settings.ts` |
+| PUT | `/api/admin/secrets/:name` | `packages/server/src/routes/account-settings.ts` |
+| DELETE | `/api/admin/secrets/:name` | `packages/server/src/routes/account-settings.ts` |
+| GET | `/api/admin/profiles` | `packages/server/src/routes/account-settings.ts` |
+| POST | `/api/admin/profiles` | `packages/server/src/routes/account-settings.ts` |
+| DELETE | `/api/admin/profiles/:id` | `packages/server/src/routes/account-settings.ts` |
+| POST | `/api/admin/invites` | `packages/server/src/routes/account-settings.ts` |
+| GET | `/api/admin/invites` | `packages/server/src/routes/account-settings.ts` |
+| DELETE | `/api/admin/invites/:id` | `packages/server/src/routes/account-settings.ts` |
+| PUT | `/api/admin/speech` | `packages/server/src/routes/account-settings.ts` |
+| GET | `/api/settings/secrets` | `packages/server/src/routes/account-settings.ts` |
+| PUT | `/api/settings/secrets/:name` | `packages/server/src/routes/account-settings.ts` |
+| DELETE | `/api/settings/secrets/:name` | `packages/server/src/routes/account-settings.ts` |
+| GET | `/api/settings/speech` | `packages/server/src/routes/account-settings.ts` |
+| PUT | `/api/settings/speech` | `packages/server/src/routes/account-settings.ts` |
 | GET | `/api/settings/always-on` | `packages/server/src/routes/always-on-settings.ts` |
 | PATCH | `/api/settings/always-on` | `packages/server/src/routes/always-on-settings.ts` |
 | GET | `/api/agent-messages` | `packages/server/src/routes/agent-messages.ts` |
@@ -118,15 +138,15 @@ Registered only through `router.add` in the handler file. `packages/server/src/a
 
 `GET` and `DELETE` on `/internal/mcp/runs/:runId` are registered and then answered 405 after the run token check. The CLI uses `POST` JSON-RPC (`initialize`, `ping`, `tools/list`, `tools/call`). Session cookies do not authenticate that path.
 
-`POST /api/hooks/:listenerId` is also outside the passcode. It checks the listener secret (`packages/server/src/listeners/verify.ts`). `GET` and `PATCH /api/settings/always-on` are passcode-gated and marked instance-admin in `packages/server/src/routes/always-on-settings.ts`. The scheduler starts from `packages/server/src/serve.ts` unless `createApp({ scheduler: false })`. Each tick reads `always_on.*` from the store (`packages/db/src/always-on-settings.ts`).
+`POST /api/hooks/:listenerId` is outside the session. It checks the listener secret (`packages/server/src/listeners/verify.ts`). `GET` and `PATCH /api/settings/always-on` require an admin session (`packages/server/src/routes/always-on-settings.ts`). The scheduler starts from `packages/server/src/serve.ts` unless `createApp({ scheduler: false })`. Each tick reads `always_on.*` from the store (`packages/db/src/always-on-settings.ts`).
 
 ## Env vars
 
-`loadConfig` in `packages/server/src/config.ts` reads: `BOTANICAL_DEPLOYMENT_MODE`, `BOTANICAL_BRAND_NAME`, `BOTANICAL_PASSWORD`, `BOTANICAL_PASSWORD_HASH`, `DATABASE_URL`, `BOTANICAL_HOST`, `BOTANICAL_PORT`, `PORT`, `BOTANICAL_SESSION_TTL_SECONDS`, `BOTANICAL_COOKIE_SECURE`, `BOTANICAL_CORS_ORIGIN`, `BOTANICAL_TRUST_PROXY`, `BOTANICAL_MAX_BODY_BYTES`, `BOTANICAL_A2A_AUTORUN`, `BOTANICAL_PUBLIC_ORIGIN`, `BOTANICAL_CLI_PROFILES`, `BOTANICAL_STT_MAX_BYTES`, `BOTANICAL_STT_MAX_SECONDS`, `BOTANICAL_STT_DISABLED`, `BOTANICAL_STT_PROVIDER`, `BOTANICAL_STT_BASE_URL`, `BOTANICAL_STT_MODEL`, `BOTANICAL_STT_API_KEY`, `OPENAI_API_KEY`. STT presets also read `OPENROUTER_API_KEY`, `XAI_API_KEY`, or `DASHSCOPE_API_KEY` by provider name.
+`loadConfig` in `packages/server/src/config.ts` reads: `BOTANICAL_DEPLOYMENT_MODE`, `BOTANICAL_BRAND_NAME`, `BOTANICAL_ENCRYPTION_KEY`, `DATABASE_URL`, `BOTANICAL_HOST`, `BOTANICAL_PORT`, `PORT`, `BOTANICAL_SESSION_TTL_SECONDS`, `BOTANICAL_COOKIE_SECURE`, `BOTANICAL_CORS_ORIGIN`, `BOTANICAL_TRUST_PROXY`, `BOTANICAL_MAX_BODY_BYTES`, `BOTANICAL_A2A_AUTORUN`, `BOTANICAL_PUBLIC_ORIGIN`, `BOTANICAL_CLI_PROFILES`, `BOTANICAL_STT_MAX_BYTES`, `BOTANICAL_STT_MAX_SECONDS`, `BOTANICAL_STT_DISABLED`, `BOTANICAL_STT_PROVIDER`, `BOTANICAL_STT_BASE_URL`, `BOTANICAL_STT_MODEL`, `BOTANICAL_STT_API_KEY`, `OPENAI_API_KEY`. STT presets also read `OPENROUTER_API_KEY`, `XAI_API_KEY`, or `DASHSCOPE_API_KEY` by provider name.
 
 Scheduler on/off, tick interval, background concurrency, and webhook body size are not env vars. They are `settings` keys `always_on.scheduler_enabled`, `always_on.scheduler_interval_ms`, `always_on.background_concurrency`, and `always_on.listener_max_bytes` (`packages/db/src/always-on-settings.ts`).
 
-Profile documents and provider keys are read via `packages/providers` (see [providers](providers.md)). It does not read `BOTANICAL_PASSCODE`; `deploy/scripts/server-entrypoint.sh` copies that into `BOTANICAL_PASSWORD` before start.
+Profile documents are stored in the database. Provider keys are decrypted from `secrets` and passed into `packages/providers` (see [providers](providers.md)). `deploy/scripts/server-entrypoint.sh` warns when `BOTANICAL_ENCRYPTION_KEY` is unset and does not require a passcode.
 
 | File | Also reads |
 |------|------------|

@@ -17,7 +17,7 @@ Images, compose, release zip, and the one workflow. The API process inside the s
 | `.dockerignore` | Docker build context filter |
 | `packages/db/docker-compose.test.yml` | Test-only Postgres. Do not start it unless asked |
 
-`deploy/scripts/server-entrypoint.sh` normalizes `DEPLOYMENT_MODE` / `BOTANICAL_DEPLOYMENT_MODE` into `BOTANICAL_DEPLOYMENT_MODE`, copies `BOTANICAL_PASSCODE` to `BOTANICAL_PASSWORD` when the password and hash are unset, runs `bun run db:migrate` when `DATABASE_URL` is set, then `bun src/serve.ts` in `packages/server`.
+`deploy/scripts/server-entrypoint.sh` normalizes `DEPLOYMENT_MODE` / `BOTANICAL_DEPLOYMENT_MODE` into `BOTANICAL_DEPLOYMENT_MODE`, warns when `BOTANICAL_ENCRYPTION_KEY` is unset, runs `bun run db:migrate` when `DATABASE_URL` is set, then `bun src/serve.ts` in `packages/server`.
 
 ## `deploy/`
 

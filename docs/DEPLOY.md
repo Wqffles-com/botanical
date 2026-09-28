@@ -9,7 +9,7 @@ The reference stack is Docker Compose, project name **`botanical-mvp`**:
 | Service | Role | Inside the network | Published on the host |
 |---------|------|--------------------|------------------------|
 | `web` | Next.js (standalone) | `3000` | `${WEB_BIND:-0.0.0.0}:${WEB_PORT:-3000}` |
-| `server` | Bun API, passcode, provider keys | `8787` | `127.0.0.1:${SERVER_PORT:-8788}` |
+| `server` | Bun API, accounts, provider keys | `8787` | `127.0.0.1:${SERVER_PORT:-8788}` |
 | `postgres` | Postgres 17 | `5432` | `127.0.0.1:${POSTGRES_PORT:-5433}` |
 
 The API and Postgres are published on loopback only. Change the host ports with `WEB_PORT`, `SERVER_PORT`, and `POSTGRES_PORT`.
@@ -28,7 +28,7 @@ cd botanical
 cp .env.example .env
 ```
 
-Edit `.env`. Set a long `BOTANICAL_PASSCODE`. Change `POSTGRES_PASSWORD` and the matching password inside `DATABASE_URL` before anyone else can reach the host. The host in `DATABASE_URL` is `postgres` (the Compose service) and the port in that URL is **5432**. `POSTGRES_PORT` is only the port published on the machine (default **5433**).
+Edit `.env`. Set `BOTANICAL_ENCRYPTION_KEY`. Change `POSTGRES_PASSWORD` and the matching password inside `DATABASE_URL` before anyone else can reach the host. The host in `DATABASE_URL` is `postgres` (the Compose service) and the port in that URL is **5432**. `POSTGRES_PORT` is only the port published on the machine (default **5433**).
 
 ```sh
 docker compose up --build -d
@@ -43,12 +43,12 @@ Unlock check, through the web origin:
 
 ```sh
 curl -fsS -c /tmp/botanical.cookies -H 'content-type: application/json' \
-  -d '{"passcode":"YOUR_PASSCODE"}' \
+  -d '{"email":"you@example.com","password":"a-long-password","displayName":"Admin"}' \
   http://127.0.0.1:3000/api/auth/login
 curl -fsS -b /tmp/botanical.cookies http://127.0.0.1:3000/api/auth/me
 ```
 
-The API also accepts `"password"` in that JSON body. Leave `BOTANICAL_PASSWORD` empty to use `BOTANICAL_PASSCODE` (the entrypoint copies it). If both are set, `BOTANICAL_PASSWORD` is the one the API checks. `BOTANICAL_PASSWORD_HASH` (argon2) wins over either plaintext.
+That request is `POST /api/auth/signup`. The first account is the admin. Later sign-ins use `POST /api/auth/login` with `email` and `password`.
 
 Logs and shutdown:
 
@@ -100,7 +100,7 @@ Copy from [.env.example](../.env.example). Do not commit `.env`.
 | Key | Required | Purpose |
 |-----|----------|---------|
 | `DEPLOYMENT_MODE` | yes | `SELF_HOST` or `SAAS` |
-| `BOTANICAL_PASSCODE` | yes | Web → server gate. Copied to `BOTANICAL_PASSWORD` when that is empty |
+| `BOTANICAL_ENCRYPTION_KEY` | yes | Encrypts provider keys stored in Postgres |
 | `DATABASE_URL` | yes for Postgres | Host `postgres`, port `5432`, on the Compose network |
 | `BOTANICAL_SESSION_SECRET` | no | Reserved. The current API does not read it |
 | `BOTANICAL_PUBLIC_ORIGIN` | recommended | Public web origin, and the origin used in webhook URLs. Pair `https://` with `BOTANICAL_COOKIE_SECURE=true` |
@@ -253,7 +253,7 @@ botanical.example.com {
 }
 ```
 
-Leave Postgres on `127.0.0.1` and do not publish `5433` in a cloud security group. The API publish is already loopback. Browsers talk to `web`. Provider keys and the passcode must not cross the internet in cleartext.
+Leave Postgres on `127.0.0.1` and do not publish `5433` in a cloud security group. The API publish is already loopback. Browsers talk to `web`. Provider keys must not cross the internet in cleartext.
 
 ## Data, backups, upgrades
 
@@ -293,7 +293,7 @@ SaaS here means **the same artifacts, run as a hosted service**, not a multi-ten
 What to set:
 
 - `DEPLOYMENT_MODE=SAAS` (the override file forces this on the server).
-- A long passcode that is not the example value.
+- `BOTANICAL_ENCRYPTION_KEY` set to a value that is not the example.
 - `BOTANICAL_PUBLIC_ORIGIN=https://…` and `BOTANICAL_COOKIE_SECURE=true`.
 - `DATABASE_URL` pointing at managed Postgres.
 
@@ -309,7 +309,7 @@ Bring the process up without the bundled database:
 # .env — managed Postgres, real secrets, public https origin
 DEPLOYMENT_MODE=SAAS
 DATABASE_URL=postgresql://botanical:URL_ENCODED@db.internal:5432/botanical?sslmode=require
-BOTANICAL_PASSCODE=...
+BOTANICAL_ENCRYPTION_KEY=...
 BOTANICAL_SESSION_SECRET=...
 BOTANICAL_PUBLIC_ORIGIN=https://app.example.com
 BOTANICAL_COOKIE_SECURE=true
@@ -334,7 +334,7 @@ Operating notes:
 
 | Symptom | What to check |
 |---------|----------------|
-| Server exits immediately | `docker compose logs server`. Missing passcode, bad `DEPLOYMENT_MODE`, or `DATABASE_URL` set while `packages/db` has no `createStore` |
+| Server exits immediately | `docker compose logs server`. Bad `DEPLOYMENT_MODE`, or `DATABASE_URL` set while `packages/db` has no `createStore` |
 | `migrations failed` | `DATABASE_URL` host should be `postgres` and the password must match `POSTGRES_PASSWORD`. `docker compose ps` should show postgres healthy |
 | Web UI loads, `/api/auth/me` fails | Web was built with the wrong `BOTANICAL_API_URL`, or the server is not healthy. Rebuild web after changing the API URL |
 | Cookie does not stick | `https://` origin with the site opened over `http://`, or `BOTANICAL_COOKIE_SECURE` does not match the scheme |

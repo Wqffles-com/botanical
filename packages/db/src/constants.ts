@@ -29,6 +29,33 @@ export const SETTING_KEYS = {
   authPasscodeEnv: 'auth.passcode_env',
   authPasscodeAliasEnv: 'auth.passcode_alias_env',
   authPasscodeHashEnv: 'auth.passcode_hash_env',
+  signupMode: 'auth.signup_mode',
+  allowGlobalKeys: 'providers.allow_global_keys',
+} as const;
+
+export const SIGNUP_MODES = ['open', 'invite', 'closed'] as const;
+export type SignupMode = (typeof SIGNUP_MODES)[number];
+
+/** Logical secret names stored encrypted. Values are not env vars. */
+export const SECRET_NAMES = [
+  'openai',
+  'anthropic',
+  'xai',
+  'deepseek',
+  'openrouter',
+  'dashscope',
+  'openai-compat',
+  'stt',
+] as const;
+export type SecretName = (typeof SECRET_NAMES)[number];
+
+export const STT_SETTING_KEYS = {
+  mode: 'stt.mode',
+  provider: 'stt.provider',
+  baseUrl: 'stt.base_url',
+  model: 'stt.model',
+  maxBytes: 'stt.max_bytes',
+  maxSeconds: 'stt.max_seconds',
 } as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];

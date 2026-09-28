@@ -8,7 +8,9 @@ import {
   isAgentIcon,
   type AgentColor,
 } from "@botanical/core";
-import { createAlwaysOn } from "./always-on.ts";
+import { currentUserId, pinStore } from "@botanical/db";
+import { createAlwaysOn, MEMORY_OPERATOR_ID } from "./always-on.ts";
+import { createMemoryAccounts } from "./memory-accounts.ts";
 import { createPlatform } from "./platform.ts";
 import {
   AGENT_MESSAGE_STATUSES,
@@ -37,7 +39,7 @@ const PROFILE_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
  * Data does not survive a restart.
  * Pass `{ seed: true }` for the three example agents (Gardener, Builder, Scout).
  */
-export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }): Store {
+export function createMemoryStore(options?: { seed?: boolean; now?: () => Date; encryptionKey?: string }): Store {
   const agents = new Map<string, Agent>();
   const alwaysOn = createAlwaysOn({
     now: options?.now ?? (() => new Date()),
@@ -49,6 +51,24 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }
   const sessions = new Map<string, Session>();
   const sessionsByHash = new Map<string, string>();
   const profiles = new Map<string, ModelProfile>();
+  const profileOwners = new Map<string, string | null>();
+  const agentOwners = new Map<string, string>();
+  const chatOwners = new Map<string, string>();
+  const memoryOwners = new Map<string, string>();
+
+  function acting(): string {
+    return currentUserId() ?? MEMORY_OPERATOR_ID;
+  }
+
+  function seesAgent(id: string): boolean {
+    const owner = agentOwners.get(id);
+    if (!owner) return currentUserId() === null;
+    return owner === acting();
+  }
+
+  function profileKey(owner: string | null, id: string): string {
+    return `${owner ?? "global"}\0${id}`;
+  }
 
   let clock = 0;
   const timestamp = (): string => {
@@ -86,21 +106,67 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }
         createdAt: EXAMPLE_AGENTS_CREATED_AT,
         updatedAt: EXAMPLE_AGENTS_CREATED_AT,
       });
+      agentOwners.set(example.id, MEMORY_OPERATOR_ID);
     }
   }
 
-  return {
+  function adoptLegacy(userId: string): void {
+    for (const [id, owner] of agentOwners) {
+      if (owner === MEMORY_OPERATOR_ID) agentOwners.set(id, userId);
+    }
+    for (const [id, owner] of chatOwners) {
+      if (owner === MEMORY_OPERATOR_ID) chatOwners.set(id, userId);
+    }
+    for (const [id, owner] of memoryOwners) {
+      if (owner === MEMORY_OPERATOR_ID) memoryOwners.set(id, userId);
+    }
+    for (const [key, owner] of profileOwners) {
+      if (owner === MEMORY_OPERATOR_ID) profileOwners.set(key, userId);
+    }
+    alwaysOn.reassign(MEMORY_OPERATOR_ID, userId);
+  }
+
+  const services = createMemoryAccounts({
+    encryptionKey: options?.encryptionKey,
+    now: timestamp,
+    adoptLegacy,
+    legacyUserId: MEMORY_OPERATOR_ID,
+  });
+
+  function visibleProfiles(): ModelProfile[] {
+    const merged = new Map<string, ModelProfile>();
+    for (const [key, profile] of profiles) {
+      if (profileOwners.get(key) === null) merged.set(profile.id, copyProfile(profile));
+    }
+    for (const [key, profile] of profiles) {
+      if (profileOwners.get(key) === acting()) merged.set(profile.id, copyProfile(profile));
+    }
+    return [...merged.values()];
+  }
+
+  const store: Store = {
     kind: "memory",
+    get scopeUserId() {
+      return currentUserId();
+    },
+    forUser(userId: string) {
+      return pinStore(store, userId);
+    },
+    accounts: services.accounts,
+    secrets: services.secrets,
+    prefs: services.prefs,
     async close() {},
     agents: {
       async list() {
         return [...agents.values()]
+          .filter((agent) => agentOwners.get(agent.id) === acting())
           .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
           .map(presentAgent);
       },
       async get(id) {
         const agent = agents.get(id);
-        return agent ? presentAgent(agent) : null;
+        if (!agent || agentOwners.get(id) !== acting()) return null;
+        return presentAgent(agent);
       },
       async create(input: NewAgent) {
         const now = timestamp();
@@ -120,6 +186,7 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }
           updatedAt: now,
         };
         agents.set(agent.id, agent);
+        agentOwners.set(agent.id, acting());
         if (input.roleIds && input.roleIds.length > 0) {
           await platform.roles.setForAgent(agent.id, input.roleIds);
           agent.roleIds = platform.roleIds(agent.id);
@@ -128,7 +195,7 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }
       },
       async update(id: string, patch: AgentPatch) {
         const current = agents.get(id);
-        if (!current) return null;
+        if (!current || agentOwners.get(id) !== acting()) return null;
         const next: Agent = {
           ...current,
           toolIds: patch.toolIds !== undefined ? [...patch.toolIds] : current.toolIds,
@@ -150,7 +217,8 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }
         return presentAgent(next);
       },
       async delete(id) {
-        if (!agents.has(id)) return false;
+        if (!agents.has(id) || agentOwners.get(id) !== acting()) return false;
+        agentOwners.delete(id);
         platform.onAgentDeleted(id);
         alwaysOn.onAgentDeleted(id);
         for (const agent of agents.values()) {
@@ -167,14 +235,17 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }
     chats: {
       async list() {
         return [...chats.values()]
+          .filter((chat) => chatOwners.get(chat.id) === acting())
           .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id))
           .map(clone);
       },
       async get(id) {
         const chat = chats.get(id);
-        return chat ? clone(chat) : null;
+        if (!chat || chatOwners.get(id) !== acting()) return null;
+        return clone(chat);
       },
       async create(input: NewChat) {
+        if (agentOwners.get(input.agentId) !== acting()) throw new Error("agent not found");
         const now = timestamp();
         const chat: Chat = {
           id: randomUUID(),
@@ -185,11 +256,12 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }
           updatedAt: now,
         };
         chats.set(chat.id, chat);
+        chatOwners.set(chat.id, acting());
         return clone(chat);
       },
       async update(id: string, patch: ChatPatch) {
         const current = chats.get(id);
-        if (!current) return null;
+        if (!current || chatOwners.get(id) !== acting()) return null;
         const next: Chat = {
           ...current,
           updatedAt: timestamp(),
@@ -200,21 +272,26 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }
         return clone(next);
       },
       async delete(id) {
+        if (chatOwners.get(id) !== acting()) return false;
+        chatOwners.delete(id);
         return chats.delete(id);
       },
       async countByAgent(agentId) {
+        if (agentOwners.get(agentId) !== acting()) return 0;
         let count = 0;
         for (const chat of chats.values()) {
-          if (chat.agentId === agentId) count += 1;
+          if (chat.agentId === agentId && chatOwners.get(chat.id) === acting()) count += 1;
         }
         return count;
       },
     },
     messages: {
       async listByChat(chatId) {
+        if (chatOwners.get(chatId) !== acting()) return [];
         return messages.filter((message) => message.chatId === chatId).map(clone);
       },
       async create(input: NewMessage) {
+        if (chatOwners.get(input.chatId) !== acting()) throw new Error("chat not found");
         const message = materializeMessage(input, randomUUID(), timestamp());
         messages.push(message);
         return clone(message);
@@ -253,19 +330,50 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }
     },
     profiles: {
       async list() {
-        return [...profiles.values()].sort((a, b) => a.id.localeCompare(b.id)).map(copyProfile);
+        return visibleProfiles();
       },
       async get(id) {
-        const profile = profiles.get(id);
+        const own = profiles.get(profileKey(acting(), id));
+        if (own) return copyProfile(own);
+        const global = profiles.get(profileKey(null, id));
+        return global ? copyProfile(global) : null;
+      },
+      async upsert(profile: ModelProfile) {
+        const stored = copyProfile(profile);
+        const key = profileKey(acting(), stored.id);
+        profiles.set(key, stored);
+        profileOwners.set(key, acting());
+        return copyProfile(stored);
+      },
+      async delete(id) {
+        const key = profileKey(acting(), id);
+        profileOwners.delete(key);
+        return profiles.delete(key);
+      },
+    },
+    globalProfiles: {
+      async list() {
+        const rows: ModelProfile[] = [];
+        for (const [key, profile] of profiles) {
+          if (profileOwners.get(key) === null) rows.push(copyProfile(profile));
+        }
+        return rows.sort((a, b) => a.id.localeCompare(b.id));
+      },
+      async get(id) {
+        const profile = profiles.get(profileKey(null, id));
         return profile ? copyProfile(profile) : null;
       },
       async upsert(profile: ModelProfile) {
         const stored = copyProfile(profile);
-        profiles.set(stored.id, stored);
+        const key = profileKey(null, stored.id);
+        profiles.set(key, stored);
+        profileOwners.set(key, null);
         return copyProfile(stored);
       },
       async delete(id) {
-        return profiles.delete(id);
+        const key = profileKey(null, id);
+        profileOwners.delete(key);
+        return profiles.delete(key);
       },
     },
     agentMessages: {
@@ -286,9 +394,11 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }
       },
       async get(id) {
         const row = agentMessages.get(id);
-        return row ? clone(row) : null;
+        if (!row || !seesAgent(row.fromAgentId)) return null;
+        return clone(row);
       },
       async listForAgent(agentId, opts) {
+        if (agentOwners.get(agentId) !== acting()) return [];
         const limit = opts?.limit ?? 100;
         const filtered = [...agentMessages.values()].filter((message) => {
           if (message.toAgentId !== agentId) return false;
@@ -347,6 +457,7 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }
       },
       async list(query) {
         return [...agentMessages.values()]
+          .filter((message) => agentOwners.get(message.fromAgentId) === acting())
           .filter((message) => matchesAgentMessage(message, query))
           .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
           .map(clone);
@@ -357,7 +468,7 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }
         if (input.fromAgentId === input.toAgentId) {
           throw new Error("agent message endpoints must be different agents");
         }
-        if (!agents.has(input.fromAgentId) || !agents.has(input.toAgentId)) {
+        if (agentOwners.get(input.fromAgentId) !== acting() || agentOwners.get(input.toAgentId) !== acting()) {
           throw new Error("agent message endpoints must reference existing agents");
         }
         const now = timestamp();
@@ -390,7 +501,42 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }
         return clone(next);
       },
     },
-    memories: platform.memories,
+    memories: {
+      async list(query) {
+        const rows = await platform.memories.list(query);
+        return rows.filter((row) => memoryOwners.get(row.id) === acting());
+      },
+      async listVisible(agentId, opts) {
+        if (agentOwners.get(agentId) !== acting()) return [];
+        const rows = await platform.memories.listVisible(agentId, opts);
+        return rows.filter((row) => memoryOwners.get(row.id) === acting());
+      },
+      async get(id) {
+        if (memoryOwners.get(id) !== acting()) return null;
+        return platform.memories.get(id);
+      },
+      async create(input) {
+        if (input.agentId && agentOwners.get(input.agentId) !== acting()) throw new Error("agent not found");
+        const row = await platform.memories.create(input);
+        memoryOwners.set(row.id, acting());
+        return row;
+      },
+      async update(id, patch) {
+        if (memoryOwners.get(id) !== acting()) return null;
+        return platform.memories.update(id, patch);
+      },
+      async delete(id) {
+        if (memoryOwners.get(id) !== acting()) return false;
+        memoryOwners.delete(id);
+        return platform.memories.delete(id);
+      },
+      async deleteVisible(id, agentId) {
+        if (memoryOwners.get(id) !== acting()) return "missing";
+        const result = await platform.memories.deleteVisible(id, agentId);
+        if (result === "deleted") memoryOwners.delete(id);
+        return result;
+      },
+    },
     roles: platform.roles,
     routines: alwaysOn.routines,
     routineRuns: alwaysOn.routineRuns,
@@ -399,6 +545,7 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date }
     notifications: alwaysOn.notifications,
     alwaysOnSettings: alwaysOn.alwaysOnSettings,
   };
+  return store;
 }
 
 function materializeMessage(input: NewMessage, id: string, createdAt: string): Message {
@@ -439,7 +586,16 @@ function copyProfile(profile: ModelProfile): ModelProfile {
     provider: profile.provider,
     model: profile.model,
   };
+  if (profile.description !== undefined) stored.description = profile.description;
   if (profile.baseUrl !== undefined) stored.baseUrl = profile.baseUrl;
+  if (profile.maxTokens !== undefined) stored.maxTokens = profile.maxTokens;
+  if (profile.temperature !== undefined) stored.temperature = profile.temperature;
+  if (profile.kind) stored.kind = profile.kind;
+  if (profile.cli) stored.cli = profile.cli;
+  if (profile.bin) stored.bin = profile.bin;
+  if (profile.timeoutMs !== undefined) stored.timeoutMs = profile.timeoutMs;
+  if (profile.passModel !== undefined) stored.passModel = profile.passModel;
+  if (profile.botanicalTools !== undefined) stored.botanicalTools = profile.botanicalTools;
   return stored;
 }
 

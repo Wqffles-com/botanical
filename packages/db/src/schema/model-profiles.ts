@@ -1,20 +1,19 @@
 import { sql } from 'drizzle-orm';
-import { check, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { check, index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 import type { ModelProfileConfig } from '../types.ts';
 import { users } from './users.ts';
 
 /**
  * Explicit model pick. There is no default-profile column.
- * `config.apiKeyEnv` names an env var. Raw keys are rejected.
+ * `user_id` null is an admin-global profile. A user's row with the same public id overrides it.
+ * `config` holds non-secret options. Raw keys are rejected.
  */
 export const modelProfiles = pgTable(
   'model_profiles',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'restrict' }),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'restrict' }),
     /**
      * Id the HTTP API uses (`grok`, `mock`). The uuid primary key stays internal
      * so chats can keep a foreign key.
@@ -33,8 +32,13 @@ export const modelProfiles = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex('model_profiles_user_name_uidx').on(t.userId, t.name),
-    uniqueIndex('model_profiles_user_public_id_uidx').on(t.userId, t.publicId),
+    index('model_profiles_user_id_idx').on(t.userId),
+    uniqueIndex('model_profiles_user_name_uidx').on(t.userId, t.name).where(sql`${t.userId} is not null`),
+    uniqueIndex('model_profiles_user_public_id_uidx')
+      .on(t.userId, t.publicId)
+      .where(sql`${t.userId} is not null`),
+    uniqueIndex('model_profiles_global_name_uidx').on(t.name).where(sql`${t.userId} is null`),
+    uniqueIndex('model_profiles_global_public_id_uidx').on(t.publicId).where(sql`${t.userId} is null`),
     check('model_profiles_public_id_shape', sql`${t.publicId} ~ '^[A-Za-z0-9_-]{1,64}$'`),
     check(
       'model_profiles_provider_model_not_blank',

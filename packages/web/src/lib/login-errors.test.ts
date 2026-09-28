@@ -1,31 +1,27 @@
 import { describe, expect, test } from "bun:test";
 import { BotanicalApiError } from "@botanical/core";
-import { loginErrorText, passcodeClientError } from "./login-errors";
+import { loginErrorText, passwordClientError } from "./login-errors";
 
 describe("loginErrorText", () => {
-  test("maps unauthorized and rate-limited responses", () => {
-    expect(loginErrorText(new BotanicalApiError("nope", { status: 401 }))).toBe(
-      "That passcode was not accepted.",
+  test("maps auth failures", () => {
+    expect(loginErrorText(new BotanicalApiError("no", { status: 401 }))).toBe(
+      "That email or password was not accepted.",
     );
-    expect(loginErrorText(new BotanicalApiError("slow down", { status: 429 }))).toBe(
+    expect(loginErrorText(new BotanicalApiError("closed", { status: 403 }))).toBe("closed");
+    expect(loginErrorText(new BotanicalApiError("busy", { status: 429 }))).toBe(
       "Too many login attempts. Try again later.",
     );
-    expect(loginErrorText(new BotanicalApiError("bad", { status: 400 }))).toBe("bad");
-    expect(loginErrorText(new BotanicalApiError("boom", { status: 500 }))).toBe(
-      "The server could not check the passcode. Try again.",
+    expect(loginErrorText(new BotanicalApiError("down", { status: 500 }))).toBe(
+      "The server could not sign you in. Try again.",
     );
-  });
-
-  test("maps network failures", () => {
-    const error = new TypeError("Failed to fetch");
-    expect(loginErrorText(error)).toBe("Botanical server is unreachable.");
   });
 });
 
-describe("passcodeClientError", () => {
-  test("rejects empty and short passcodes", () => {
-    expect(passcodeClientError("")).toBe("Enter the server passcode.");
-    expect(passcodeClientError("  ab ")).toBe("Passcode is too short.");
-    expect(passcodeClientError("sprout")).toBeNull();
+describe("passwordClientError", () => {
+  test("rejects empty and short signup passwords", () => {
+    expect(passwordClientError("", true)).toBe("Enter your password.");
+    expect(passwordClientError("short", true)).toBe("Password must be at least 8 characters.");
+    expect(passwordClientError("long-enough", true)).toBeNull();
+    expect(passwordClientError("x", false)).toBeNull();
   });
 });

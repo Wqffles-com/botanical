@@ -8,16 +8,16 @@ The web app (`packages/web`) talks only through `BotanicalClient`. Routes below 
 
 ## Auth
 
-Password / passcode. The client sends JSON:
+Email and password. The client sends JSON:
 
 ```json
-{ "password": "the-passcode" }
+{ "email": "ada@example.com", "password": "at-least-8" }
 ```
 
-`POST /api/auth/login` → `200`
+`POST /api/auth/signup` creates an account (the first one is admin) and returns the same session shape as login. `POST /api/auth/login` → `200`
 
 ```json
-{ "token": "<bearer>", "tokenType": "Bearer", "expiresAt": "2026-10-07T00:00:00.000Z", "operator": { "id": "operator" } }
+{ "token": "<bearer>", "tokenType": "Bearer", "expiresAt": "2026-10-07T00:00:00.000Z", "user": { "id": "<uuid>", "email": "ada@example.com", "displayName": "Ada", "role": "admin" } }
 ```
 
 The same token is set as the `HttpOnly` cookie `botanical_session`. Logout must send a JSON body (`{}`); an empty body is rejected.
@@ -102,7 +102,7 @@ interface ChatMessage {
 
 ## Streaming aliases
 
-Besides the server frames below, the parser accepts NDJSON, a single JSON assistant message, `event: message-start`, `tool-call`, `usage`, `error`, `text.delta`, `finish`, and `data: [DONE]`. `401` / `403` clear the saved session and return the UI to the passcode screen.
+Besides the server frames below, the parser accepts NDJSON, a single JSON assistant message, `event: message-start`, `tool-call`, `usage`, `error`, `text.delta`, `finish`, and `data: [DONE]`. `401` / `403` clear the saved session and return the UI to the login screen.
 
 ## Server stream and base URL
 

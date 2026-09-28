@@ -1,6 +1,6 @@
 # @botanical/server
 
-HTTP API for Botanical v0: password or passcode auth, agents, chats, messages, model profiles, tools, MCP, and agent-to-agent mail.
+HTTP API for Botanical: accounts, agents, chats, messages, model profiles, tools, MCP, and agent-to-agent mail.
 
 Runtime is **Bun**. `SELF_HOST` and `SAAS` are the same server. The deployment mode is a flag plus branding. It does not change auth, routes, or storage.
 
@@ -9,7 +9,7 @@ Runtime is **Bun**. `SELF_HOST` and `SAAS` are the same server. The deployment m
 ```bash
 cd packages/server
 cp .env.example .env
-# set BOTANICAL_PASSWORD. Profiles come from provider API keys; mock is always listed.
+# set BOTANICAL_ENCRYPTION_KEY before saving provider keys. Mock profile is always listed.
 bun install
 bun src/serve.ts
 ```
@@ -21,7 +21,7 @@ Docker, from this directory:
 ```bash
 docker build -t botanical-server .
 docker run --rm -p 8787:8787 \
-  -e BOTANICAL_PASSWORD=change-me \
+  -e BOTANICAL_ENCRYPTION_KEY=change-me-encryption-key \
   -e BOTANICAL_COOKIE_SECURE=false \
   -e BOTANICAL_PROFILES='[{"id":"grok","name":"Grok","provider":"xai","model":"grok-4"}]' \
   botanical-server
@@ -35,7 +35,7 @@ With no `DATABASE_URL`, the memory store starts with three example agents: Garde
 
 ## Auth
 
-One operator. `POST /api/auth/login` accepts `{ "password": "..." }` or `{ "passcode": "..." }`.
+`POST /api/auth/signup` creates an account. The first one is admin. `POST /api/auth/login` accepts `{ "email", "password" }`.
 
 The JSON body returns `token`. The same value is set as an `HttpOnly` cookie, `botanical_session`. Call the API with either:
 
@@ -44,7 +44,7 @@ The JSON body returns `token`. The same value is set as an `HttpOnly` cookie, `b
 
 Bearer is preferred when both are sent. Logout deletes that session only. A second client stays signed in.
 
-Set `BOTANICAL_PASSWORD_HASH` to an argon2 hash from `Bun.password.hash` on a real deploy. If both the hash and `BOTANICAL_PASSWORD` are set, the hash is what login checks.
+Passwords are hashed with argon2id (`Bun.password.hash`) and stored on the user row. Sessions store a SHA-256 of the cookie token.
 
 Failed logins are limited per client address (20 failures / 15 minutes).
 

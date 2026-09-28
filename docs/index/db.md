@@ -7,6 +7,7 @@ Postgres schema (Drizzle), migrations, and the store the API uses when `DATABASE
 - Package: `@botanical/db`
 - Entries: `packages/db/src/index.ts`, `packages/db/src/schema/index.ts` (`./schema`), `packages/db/src/client.ts` (`./client`)
 - Migrate CLI: `packages/db/src/cli.ts` (script `migrate`, root `bun run db:migrate`)
+- Accounts and encryption: `packages/db/src/accounts.ts`, `packages/db/src/account-types.ts`, `packages/db/src/crypto.ts`, `packages/db/src/actor.ts`
 
 ## Tables
 
@@ -34,6 +35,9 @@ Defined with `pgTable` under `packages/db/src/schema`. Re-exported from `package
 | `listeners` | `packages/db/src/schema/listeners.ts` |
 | `listener_deliveries` | `packages/db/src/schema/listeners.ts` |
 | `notifications` | `packages/db/src/schema/notifications.ts` |
+| `invites` | `packages/db/src/schema/invites.ts` |
+| `secrets` | `packages/db/src/schema/secrets.ts` |
+| `user_settings` | `packages/db/src/schema/user-settings.ts` |
 
 Enums in `packages/db/src/schema/enums.ts`: `message_role`, `a2a_status`, `agent_color`. Relations: `packages/db/src/schema/relations.ts`.
 
@@ -48,6 +52,7 @@ Enums in `packages/db/src/schema/enums.ts`: `message_role`, `a2a_status`, `agent
 | `packages/db/migrations/0002_mvp_store.sql` | `sessions`, profile `public_id` |
 | `packages/db/migrations/0003_mvp2.sql` | `roles`, `agent_roles`, `memories`, agent creator |
 | `packages/db/migrations/0004_routines.sql` | `routines`, `routine_runs`, `listeners`, `listener_deliveries`, `notifications` |
+| `packages/db/migrations/0005_accounts.sql` | user role, session owner, invites, encrypted secrets, user settings, global profiles |
 | `packages/db/migrations/meta/_journal.json` | Apply order (tags match the SQL filenames) |
 | `packages/db/migrations/meta/0000_snapshot.json` | Drizzle snapshot for `0000` |
 | `packages/db/migrations/meta/0001_snapshot.json` | Drizzle snapshot for `0001` |

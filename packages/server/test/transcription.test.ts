@@ -492,7 +492,7 @@ describe("transcription routes", () => {
       },
     });
     const spy = spyOn(sttConfig, "resolve").mockImplementation(async (context) => {
-      expect(context.userId).toBe("operator");
+      expect(context.userId).toMatch(/^[0-9a-f-]{36}$/);
       expect(context.config.dictation).toMatchObject({
         mode: "server",
         apiKey: "config-key",

@@ -102,6 +102,13 @@ describe("coding CLI routes", () => {
     });
     const { app } = setup(env, { cli });
     const { token } = await login(app);
+    const me = await readJson<{ user: { id: string } }>(
+      await app.fetch(new Request("http://localhost/api/auth/me", { headers: bearer(token) })),
+    );
+    const userHome = `${home}/users/${me.user.id.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80)}`;
+    for (const [path, bytes] of [...files]) {
+      if (path.startsWith(`${home}/`) && !path.startsWith(`${userHome}/`)) files.set(path.replace(home, userHome), bytes);
+    }
     const response = await app.fetch(new Request("http://localhost/api/cli", { headers: bearer(token) }));
     expect(response.status).toBe(200);
     const body = await readJson<{ clis: { cli: string; loggedIn: boolean | string; lastError: string | null }[] }>(response);
@@ -178,6 +185,16 @@ async function cliLoggedIn(
   });
   const { app } = setup(env, { cli });
   const { token } = await login(app);
+  const me = await readJson<{ user: { id: string } }>(
+    await app.fetch(new Request("http://localhost/api/auth/me", { headers: bearer(token) })),
+  );
+  const userHome = `${home}/users/${me.user.id.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80)}`;
+  const bag = io as InstallIo & { files?: Map<string, Uint8Array> };
+  for (const [path, bytes] of bag.files ?? []) {
+    if (path.startsWith(`${home}/`) && !path.startsWith(`${userHome}/`)) {
+      bag.files?.set(path.replace(home, userHome), bytes);
+    }
+  }
   const response = await app.fetch(new Request("http://localhost/api/cli", { headers: bearer(token) }));
   const body = await readJson<{ clis: { cli: string; loggedIn: boolean | string }[] }>(response);
   const raw = JSON.stringify(body);
@@ -279,8 +296,9 @@ function idle() {
   };
 }
 
-function memory(files: Map<string, Uint8Array>): InstallIo {
+function memory(files: Map<string, Uint8Array>): InstallIo & { files: Map<string, Uint8Array> } {
   return {
+    files,
     env: {},
     now: () => new Date("2026-09-27T00:00:00.000Z"),
     arch: () => "x64",

@@ -110,11 +110,24 @@ export function normalizeMe(body: unknown): Me {
   if (record.authenticated === false) {
     throw new BotanicalApiError("Not signed in.", { status: 401, body });
   }
+  const user = readAccountUser(record.user);
   return {
     authenticated: true,
     mode: normalizeMode(record.mode ?? record.deploymentMode ?? record.deployment_mode),
     brandName: readBrandName(record.brand ?? record.brandName ?? record.brand_name),
+    user,
   };
+}
+
+function readAccountUser(value: unknown): import("./types").AccountUser | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const id = typeof record.id === "string" ? record.id : "";
+  const email = typeof record.email === "string" ? record.email : "";
+  const displayName = typeof record.displayName === "string" ? record.displayName : "";
+  const role = record.role === "admin" || record.role === "member" ? record.role : null;
+  if (!id || !role) return null;
+  return { id, email, displayName, role };
 }
 
 export function normalizeProfile(body: unknown): ModelProfile {

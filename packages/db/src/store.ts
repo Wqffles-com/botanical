@@ -1,5 +1,8 @@
-import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 
+import type { AccountRepository, PrefsRepository, SecretRepository } from './account-types.ts';
+import { createAccountServices } from './accounts.ts';
+import { currentUserId, pinStore } from './actor.ts';
 import {
   ALWAYS_ON_SETTING_KEYS,
   alwaysOnToRaw,
@@ -63,7 +66,16 @@ export interface ModelProfile {
   name: string;
   provider: string;
   model: string;
+  description?: string | null;
   baseUrl?: string;
+  maxTokens?: number;
+  temperature?: number;
+  kind?: string;
+  cli?: string;
+  bin?: string;
+  timeoutMs?: number;
+  passModel?: boolean;
+  botanicalTools?: boolean;
 }
 
 export interface Agent {
@@ -149,6 +161,7 @@ export interface NewMessage {
 
 export interface Session {
   id: string;
+  userId: string;
   tokenHash: string;
   createdAt: string;
   expiresAt: string;
@@ -243,6 +256,18 @@ export interface Store {
   readonly notifications: AlwaysOn['notifications'];
   /** Instance-admin tuning for background work. Not per-user. */
   readonly alwaysOnSettings: AlwaysOnSettingsRepository;
+  readonly accounts: AccountRepository;
+  readonly secrets: SecretRepository;
+  readonly prefs: PrefsRepository;
+  readonly globalProfiles: {
+    list(): Promise<ModelProfile[]>;
+    get(id: string): Promise<ModelProfile | null>;
+    upsert(profile: ModelProfile): Promise<ModelProfile>;
+    delete(id: string): Promise<boolean>;
+  };
+  /** Acting user, or null on the shared store outside a request. */
+  readonly scopeUserId: string | null;
+  forUser(userId: string): Store;
   readonly roles: {
     list(): Promise<RoleRecord[]>;
     get(id: string): Promise<RoleRecord | null>;
@@ -263,7 +288,7 @@ export interface Store {
  * Migrate, bootstrap the single operator, and return a Store.
  * Called by the HTTP server when DATABASE_URL is set.
  */
-export async function createStore(options: { connectionString: string }): Promise<Store> {
+export async function createStore(options: { connectionString: string; encryptionKey?: string }): Promise<Store> {
   const connectionString = options.connectionString?.trim();
   if (!connectionString) throw new Error('connectionString is required');
   await ensureDatabase(connectionString);
@@ -271,7 +296,7 @@ export async function createStore(options: { connectionString: string }): Promis
   const handle = createDb({ databaseUrl: connectionString });
   try {
     const userId = await ensureOperator(handle.db);
-    return buildStore(handle.db, userId, () => handle.close());
+    return buildStore(handle.db, userId, () => handle.close(), options.encryptionKey);
   } catch (error) {
     await handle.close().catch(() => undefined);
     throw error;
@@ -294,10 +319,19 @@ async function ensureOperator(db: BotanicalDb): Promise<string> {
   });
 }
 
-function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<void>): Store {
+function buildStore(
+  db: BotanicalDb,
+  legacyUserId: string,
+  closePool: () => Promise<void>,
+  encryptionKey?: string,
+): Store {
   let closed = false;
-  const mvp2 = createMvp2(db, userId);
-  const alwaysOn = createAlwaysOn(db, userId);
+  function bound(): string {
+    return currentUserId() ?? legacyUserId;
+  }
+  const mvp2 = createMvp2(db, bound);
+  const alwaysOn = createAlwaysOn(db, legacyUserId);
+  const services = createAccountServices(db, { encryptionKey, legacyUserId });
   const alwaysOnKeys = Object.values(ALWAYS_ON_SETTING_KEYS);
   const alwaysOnSettings = createAlwaysOnSettingsAccessor({
     async read() {
@@ -330,14 +364,19 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
     if (!PROFILE_ID_PATTERN.test(id)) {
       throw new Error(`Unknown model profile ${JSON.stringify(publicId)}`);
     }
-    const rows = await db
+    const own = await db
       .select({ id: modelProfiles.id })
       .from(modelProfiles)
-      .where(and(eq(modelProfiles.userId, userId), eq(modelProfiles.publicId, id)))
+      .where(and(eq(modelProfiles.userId, bound()), eq(modelProfiles.publicId, id)))
       .limit(1);
-    const row = rows[0];
-    if (!row) throw new Error(`Unknown model profile ${JSON.stringify(id)}. Upsert it before use.`);
-    return row.id;
+    if (own[0]) return own[0].id;
+    const global = await db
+      .select({ id: modelProfiles.id })
+      .from(modelProfiles)
+      .where(and(isNull(modelProfiles.userId), eq(modelProfiles.publicId, id)))
+      .limit(1);
+    if (global[0]) return global[0].id;
+    throw new Error(`Unknown model profile ${JSON.stringify(id)}. Upsert it before use.`);
   }
 
   async function requireOwnedChat(chatId: string): Promise<boolean> {
@@ -345,13 +384,22 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
     const rows = await db
       .select({ id: chats.id })
       .from(chats)
-      .where(and(eq(chats.id, chatId), eq(chats.userId, userId)))
+      .where(and(eq(chats.id, chatId), eq(chats.userId, bound())))
       .limit(1);
     return Boolean(rows[0]);
   }
 
-  return {
+  const store: Store = {
     kind: 'postgres',
+    get scopeUserId() {
+      return currentUserId();
+    },
+    forUser(userId: string) {
+      return pinStore(store, userId);
+    },
+    accounts: services.accounts,
+    secrets: services.secrets,
+    prefs: services.prefs,
     async close() {
       if (closed) return;
       closed = true;
@@ -362,7 +410,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
         const rows = await db
           .select()
           .from(agents)
-          .where(eq(agents.userId, userId))
+          .where(eq(agents.userId, bound()))
           .orderBy(asc(agents.createdAt), asc(agents.id));
         return hydrate(rows);
       },
@@ -371,7 +419,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
         const rows = await db
           .select()
           .from(agents)
-          .where(and(eq(agents.id, id), eq(agents.userId, userId)))
+          .where(and(eq(agents.id, id), eq(agents.userId, bound())))
           .limit(1);
         const hydrated = await hydrate(rows);
         return hydrated[0] ?? null;
@@ -380,7 +428,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
         const inserted = await db
           .insert(agents)
           .values({
-            userId,
+            userId: bound(),
             name: requireName(input.name),
             icon: normalizeIcon(input.icon),
             color: normalizeColor(input.color),
@@ -425,7 +473,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
         const updated = await db
           .update(agents)
           .set(values)
-          .where(and(eq(agents.id, id), eq(agents.userId, userId)))
+          .where(and(eq(agents.id, id), eq(agents.userId, bound())))
           .returning();
         const row = updated[0];
         if (!row) return null;
@@ -438,7 +486,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
         const existing = await db
           .select({ id: agents.id })
           .from(agents)
-          .where(and(eq(agents.id, id), eq(agents.userId, userId)))
+          .where(and(eq(agents.id, id), eq(agents.userId, bound())))
           .limit(1);
         if (!existing[0]) return false;
         const owned = await db
@@ -447,7 +495,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
           .where(eq(chats.agentId, id))
           .limit(1);
         if (owned[0]) throw new Error('agent still owns chats');
-        await db.delete(agents).where(and(eq(agents.id, id), eq(agents.userId, userId)));
+        await db.delete(agents).where(and(eq(agents.id, id), eq(agents.userId, bound())));
         return true;
       },
     },
@@ -457,7 +505,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
           .select({ chat: chats, profilePublicId: modelProfiles.publicId })
           .from(chats)
           .innerJoin(modelProfiles, eq(chats.profileId, modelProfiles.id))
-          .where(eq(chats.userId, userId))
+          .where(eq(chats.userId, bound()))
           .orderBy(desc(chats.updatedAt), desc(chats.id));
         return rows.map((row) => toChat(row.chat, row.profilePublicId));
       },
@@ -467,7 +515,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
           .select({ chat: chats, profilePublicId: modelProfiles.publicId })
           .from(chats)
           .innerJoin(modelProfiles, eq(chats.profileId, modelProfiles.id))
-          .where(and(eq(chats.id, id), eq(chats.userId, userId)))
+          .where(and(eq(chats.id, id), eq(chats.userId, bound())))
           .limit(1);
         const row = rows[0];
         return row ? toChat(row.chat, row.profilePublicId) : null;
@@ -477,14 +525,14 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
         const agent = await db
           .select({ id: agents.id })
           .from(agents)
-          .where(and(eq(agents.id, input.agentId), eq(agents.userId, userId)))
+          .where(and(eq(agents.id, input.agentId), eq(agents.userId, bound())))
           .limit(1);
         if (!agent[0]) throw new Error('agent not found');
         const profileUuid = await requireProfileUuid(input.profileId);
         const inserted = await db
           .insert(chats)
           .values({
-            userId,
+            userId: bound(),
             agentId: input.agentId,
             profileId: profileUuid,
             title: input.title,
@@ -502,7 +550,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
         const updated = await db
           .update(chats)
           .set(values)
-          .where(and(eq(chats.id, id), eq(chats.userId, userId)))
+          .where(and(eq(chats.id, id), eq(chats.userId, bound())))
           .returning();
         const row = updated[0];
         if (!row) return null;
@@ -520,13 +568,13 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
           const existing = await tx
             .select({ id: chats.id })
             .from(chats)
-            .where(and(eq(chats.id, id), eq(chats.userId, userId)))
+            .where(and(eq(chats.id, id), eq(chats.userId, bound())))
             .limit(1);
           if (!existing[0]) return false;
           await tx.delete(messages).where(eq(messages.chatId, id));
           const removed = await tx
             .delete(chats)
-            .where(and(eq(chats.id, id), eq(chats.userId, userId)))
+            .where(and(eq(chats.id, id), eq(chats.userId, bound())))
             .returning({ id: chats.id });
           return removed.length > 0;
         });
@@ -536,7 +584,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
         const rows = await db
           .select({ id: chats.id })
           .from(chats)
-          .where(and(eq(chats.agentId, agentId), eq(chats.userId, userId)));
+          .where(and(eq(chats.agentId, agentId), eq(chats.userId, bound())));
         return rows.length;
       },
     },
@@ -583,10 +631,12 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
     sessions: {
       async create(session) {
         if (!isUuid(session.id)) throw new Error('session id must be a uuid');
+        if (!isUuid(session.userId)) throw new Error('session user id must be a uuid');
         const inserted = await db
           .insert(sessions)
           .values({
             id: session.id,
+            userId: session.userId,
             tokenHash: session.tokenHash,
             createdAt: asDate(session.createdAt, 'createdAt'),
             expiresAt: asDate(session.expiresAt, 'expiresAt'),
@@ -608,29 +658,35 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
     },
     profiles: {
       async list() {
-        const rows = await db
-          .select()
-          .from(modelProfiles)
-          .where(eq(modelProfiles.userId, userId))
-          .orderBy(asc(modelProfiles.publicId));
-        return rows.map(toProfile);
+        const globals = await db.select().from(modelProfiles).where(isNull(modelProfiles.userId));
+        const own = await db.select().from(modelProfiles).where(eq(modelProfiles.userId, bound()));
+        const byId = new Map<string, ProfileRow>();
+        for (const row of globals) byId.set(row.publicId, row);
+        for (const row of own) byId.set(row.publicId, row);
+        return [...byId.values()].map(toProfile);
       },
       async get(id) {
-        const rows = await db
+        const own = await db
           .select()
           .from(modelProfiles)
-          .where(and(eq(modelProfiles.userId, userId), eq(modelProfiles.publicId, id)))
+          .where(and(eq(modelProfiles.userId, bound()), eq(modelProfiles.publicId, id)))
           .limit(1);
-        return rows[0] ? toProfile(rows[0]) : null;
+        if (own[0]) return toProfile(own[0]);
+        const global = await db
+          .select()
+          .from(modelProfiles)
+          .where(and(isNull(modelProfiles.userId), eq(modelProfiles.publicId, id)))
+          .limit(1);
+        return global[0] ? toProfile(global[0]) : null;
       },
       async upsert(profile) {
         const stored = sanitizeProfile(profile);
         const existing = await db
           .select()
           .from(modelProfiles)
-          .where(and(eq(modelProfiles.userId, userId), eq(modelProfiles.publicId, stored.id)))
+          .where(and(eq(modelProfiles.userId, bound()), eq(modelProfiles.publicId, stored.id)))
           .limit(1);
-        const config = nextConfig(existing[0]?.config, stored.baseUrl);
+        const config = nextConfig(existing[0]?.config, stored);
         if (existing[0]) {
           const updated = await db
             .update(modelProfiles)
@@ -650,7 +706,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
           const inserted = await db
             .insert(modelProfiles)
             .values({
-              userId,
+              userId: bound(),
               publicId: stored.id,
               name: stored.name,
               provider: stored.provider,
@@ -672,7 +728,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
         const existing = await db
           .select({ id: modelProfiles.id })
           .from(modelProfiles)
-          .where(and(eq(modelProfiles.userId, userId), eq(modelProfiles.publicId, id)))
+          .where(and(eq(modelProfiles.userId, bound()), eq(modelProfiles.publicId, id)))
           .limit(1);
         const row = existing[0];
         if (!row) return false;
@@ -696,7 +752,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
           .innerJoin(agents, eq(agentMessages.fromAgent, agents.id))
           .where(
             and(
-              eq(agents.userId, userId),
+              eq(agents.userId, bound()),
               endpoint,
               query?.status ? eq(agentMessages.status, query.status) : undefined,
             ),
@@ -710,7 +766,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
           .select({ message: agentMessages })
           .from(agentMessages)
           .innerJoin(agents, eq(agentMessages.fromAgent, agents.id))
-          .where(and(eq(agentMessages.id, id), eq(agents.userId, userId)))
+          .where(and(eq(agentMessages.id, id), eq(agents.userId, bound())))
           .limit(1);
         return rows[0] ? toAgentMessage(rows[0].message) : null;
       },
@@ -726,7 +782,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
         const owned = await db
           .select({ id: agents.id })
           .from(agents)
-          .where(and(eq(agents.userId, userId), or(eq(agents.id, input.fromAgentId), eq(agents.id, input.toAgentId))));
+          .where(and(eq(agents.userId, bound()), or(eq(agents.id, input.fromAgentId), eq(agents.id, input.toAgentId))));
         if (owned.length !== 2) {
           throw new Error('agent message endpoints must reference existing agents');
         }
@@ -749,7 +805,7 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
           .select({ id: agentMessages.id })
           .from(agentMessages)
           .innerJoin(agents, eq(agentMessages.fromAgent, agents.id))
-          .where(and(eq(agentMessages.id, id), eq(agents.userId, userId)))
+          .where(and(eq(agentMessages.id, id), eq(agents.userId, bound())))
           .limit(1);
         if (!current[0]) return null;
         const updated = await db
@@ -768,7 +824,72 @@ function buildStore(db: BotanicalDb, userId: string, closePool: () => Promise<vo
     listenerDeliveries: alwaysOn.listenerDeliveries,
     notifications: alwaysOn.notifications,
     alwaysOnSettings,
+    globalProfiles: {
+      async list() {
+        const rows = await db
+          .select()
+          .from(modelProfiles)
+          .where(isNull(modelProfiles.userId))
+          .orderBy(asc(modelProfiles.createdAt), asc(modelProfiles.publicId));
+        return rows.map(toProfile);
+      },
+      async get(id) {
+        const rows = await db
+          .select()
+          .from(modelProfiles)
+          .where(and(isNull(modelProfiles.userId), eq(modelProfiles.publicId, id)))
+          .limit(1);
+        return rows[0] ? toProfile(rows[0]) : null;
+      },
+      async upsert(profile) {
+        const stored = sanitizeProfile(profile);
+        const existing = await db
+          .select()
+          .from(modelProfiles)
+          .where(and(isNull(modelProfiles.userId), eq(modelProfiles.publicId, stored.id)))
+          .limit(1);
+        const config = nextConfig(existing[0]?.config, stored);
+        if (existing[0]) {
+          const updated = await db
+            .update(modelProfiles)
+            .set({ name: stored.name, provider: stored.provider, model: stored.model, config })
+            .where(eq(modelProfiles.id, existing[0].id))
+            .returning();
+          const row = updated[0];
+          if (!row) throw new Error('profile update failed');
+          return toProfile(row);
+        }
+        const inserted = await db
+          .insert(modelProfiles)
+          .values({
+            userId: null,
+            publicId: stored.id,
+            name: stored.name,
+            provider: stored.provider,
+            model: stored.model,
+            config,
+          })
+          .returning();
+        const row = inserted[0];
+        if (!row) throw new Error('profile insert failed');
+        return toProfile(row);
+      },
+      async delete(id) {
+        const existing = await db
+          .select({ id: modelProfiles.id })
+          .from(modelProfiles)
+          .where(and(isNull(modelProfiles.userId), eq(modelProfiles.publicId, id)))
+          .limit(1);
+        const row = existing[0];
+        if (!row) return false;
+        const used = await db.select({ id: chats.id }).from(chats).where(eq(chats.profileId, row.id)).limit(1);
+        if (used[0]) throw new Error('profile is still used by a chat');
+        await db.delete(modelProfiles).where(eq(modelProfiles.id, row.id));
+        return true;
+      },
+    },
   };
+  return store;
 }
 
 type AgentRow = typeof agents.$inferSelect;
@@ -835,15 +956,25 @@ function toProfile(row: ProfileRow): ModelProfile {
     provider: row.provider,
     model: row.model,
   };
-  if (typeof row.config?.baseUrl === 'string' && row.config.baseUrl.length > 0) {
-    profile.baseUrl = row.config.baseUrl;
-  }
+  const config = row.config ?? {};
+  if (typeof config.baseUrl === 'string' && config.baseUrl.length > 0) profile.baseUrl = config.baseUrl;
+  if (typeof config.maxTokens === 'number') profile.maxTokens = config.maxTokens;
+  if (typeof config.temperature === 'number') profile.temperature = config.temperature;
+  const extra = config.extra ?? {};
+  if (typeof extra.kind === 'string') profile.kind = extra.kind;
+  if (typeof extra.cli === 'string') profile.cli = extra.cli;
+  if (typeof extra.bin === 'string') profile.bin = extra.bin;
+  if (typeof extra.description === 'string') profile.description = extra.description;
+  if (typeof extra.timeoutMs === 'number') profile.timeoutMs = extra.timeoutMs;
+  if (typeof extra.passModel === 'boolean') profile.passModel = extra.passModel;
+  if (typeof extra.botanicalTools === 'boolean') profile.botanicalTools = extra.botanicalTools;
   return profile;
 }
 
 function toSession(row: SessionRow): Session {
   return {
     id: row.id,
+    userId: row.userId,
     tokenHash: row.tokenHash,
     createdAt: iso(row.createdAt),
     expiresAt: iso(row.expiresAt),
@@ -907,18 +1038,38 @@ function sanitizeProfile(profile: ModelProfile): ModelProfile {
   const model = profile.model?.trim?.() ?? '';
   if (!name || !provider || !model) throw new Error('profile name, provider, and model are required');
   const stored: ModelProfile = { id, name, provider, model };
+  if (profile.description) stored.description = profile.description;
   if (profile.baseUrl !== undefined) {
     const baseUrl = profile.baseUrl.trim();
     if (baseUrl) stored.baseUrl = baseUrl;
   }
+  if (profile.maxTokens !== undefined) stored.maxTokens = profile.maxTokens;
+  if (profile.temperature !== undefined) stored.temperature = profile.temperature;
+  if (profile.kind) stored.kind = profile.kind;
+  if (profile.cli) stored.cli = profile.cli;
+  if (profile.bin) stored.bin = profile.bin;
+  if (profile.timeoutMs !== undefined) stored.timeoutMs = profile.timeoutMs;
+  if (profile.passModel !== undefined) stored.passModel = profile.passModel;
+  if (profile.botanicalTools !== undefined) stored.botanicalTools = profile.botanicalTools;
   return stored;
 }
 
-function nextConfig(previous: ModelProfileConfig | undefined, baseUrl: string | undefined): ModelProfileConfig {
+function nextConfig(previous: ModelProfileConfig | undefined, profile: ModelProfile): ModelProfileConfig {
   const record: Record<string, unknown> = { ...(previous ?? {}) };
   for (const key of FORBIDDEN_CONFIG_KEYS) delete record[key];
-  if (baseUrl) record.baseUrl = baseUrl;
+  if (profile.baseUrl) record.baseUrl = profile.baseUrl;
   else delete record.baseUrl;
+  if (profile.maxTokens !== undefined) record.maxTokens = profile.maxTokens;
+  if (profile.temperature !== undefined) record.temperature = profile.temperature;
+  const extra = { ...((record.extra as Record<string, unknown> | undefined) ?? {}) };
+  if (profile.kind) extra.kind = profile.kind;
+  if (profile.cli) extra.cli = profile.cli;
+  if (profile.bin) extra.bin = profile.bin;
+  if (profile.description) extra.description = profile.description;
+  if (profile.timeoutMs !== undefined) extra.timeoutMs = profile.timeoutMs;
+  if (profile.passModel !== undefined) extra.passModel = profile.passModel;
+  if (profile.botanicalTools !== undefined) extra.botanicalTools = profile.botanicalTools;
+  if (Object.keys(extra).length > 0) record.extra = extra;
   return record as ModelProfileConfig;
 }
 

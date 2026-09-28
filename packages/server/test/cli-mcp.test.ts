@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "bun:test";
 import { BUILTIN_ROLE_IDS, type ToolContributor } from "@botanical/agent-runtime";
+import { runAsUser } from "@botanical/db";
 import { clearCliAvailabilityCache } from "@botanical/providers";
 
 import { agentWorkspace } from "../src/runtime/workspace.ts";
@@ -57,16 +58,6 @@ describe("per-run CLI MCP", () => {
     expect((await rpc(app, session.runId, null, initialize)).status).toBe(401);
     expect((await rpc(app, session.runId, "not-the-token", initialize)).status).toBe(401);
     expect((await rpc(app, "00000000-0000-4000-8000-000000000099", session.token, initialize)).status).toBe(404);
-
-    const { token } = await login(app);
-    const cookieOnly = await app.fetch(
-      new Request(`http://localhost${CLI_MCP_PATH}/${session.runId}`, {
-        method: "POST",
-        headers: { "content-type": "application/json", cookie: `botanical_session=${token}` },
-        body: JSON.stringify(initialize),
-      }),
-    );
-    expect(cookieOnly.status).toBe(401);
 
     const probe = await app.fetch(
       new Request(`http://localhost${CLI_MCP_PATH}/${session.runId}`, {
@@ -140,6 +131,16 @@ describe("per-run CLI MCP", () => {
     expect(blocked.result.content[0]?.text).toContain("memory.write");
     const visible = await store.memories.listVisible(reviewer.id, { limit: 20 });
     expect(visible.some((row) => row.content === "should not stick")).toBe(false);
+
+    const { token } = await login(app);
+    const cookieOnly = await app.fetch(
+      new Request(`http://localhost${CLI_MCP_PATH}/${session.runId}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: `botanical_session=${token}` },
+        body: JSON.stringify(initialize),
+      }),
+    );
+    expect(cookieOnly.status).toBe(401);
 
     session.close();
     denied.close();
@@ -260,7 +261,10 @@ describe("per-run CLI MCP", () => {
       const tool = messages.messages.find((message) => message.role === "tool");
       expect(tool?.name).toBe("memory_write");
       expect(tool?.content).toContain("\"id\"");
-      const memories = await store.memories.listVisible(agentId, { limit: 10 });
+      const me = await readJson<{ user: { id: string } }>(
+        await app.fetch(new Request("http://localhost/api/auth/me", { headers: bearer(token) })),
+      );
+      const memories = await runAsUser(me.user.id, () => store.memories.listVisible(agentId, { limit: 10 }));
       expect(memories.some((memory) => memory.content === "fern from cli" && memory.agentId === agentId)).toBe(true);
       const runId = /RUN_ID:([^\s]+)/.exec(assistant?.content ?? "")?.[1] ?? "";
       expect(runId.length).toBeGreaterThan(0);

@@ -13,7 +13,7 @@ This log records the project's design decisions and why they were made. Later en
 3. **Scope of the first release.** Streaming chat, tools, and MCP. Scheduled routines were deferred (see [ROADMAP.md](./ROADMAP.md)).
 4. **Portable hosting.** No hard dependency on one cloud vendor. Docker Compose is the reference deploy.
 5. **No default model.** Every chat must name an explicit model profile. Nothing is silently auto-selected, so cost and behavior are always a visible choice.
-6. **Passcode auth.** A single operator passcode protects the web → server boundary. Multi-user accounts are deferred.
+6. **Passcode auth.** Superseded on 2026-09-28 by accounts. See the multi-user entry below.
 7. **Stack.** TypeScript on Bun (Bun was picked over Deno when the repo was scaffolded).
 8. **Unlimited custom agents.** Each agent is defined by a prompt/description and a set of tools.
 9. **One agent per chat.** Each thread is owned by one agent, which keeps context and permissions unambiguous.
@@ -208,8 +208,28 @@ Listener secrets are generated on the server (at least 32 random bytes, url-safe
 
 ### Ownership
 
-`routines`, `listeners`, and `notifications` have a required `user_id` foreign key to `users`, on delete restrict, matching agents and chats. v0 writes the single operator (a notification uses the owning agent's user). List routes already filter by that id. The rows are operator-owned now, and enforced per user when accounts land, without a schema change. `routine_runs` and `listener_deliveries` do not store `user_id`; they inherit the parent.
+`routines`, `listeners`, and `notifications` have a required `user_id` foreign key to `users`, on delete restrict, matching agents and chats. A notification uses the owning agent's user. `routine_runs` and `listener_deliveries` do not store `user_id`; they inherit the parent. Accounts enforce that owner on every route, scheduler tick, and webhook turn.
 
 ### Instance settings
 
-Scheduler on/off, tick interval, background-turn cap, and webhook body cap are rows in `settings` (`always_on.scheduler_enabled`, `always_on.scheduler_interval_ms`, `always_on.background_concurrency`, `always_on.listener_max_bytes`), not environment variables. Absent rows use the defaults (on, 15000 ms, 2, 65536). `GET` and `PATCH /api/settings/always-on` are passcode-gated and marked instance-admin, so they become admin-only when accounts land. They are one value for the deployment, not per user. A short cache lets a saved value apply without a restart. Tests that need the interval to stay stopped pass `createApp({ scheduler: false })`.
+Scheduler on/off, tick interval, background-turn cap, and webhook body cap are rows in `settings` (`always_on.scheduler_enabled`, `always_on.scheduler_interval_ms`, `always_on.background_concurrency`, `always_on.listener_max_bytes`), not environment variables. Absent rows use the defaults (on, 15000 ms, 2, 65536). `GET /api/settings/always-on` is available to a signed-in user. `PATCH` is admin-only. They are one value for the deployment, not per user. A short cache lets a saved value apply without a restart. Tests that need the interval to stay stopped pass `createApp({ scheduler: false })`.
+
+---
+
+## 2026-09-28: Every instance is multi-user
+
+**Status:** Accepted. Replaces the single-passcode decision from 2026-09-23.
+
+Self-host and hosted mode use the same accounts. There is no shared passcode.
+
+- Signup and login use an email and a password. Passwords are stored as argon2id hashes. Sessions are random tokens, stored as a SHA-256 hash, and set as an HttpOnly cookie. Bearer tokens still work.
+- The first account to set a password is the admin. Existing rows that belonged to the bootstrap owner are claimed by that account.
+- The admin chooses signup mode in Settings: open, invite-only, or closed. Invite links are single-use. Before any account exists, signup stays open so the instance can be claimed.
+- Agents, chats, messages, memory, routines, listeners, notifications, and workspaces belong to one user. Routes, the scheduler, and webhook turns run as that owner. A user cannot read another user's rows.
+- Provider keys and speech settings live in the database. Admin-global values apply to the instance. A user's own value overrides them. The admin can turn off member use of the global keys. Keys are encrypted with AES-256-GCM under `BOTANICAL_ENCRYPTION_KEY` and the UI only shows the last four characters.
+- Model profiles follow the same split: admin-global profiles, with a per-user profile of the same id overriding. `BOTANICAL_PROFILES` and provider key env vars seed those rows once, on first boot, when the database is empty.
+- Coding CLI logins and agent workspaces use a directory per user.
+- `DATABASE_URL` and `BOTANICAL_ENCRYPTION_KEY` are the bootstrap secrets. Other env vars are optional seeds, not the live configuration.
+- Billing is out of scope. Roles (Coder, Reviewer, Orchestrator) stay shared templates. Builtin role names are not per user.
+
+API chats send the transcript on every turn. Before the provider call, messages are trimmed to the profile's `maxContext` (about four characters per token). The system prompt and the newest turn stay. Older turns are dropped first, and a tool result stays with the assistant message that requested it. Coding CLI turns do not resume a vendor session id. Each turn renders the transcript into a new prompt. Saving and resuming CLI session ids is left open.

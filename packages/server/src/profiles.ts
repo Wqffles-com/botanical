@@ -1,6 +1,5 @@
-import type { ServerConfig } from "./config.ts";
 import { HttpError } from "./http.ts";
-import type { ModelProfile } from "./types.ts";
+import type { ModelProfile, Store } from "./types.ts";
 
 export function readRequestedProfileId(value: unknown, required: boolean): string | undefined {
   if (value === undefined) {
@@ -21,12 +20,13 @@ export function readRequestedProfileId(value: unknown, required: boolean): strin
  * Resolves an explicit profile. `requested` wins over the chat's stored profile.
  * There is no ambient default: an unknown or missing id is an error.
  */
-export function resolveProfile(
-  config: ServerConfig,
+export async function resolveProfile(
+  store: Store,
   requested: string | undefined,
   fallbackId: string | undefined,
-): ModelProfile {
-  if (config.profiles.length === 0) {
+): Promise<ModelProfile> {
+  const profiles = await store.profiles.list();
+  if (profiles.length === 0) {
     throw new HttpError(
       422,
       "no_profiles_configured",
@@ -35,7 +35,7 @@ export function resolveProfile(
   }
   const id = requested ?? fallbackId;
   if (!id) throw profileRequired();
-  const profile = config.profiles.find((item) => item.id === id);
+  const profile = profiles.find((item) => item.id === id);
   if (!profile) {
     throw new HttpError(
       422,

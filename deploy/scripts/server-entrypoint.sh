@@ -20,12 +20,8 @@ normalize_mode() {
 
 normalize_mode
 
-if [ -z "${BOTANICAL_PASSWORD:-}" ] && [ -z "${BOTANICAL_PASSWORD_HASH:-}" ]; then
-  if [ -z "${BOTANICAL_PASSCODE:-}" ]; then
-    echo "botanical: set BOTANICAL_PASSCODE or BOTANICAL_PASSWORD" >&2
-    exit 1
-  fi
-  export BOTANICAL_PASSWORD="$BOTANICAL_PASSCODE"
+if [ -z "${BOTANICAL_ENCRYPTION_KEY:-}" ]; then
+  echo "botanical: BOTANICAL_ENCRYPTION_KEY is unset. Provider keys cannot be stored until it is set." >&2
 fi
 
 if [ "$(id -u)" = "0" ]; then

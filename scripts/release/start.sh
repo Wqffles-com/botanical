@@ -2,7 +2,7 @@
 # Start Botanical from an unzipped release: the Bun API, then the Next.js web.
 # Needs Bun >= 1.2, Node >= 20, and a reachable Postgres (see docker-compose.yml).
 #
-#   cp .env.example .env   # edit BOTANICAL_PASSWORD and DATABASE_URL
+#   cp .env.example .env   # edit BOTANICAL_ENCRYPTION_KEY and DATABASE_URL
 #   ./start.sh             # API on :8787 (loopback), web on :3000
 #   ./start.sh server      # API only
 #   ./start.sh web         # web only
