@@ -1,5 +1,7 @@
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
+import { currentUserId, runAsUser } from "@botanical/db";
+
 import {
   collectTools,
   dispatchToolCall,
@@ -34,6 +36,7 @@ interface ToolRun {
   agentId: string;
   chatId: string;
   principal: typeof PRINCIPAL;
+  userId: string | null;
   signal?: AbortSignal;
   listeners: Set<(event: CliToolCallEvent) => void>;
 }
@@ -75,6 +78,7 @@ export function createCliToolHost(options: {
         agentId: input.agentId,
         chatId: input.chatId,
         principal: PRINCIPAL,
+        userId: currentUserId(),
         ...(input.signal ? { signal: input.signal } : {}),
         listeners: new Set(),
       };
@@ -103,7 +107,9 @@ export function createCliToolHost(options: {
       return runs.size;
     },
     handle(request, runId, config) {
-      return handleRun(options.getDeps, runs, request, runId, config);
+      const run = runs.get(runId);
+      const work = () => handleRun(options.getDeps, runs, request, runId, config);
+      return run?.userId ? runAsUser(run.userId, work) : work();
     },
   };
 }

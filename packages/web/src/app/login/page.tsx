@@ -12,8 +12,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
-import { loginErrorText, passcodeClientError } from "@/lib/login-errors";
+import { loginErrorText, passwordClientError } from "@/lib/login-errors";
 import { fetchHealth } from "@/lib/mvp-api";
+
+type AuthConfig = { signupMode: "open" | "invite" | "closed"; hasUsers: boolean; canSignup: boolean };
 
 export default function LoginPage() {
   return (
@@ -32,7 +34,12 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [passcode, setPasscode] = useState("");
+  const invite = searchParams.get("invite") ?? "";
+  const [mode, setMode] = useState<"login" | "signup">("signup");
+  const [config, setConfig] = useState<AuthConfig | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -43,22 +50,50 @@ function LoginForm() {
     fetchHealth().then((meta) => {
       if (!cancelled) setHealth(meta);
     });
+    fetch("/api/auth/config")
+      .then((response) => response.json())
+      .then((body: AuthConfig) => {
+        if (cancelled) return;
+        setConfig(body);
+        setMode(body.hasUsers ? "login" : "signup");
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, []);
 
+  const signupOpen = config ? config.signupMode !== "closed" && (config.canSignup || Boolean(invite)) : true;
+  const signingUp = mode === "signup";
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    const clientError = passcodeClientError(passcode);
+    if (!email.trim()) {
+      setError("Enter your email.");
+      return;
+    }
+    const clientError = passwordClientError(password, signingUp);
     if (clientError) {
       setError(clientError);
+      return;
+    }
+    if (signingUp && !displayName.trim()) {
+      setError("Enter a display name.");
       return;
     }
     setError(null);
     setPending(true);
     try {
-      await api.login(passcode);
+      if (signingUp) {
+        await api.signup({
+          email,
+          password,
+          displayName,
+          ...(invite ? { inviteToken: invite } : {}),
+        });
+      } else {
+        await api.login({ email, password });
+      }
       const next = searchParams.get("next");
       router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
       router.refresh();
@@ -85,22 +120,48 @@ function LoginForm() {
         <Card className="bg-card">
           <CardContent className="px-5">
             <form onSubmit={(event) => void onSubmit(event)} className="grid gap-3" data-testid="login-form">
+              {signingUp ? (
+                <div className="grid gap-1.5">
+                  <Label htmlFor="display-name">Name</Label>
+                  <Input
+                    id="display-name"
+                    data-testid="display-name"
+                    value={displayName}
+                    onChange={(event) => setDisplayName(event.target.value)}
+                    autoComplete="name"
+                    autoFocus
+                  />
+                </div>
+              ) : null}
               <div className="grid gap-1.5">
-                <Label htmlFor="passcode">Passcode</Label>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  data-testid="email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    if (error) setError(null);
+                  }}
+                  autoFocus={!signingUp}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="password">Password</Label>
                 <div className="relative">
                   <Input
-                    id="passcode"
-                    data-testid="passcode"
+                    id="password"
+                    data-testid="password"
                     type={show ? "text" : "password"}
-                    autoComplete="current-password"
-                    value={passcode}
+                    autoComplete={signingUp ? "new-password" : "current-password"}
+                    value={password}
                     onChange={(event) => {
-                      setPasscode(event.target.value);
+                      setPassword(event.target.value);
                       if (error) setError(null);
                     }}
-                    placeholder="Server passcode"
                     className="pr-10"
-                    autoFocus
                     aria-invalid={Boolean(error) || undefined}
                     aria-describedby={error ? "login-error" : undefined}
                   />
@@ -108,7 +169,7 @@ function LoginForm() {
                     type="button"
                     onClick={() => setShow((value) => !value)}
                     className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    aria-label={show ? "Hide passcode" : "Show passcode"}
+                    aria-label={show ? "Hide password" : "Show password"}
                   >
                     {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
@@ -119,12 +180,31 @@ function LoginForm() {
                   {error}
                 </p>
               ) : null}
-              <Button type="submit" disabled={pending || passcode.trim().length === 0} className="w-full">
-                {pending ? "Checking…" : "Continue"}
+              {config && !signupOpen && signingUp ? (
+                <p className="text-sm text-muted-foreground">Signup is closed.</p>
+              ) : null}
+              <Button type="submit" disabled={pending || (signingUp && !signupOpen)} className="w-full" data-testid="submit-auth">
+                {pending ? "Checking…" : signingUp ? (config?.hasUsers ? "Create account" : "Create admin account") : "Sign in"}
               </Button>
-              <p className="text-xs text-muted-foreground">
-                Web → server only. Model keys never leave the host.
-              </p>
+              {config?.hasUsers && signupOpen ? (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground underline"
+                  onClick={() => {
+                    setMode(signingUp ? "login" : "signup");
+                    setError(null);
+                  }}
+                >
+                  {signingUp ? "Already have an account? Sign in" : "Need an account? Sign up"}
+                </button>
+              ) : null}
+              {config?.hasUsers && !signupOpen ? (
+                <p className="text-xs text-muted-foreground" data-testid="signup-closed">
+                  {config.signupMode === "invite"
+                    ? "Signup is invite-only. Use the link an admin sent you."
+                    : "Signup is closed."}
+                </p>
+              ) : null}
             </form>
           </CardContent>
         </Card>

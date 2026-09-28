@@ -14,7 +14,7 @@ Next.js App Router client. Monochrome shadcn UI (`packages/web/components.json`,
 
 ## Routes
 
-There is no `middleware.ts`. `packages/web/src/proxy.ts` is the auth gate: public path `/login`; everything else needs `GET /api/auth/me`.
+There is no `middleware.ts`. `packages/web/src/proxy.ts` is the auth gate: public path `/login`; everything else needs `GET /api/auth/me`. `/login` signs up or signs in with email and password (`packages/web/src/app/login/page.tsx`).
 
 | URL | File |
 |-----|------|
@@ -46,6 +46,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/components/listeners` | Listener list and editor |
 | `packages/web/src/components/notifications/notification-bell.tsx` | Unread badge in `packages/web/src/components/app-shell.tsx` |
 | `packages/web/src/components/settings/settings-view.tsx` | Settings tabs |
+| `packages/web/src/components/settings/admin-panel.tsx` | Admin signup mode, global keys, and invites |
 | `packages/web/src/components/settings/background-work-card.tsx` | Always-on scheduler and webhook limits on the general tab |
 | `packages/web/src/hooks/use-chat-thread.ts` | Thread loading and stream |
 | `packages/web/src/lib/mvp-api.ts` | Profiles, tools, MCP, settings fetches outside `API` |

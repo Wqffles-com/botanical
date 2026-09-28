@@ -29,7 +29,7 @@ export function registerChats(router: Router): void {
       const agentId = readRequiredId(body.agentId, "agentId");
       const agent = await ctx.store.agents.get(agentId);
       if (!agent) throw new HttpError(404, "not_found", "Agent not found");
-      const profile = resolveProfile(ctx.config, readRequestedProfileId(body.profileId, true), undefined);
+      const profile = await resolveProfile(ctx.store, readRequestedProfileId(body.profileId, true), undefined);
       const title =
         body.title === undefined
           ? "New chat"
@@ -70,7 +70,7 @@ export function registerChats(router: Router): void {
         patch.title = title;
       }
       if (body.profileId !== undefined) {
-        const profile = resolveProfile(ctx.config, readRequestedProfileId(body.profileId, true), undefined);
+        const profile = await resolveProfile(ctx.store, readRequestedProfileId(body.profileId, true), undefined);
         patch.profileId = profile.id;
       }
       if (patch.title === undefined && patch.profileId === undefined) {

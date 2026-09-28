@@ -10,7 +10,7 @@ export function registerProfiles(router: Router): void {
     "/api/profiles",
     authed(async (ctx) => {
       const profiles = [];
-      for (const profile of ctx.config.profiles) {
+      for (const profile of await ctx.store.profiles.list()) {
         profiles.push(await presentProfile(profile));
       }
       return json(200, { profiles, defaultProfileId: null });

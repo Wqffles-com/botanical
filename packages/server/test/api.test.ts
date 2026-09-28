@@ -80,20 +80,25 @@ describe("health and deployment mode", () => {
 describe("auth", () => {
   test("rejects a wrong password without setting a cookie", async () => {
     const { app } = setup();
-    const response = await postJson(app, "/api/auth/login", { password: "nope" });
+    await login(app);
+    const response = await postJson(app, "/api/auth/login", { email: "admin@example.com", password: "nope" });
     expect(response.status).toBe(401);
     const body = await readJson<{ error: { code: string } }>(response);
     expect(body.error.code).toBe("unauthorized");
     expect(response.headers.get("set-cookie")).toBeNull();
   });
 
-  test("login accepts a passcode and returns a bearer token plus cookie", async () => {
+  test("signup creates the admin and returns a bearer token plus cookie", async () => {
     const { app } = setup();
-    const response = await postJson(app, "/api/auth/login", { passcode: PASSWORD });
+    const response = await postJson(app, "/api/auth/signup", {
+      email: "admin@example.com",
+      password: PASSWORD,
+      displayName: "Admin",
+    });
     expect(response.status).toBe(200);
-    const body = await readJson<{ token: string; tokenType: string; operator: { id: string } }>(response);
+    const body = await readJson<{ token: string; tokenType: string; user: { role: string } }>(response);
     expect(body.tokenType).toBe("Bearer");
-    expect(body.operator.id).toBe("operator");
+    expect(body.user.role).toBe("admin");
     expect(body.token.length).toBeGreaterThan(20);
     const cookie = response.headers.get("set-cookie") ?? "";
     expect(cookie).toContain(`botanical_session=${body.token}`);
@@ -161,34 +166,30 @@ describe("auth", () => {
     expect(me.status).toBe(401);
   });
 
-  test("mismatched password and passcode is 400", async () => {
+  test("login requires an email", async () => {
     const { app } = setup();
-    const response = await postJson(app, "/api/auth/login", { password: PASSWORD, passcode: "other" });
+    const response = await postJson(app, "/api/auth/login", { password: PASSWORD });
     expect(response.status).toBe(400);
   });
 
   test("secure cookies are marked Secure", async () => {
     const { app } = setup({ BOTANICAL_COOKIE_SECURE: "true" });
-    const response = await postJson(app, "/api/auth/login", { password: PASSWORD });
+    const response = await postJson(app, "/api/auth/signup", {
+      email: "admin@example.com",
+      password: PASSWORD,
+      displayName: "Admin",
+    });
     expect(response.headers.get("set-cookie") ?? "").toContain("Secure");
-  });
-
-  test("hash login ignores the plaintext password", async () => {
-    const hash = await Bun.password.hash("hash-secret");
-    const { app } = setup({ BOTANICAL_PASSWORD: "plain-secret", BOTANICAL_PASSWORD_HASH: hash });
-    const wrong = await postJson(app, "/api/auth/login", { password: "plain-secret" });
-    expect(wrong.status).toBe(401);
-    const right = await postJson(app, "/api/auth/login", { password: "hash-secret" });
-    expect(right.status).toBe(200);
   });
 
   test("login rate limit is per client and does not leak the cause", async () => {
     const { app } = setup({}, { rateLimiter: new LoginRateLimiter(2, 60_000) });
-    expect((await postJson(app, "/api/auth/login", { password: "nope" }, {}, "a")).status).toBe(401);
-    expect((await postJson(app, "/api/auth/login", { password: "nope" }, {}, "a")).status).toBe(401);
-    const locked = await postJson(app, "/api/auth/login", { password: PASSWORD }, {}, "a");
+    await login(app);
+    expect((await postJson(app, "/api/auth/login", { email: "admin@example.com", password: "nope" }, {}, "a")).status).toBe(401);
+    expect((await postJson(app, "/api/auth/login", { email: "admin@example.com", password: "nope" }, {}, "a")).status).toBe(401);
+    const locked = await postJson(app, "/api/auth/login", { email: "admin@example.com", password: PASSWORD }, {}, "a");
     expect(locked.status).toBe(429);
-    const other = await postJson(app, "/api/auth/login", { password: PASSWORD }, {}, "b");
+    const other = await postJson(app, "/api/auth/login", { email: "admin@example.com", password: PASSWORD }, {}, "b");
     expect(other.status).toBe(200);
   });
 

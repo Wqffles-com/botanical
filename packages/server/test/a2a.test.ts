@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { runAsUser } from "@botanical/db";
 
 import { createSendAgentMessageTool } from "../src/a2a/tool.ts";
 import { INBOX_CHAT_TITLE } from "../src/a2a/constants.ts";
@@ -181,17 +182,21 @@ describe("agent messages", () => {
     const from = await createAgent(app, token, { name: "Scout" });
     const to = await createAgent(app, token, { name: "Keeper" });
     const chatId = await createChat(app, token, from.id);
+    const me = await readJson<{ user: { id: string } }>(
+      await app.fetch(new Request("http://localhost/api/auth/me", { headers: bearer(token) })),
+    );
     const tool = createSendAgentMessageTool(app.a2a);
 
-    const spoofed = await tool.execute(
-      { toAgentId: to.id, body: "From the tool", fromAgentId: to.id },
-      { agentId: from.id, chatId },
+    const spoofed = await runAsUser(me.user.id, () =>
+      tool.execute(
+        { toAgentId: to.id, body: "From the tool", fromAgentId: to.id },
+        { agentId: from.id, chatId },
+      ),
     );
     expect(spoofed.ok).toBe(false);
 
-    const sent = await tool.execute(
-      { toAgentName: "Keeper", body: "From the tool" },
-      { agentId: from.id, chatId },
+    const sent = await runAsUser(me.user.id, () =>
+      tool.execute({ toAgentName: "Keeper", body: "From the tool" }, { agentId: from.id, chatId }),
     );
     expect(sent.ok).toBe(true);
     expect(sent.content).toContain(to.id);

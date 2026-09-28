@@ -86,7 +86,7 @@ describe("v0 server contract", () => {
     try {
       const client = new BotanicalClient({ baseUrl: `http://127.0.0.1:${server.port}`, getToken: () => "t" });
       expect(await client.health()).toMatchObject({ ok: true, mode: "SELF_HOST", brandName: "Botanical", version: "0.1.0" });
-      expect(await client.me()).toEqual({ authenticated: true, mode: "SAAS", brandName: "Botanical Cloud" });
+      expect(await client.me()).toEqual({ authenticated: true, mode: "SAAS", brandName: "Botanical Cloud", user: null });
       const profiles = await client.listProfiles();
       expect(profiles.map((profile) => profile.id)).toEqual(["grok"]);
 
@@ -136,7 +136,7 @@ describe("v0 server contract", () => {
     });
     try {
       const client = new BotanicalClient({ baseUrl: `http://127.0.0.1:${server.port}` });
-      await expect(client.login("nope")).rejects.toThrow("Invalid credentials");
+      await expect(client.login({ email: "ada@example.com", password: "nope" })).rejects.toThrow("Invalid credentials");
       jsonTurn = true;
       const events = [];
       for await (const event of client.streamMessage("c", { content: "Hi", profileId: "grok" })) events.push(event);

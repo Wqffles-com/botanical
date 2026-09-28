@@ -136,6 +136,7 @@ describe('postgres store', () => {
 
         const session = await store.sessions.create({
           id: '11111111-1111-4111-8111-111111111111',
+          userId: await store.accounts.bootstrapUserId(),
           tokenHash: 'hash-one',
           createdAt: '2026-09-24T00:00:00.000Z',
           expiresAt: '2026-10-08T00:00:00.000Z',

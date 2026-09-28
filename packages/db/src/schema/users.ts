@@ -4,8 +4,9 @@ import { check, index, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizz
 import { tenants } from './tenants.ts';
 
 /**
- * Identity row. Self-host v0 bootstraps one owner and authenticates with the passcode env var.
- * `password_hash` is for hosted accounts later. It is a hash, never a raw passcode.
+ * Account. `password_hash` is an argon2id hash, never a raw password.
+ * The first account to set a password is `admin`. A row with a null hash is the
+ * unclaimed bootstrap owner that migration and seed attach existing data to.
  */
 export const users = pgTable(
   'users',
@@ -15,6 +16,8 @@ export const users = pgTable(
     displayName: text('display_name').notNull(),
     email: text('email'),
     passwordHash: text('password_hash'),
+    /** `admin` or `member`. */
+    role: text('role').notNull().default('member'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -28,5 +31,6 @@ export const users = pgTable(
       'users_email_shape',
       sql`${t.email} is null or ${t.email} ~ '^[^@[:space:]]+@[^@[:space:]]+$'`,
     ),
+    check('users_role_check', sql`${t.role} in ('admin', 'member')`),
   ],
 );

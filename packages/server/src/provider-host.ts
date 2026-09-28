@@ -16,6 +16,8 @@ export type ProviderFetch = (input: Request | URL | string, init?: RequestInit) 
 export interface ProviderHost {
   readonly registry: ProviderRegistry;
   readonly runtime: RuntimeProfileResolver;
+  /** Test seam. Production leaves this unset and the registry uses global fetch. */
+  readonly fetchImpl?: ProviderFetch;
 }
 
 export function createProviderHost(
@@ -30,6 +32,7 @@ export function createProviderHost(
   return {
     registry,
     runtime: createRuntimeBridge(registry),
+    ...(fetchImpl ? { fetchImpl } : {}),
   };
 }
 

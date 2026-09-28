@@ -1,5 +1,7 @@
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import type { AnyColumn } from 'drizzle-orm';
 
+import { currentUserId } from './actor.ts';
 import type { BotanicalDb } from './client.ts';
 import { INTERRUPTED_STOPPED, RUN_LEASE_MS } from './run-lease.ts';
 import { agents } from './schema/agents.ts';
@@ -185,7 +187,16 @@ const INTERRUPTED = INTERRUPTED_STOPPED;
  * `claimDue` locks due rows with FOR UPDATE SKIP LOCKED and inserts the run
  * under the partial unique (routine_id, scheduled_for) for schedule triggers.
  */
-export function createAlwaysOn(db: BotanicalDb, userId: string) {
+export function createAlwaysOn(db: BotanicalDb, legacyUserId: string) {
+  function bound(): string {
+    return currentUserId() ?? legacyUserId;
+  }
+  /** Anonymous callers see every owner when `wide` is set. Otherwise the acting user. */
+  function matchUser(column: AnyColumn, wide: boolean): SQL | undefined {
+    if (wide && currentUserId() === null) return undefined;
+    return eq(column, bound());
+  }
+
   async function ownerFor(agentId: string | null | undefined): Promise<string> {
     if (agentId && isUuid(agentId)) {
       const rows = await db
@@ -195,7 +206,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
         .limit(1);
       if (rows[0]) return rows[0].userId;
     }
-    return userId;
+    return bound();
   }
 
   async function ownedAgent(agentId: string): Promise<boolean> {
@@ -203,7 +214,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
     const rows = await db
       .select({ id: agents.id })
       .from(agents)
-      .where(and(eq(agents.id, agentId), eq(agents.userId, userId)))
+      .where(and(eq(agents.id, agentId), matchUser(agents.userId, false)))
       .limit(1);
     return Boolean(rows[0]);
   }
@@ -218,8 +229,8 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
           .innerJoin(agents, eq(routines.agentId, agents.id))
           .where(
             and(
-              eq(routines.userId, userId),
-              eq(agents.userId, userId),
+              matchUser(routines.userId, false),
+              matchUser(agents.userId, false),
               query?.agentId ? eq(routines.agentId, query.agentId) : undefined,
             ),
           )
@@ -232,7 +243,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
           .select({ routine: routines })
           .from(routines)
           .innerJoin(agents, eq(routines.agentId, agents.id))
-          .where(and(eq(routines.id, id), eq(routines.userId, userId), eq(agents.userId, userId)))
+          .where(and(eq(routines.id, id), matchUser(routines.userId, true), matchUser(agents.userId, true)))
           .limit(1);
         return rows[0] ? toRoutine(rows[0].routine) : null;
       },
@@ -241,7 +252,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
         const inserted = await db
           .insert(routines)
           .values({
-            userId,
+            userId: bound(),
             agentId: input.agentId,
             name: input.name,
             prompt: input.prompt,
@@ -262,7 +273,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
           .select({ id: routines.id })
           .from(routines)
           .innerJoin(agents, eq(routines.agentId, agents.id))
-          .where(and(eq(routines.id, id), eq(routines.userId, userId), eq(agents.userId, userId)))
+          .where(and(eq(routines.id, id), matchUser(routines.userId, false), matchUser(agents.userId, false)))
           .limit(1);
         if (!current[0]) return null;
         const values: {
@@ -298,7 +309,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
               eq(routines.id, id),
               inArray(
                 routines.agentId,
-                db.select({ id: agents.id }).from(agents).where(eq(agents.userId, userId)),
+                db.select({ id: agents.id }).from(agents).where(matchUser(agents.userId, false)),
               ),
             ),
           )
@@ -317,8 +328,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
             INNER JOIN agents a ON a.id = r.agent_id
             WHERE r.enabled = true
               AND r.next_run_at <= ${nowIso}::timestamptz
-              AND r.user_id = ${userId}::uuid
-              AND a.user_id = ${userId}::uuid
+              AND (${currentUserId() === null}::boolean OR (r.user_id = ${bound()}::uuid AND a.user_id = ${bound()}::uuid))
             ORDER BY r.next_run_at
             FOR UPDATE OF r SKIP LOCKED
             LIMIT ${room}
@@ -365,7 +375,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
           .select({ id: routines.id })
           .from(routines)
           .innerJoin(agents, eq(routines.agentId, agents.id))
-          .where(and(eq(routines.id, routineId), eq(agents.userId, userId)))
+          .where(and(eq(routines.id, routineId), matchUser(agents.userId, false)))
           .limit(1);
         if (!owned[0]) return [];
         const { size, skip } = page(opts?.limit, opts?.offset, 20);
@@ -385,7 +395,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
           .from(routineRuns)
           .innerJoin(routines, eq(routineRuns.routineId, routines.id))
           .innerJoin(agents, eq(routines.agentId, agents.id))
-          .where(and(eq(routineRuns.id, id), eq(agents.userId, userId)))
+          .where(and(eq(routineRuns.id, id), matchUser(agents.userId, true)))
           .limit(1);
         return rows[0] ? toRun(rows[0].run) : null;
       },
@@ -395,7 +405,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
           .select({ id: routines.id })
           .from(routines)
           .innerJoin(agents, eq(routines.agentId, agents.id))
-          .where(and(eq(routines.id, input.routineId), eq(agents.userId, userId)))
+          .where(and(eq(routines.id, input.routineId), matchUser(agents.userId, false)))
           .limit(1);
         if (!owned[0]) throw new Error('routine not found');
         const inserted = await db
@@ -419,7 +429,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
           .from(routineRuns)
           .innerJoin(routines, eq(routineRuns.routineId, routines.id))
           .innerJoin(agents, eq(routines.agentId, agents.id))
-          .where(and(eq(routineRuns.id, id), eq(agents.userId, userId)))
+          .where(and(eq(routineRuns.id, id), matchUser(agents.userId, false)))
           .limit(1);
         if (!current[0]) return null;
         const values: {
@@ -469,7 +479,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
             AND rr.status IN ('queued', 'running')
             AND EXISTS (
               SELECT 1 FROM routines r
-              WHERE r.id = rr.routine_id AND r.user_id = ${userId}::uuid
+              WHERE r.id = rr.routine_id AND (${currentUserId() === null}::boolean OR r.user_id = ${bound()}::uuid)
             )
             AND (
               rr.lease_expires_at IS NULL
@@ -541,7 +551,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
                 lease_expires_at = NULL
             FROM routines AS r
             WHERE rr.routine_id = r.id
-              AND r.user_id = ${userId}::uuid
+              AND (${currentUserId() === null}::boolean OR r.user_id = ${bound()}::uuid)
               AND rr.status IN ('queued', 'running')
               AND (
                 (rr.lease_expires_at IS NOT NULL AND rr.lease_expires_at <= ${nowIso}::timestamptz)
@@ -574,8 +584,8 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
           .innerJoin(agents, eq(listeners.agentId, agents.id))
           .where(
             and(
-              eq(listeners.userId, userId),
-              eq(agents.userId, userId),
+              matchUser(listeners.userId, false),
+              matchUser(agents.userId, false),
               query?.agentId ? eq(listeners.agentId, query.agentId) : undefined,
             ),
           )
@@ -588,7 +598,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
           .select({ listener: listeners })
           .from(listeners)
           .innerJoin(agents, eq(listeners.agentId, agents.id))
-          .where(and(eq(listeners.id, id), eq(listeners.userId, userId), eq(agents.userId, userId)))
+          .where(and(eq(listeners.id, id), matchUser(listeners.userId, true), matchUser(agents.userId, true)))
           .limit(1);
         return rows[0] ? toListener(rows[0].listener) : null;
       },
@@ -597,7 +607,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
         const inserted = await db
           .insert(listeners)
           .values({
-            userId,
+            userId: bound(),
             agentId: input.agentId,
             name: input.name,
             kind: input.kind,
@@ -617,7 +627,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
           .select({ id: listeners.id })
           .from(listeners)
           .innerJoin(agents, eq(listeners.agentId, agents.id))
-          .where(and(eq(listeners.id, id), eq(listeners.userId, userId), eq(agents.userId, userId)))
+          .where(and(eq(listeners.id, id), matchUser(listeners.userId, false), matchUser(agents.userId, false)))
           .limit(1);
         if (!current[0]) return null;
         const values: {
@@ -640,7 +650,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
           .select({ id: listeners.id })
           .from(listeners)
           .innerJoin(agents, eq(listeners.agentId, agents.id))
-          .where(and(eq(listeners.id, id), eq(listeners.userId, userId), eq(agents.userId, userId)))
+          .where(and(eq(listeners.id, id), matchUser(listeners.userId, false), matchUser(agents.userId, false)))
           .limit(1);
         if (!current[0]) return null;
         const updated = await db
@@ -659,7 +669,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
               eq(listeners.id, id),
               inArray(
                 listeners.agentId,
-                db.select({ id: agents.id }).from(agents).where(eq(agents.userId, userId)),
+                db.select({ id: agents.id }).from(agents).where(matchUser(agents.userId, false)),
               ),
             ),
           )
@@ -674,7 +684,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
           .select({ id: listeners.id })
           .from(listeners)
           .innerJoin(agents, eq(listeners.agentId, agents.id))
-          .where(and(eq(listeners.id, listenerId), eq(agents.userId, userId)))
+          .where(and(eq(listeners.id, listenerId), matchUser(agents.userId, false)))
           .limit(1);
         if (!owned[0]) return [];
         const { size, skip } = page(opts?.limit, opts?.offset, 20);
@@ -694,7 +704,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
           .from(listenerDeliveries)
           .innerJoin(listeners, eq(listenerDeliveries.listenerId, listeners.id))
           .innerJoin(agents, eq(listeners.agentId, agents.id))
-          .where(and(eq(listenerDeliveries.id, id), eq(agents.userId, userId)))
+          .where(and(eq(listenerDeliveries.id, id), matchUser(agents.userId, true)))
           .limit(1);
         return rows[0] ? toDelivery(rows[0].delivery) : null;
       },
@@ -750,7 +760,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
             AND d.status = 'accepted'
             AND EXISTS (
               SELECT 1 FROM listeners l
-              WHERE l.id = d.listener_id AND l.user_id = ${userId}::uuid
+              WHERE l.id = d.listener_id AND (${currentUserId() === null}::boolean OR l.user_id = ${bound()}::uuid)
             )
             AND (
               d.lease_expires_at IS NULL
@@ -813,7 +823,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
                 lease_expires_at = NULL
             FROM listeners AS l
             WHERE d.listener_id = l.id
-              AND l.user_id = ${userId}::uuid
+              AND (${currentUserId() === null}::boolean OR l.user_id = ${bound()}::uuid)
               AND d.status = 'accepted'
               AND (
                 (d.lease_expires_at IS NOT NULL AND d.lease_expires_at <= ${nowIso}::timestamptz)
@@ -843,7 +853,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
         const rows = await db
           .select()
           .from(notifications)
-          .where(eq(notifications.userId, userId))
+          .where(matchUser(notifications.userId, false))
           .orderBy(sql`(${notifications.readAt} is null) desc`, desc(notifications.createdAt), desc(notifications.id))
           .limit(size)
           .offset(skip);
@@ -853,7 +863,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
         const rows = await db
           .select({ id: notifications.id })
           .from(notifications)
-          .where(and(eq(notifications.userId, userId), sql`${notifications.readAt} is null`));
+          .where(and(matchUser(notifications.userId, false), sql`${notifications.readAt} is null`));
         return rows.length;
       },
       async get(id: string) {
@@ -861,7 +871,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
         const rows = await db
           .select()
           .from(notifications)
-          .where(and(eq(notifications.id, id), eq(notifications.userId, userId)))
+          .where(and(eq(notifications.id, id), matchUser(notifications.userId, false)))
           .limit(1);
         return rows[0] ? toNotification(rows[0]) : null;
       },
@@ -889,7 +899,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
         const current = await db
           .select()
           .from(notifications)
-          .where(and(eq(notifications.id, id), eq(notifications.userId, userId)))
+          .where(and(eq(notifications.id, id), matchUser(notifications.userId, false)))
           .limit(1);
         const row = current[0];
         if (!row) return null;
@@ -905,7 +915,7 @@ export function createAlwaysOn(db: BotanicalDb, userId: string) {
         const updated = await db
           .update(notifications)
           .set({ readAt: now })
-          .where(and(eq(notifications.userId, userId), sql`${notifications.readAt} is null`))
+          .where(and(matchUser(notifications.userId, false), sql`${notifications.readAt} is null`))
           .returning({ id: notifications.id });
         return updated.length;
       },

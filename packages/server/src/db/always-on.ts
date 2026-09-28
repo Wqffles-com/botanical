@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { currentUserId } from "@botanical/db";
 import {
   alwaysOnToRaw,
   createAlwaysOnSettingsAccessor,
@@ -58,6 +59,7 @@ export function createAlwaysOn(options: {
   listenerDeliveries: ListenerDeliveryRepository;
   notifications: NotificationRepository;
   alwaysOnSettings: AlwaysOnSettingsRepository;
+  reassign(from: string, to: string): void;
   onAgentDeleted(agentId: string): void;
 } {
   const routines = new Map<string, Routine>();
@@ -68,6 +70,16 @@ export function createAlwaysOn(options: {
   const scheduleSlots = new Set<string>();
   let claimChain: Promise<void> = Promise.resolve();
   const operatorId = options.operatorId ?? MEMORY_OPERATOR_ID;
+  function bound(): string {
+    return currentUserId() ?? operatorId;
+  }
+  /** Anonymous reads of one row or a due slot see every owner. Lists stay on the acting user. */
+  function visible(owner: string, wide: boolean): boolean {
+    const actor = currentUserId();
+    if (actor) return owner === actor;
+    if (wide) return true;
+    return owner === operatorId;
+  }
   let settingsRaw: Record<string, unknown> = {};
   const alwaysOnSettings = createAlwaysOnSettingsAccessor({
     async read() {
@@ -89,14 +101,14 @@ export function createAlwaysOn(options: {
   const routineRepo: RoutineRepository = {
     async list(query) {
       return [...routines.values()]
-        .filter((row) => row.userId === operatorId)
+        .filter((row) => visible(row.userId, false))
         .filter((row) => !query?.agentId || row.agentId === query.agentId)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
         .map(clone);
     },
     async get(id) {
       const row = routines.get(id);
-      if (!row || row.userId !== operatorId) return null;
+      if (!row || !visible(row.userId, true)) return null;
       return clone(row);
     },
     async create(input: NewRoutine) {
@@ -104,7 +116,7 @@ export function createAlwaysOn(options: {
       const now = stamp();
       const row: Routine = {
         id: randomUUID(),
-        userId: operatorId,
+        userId: bound(),
         agentId: input.agentId,
         name: input.name,
         prompt: input.prompt,
@@ -272,7 +284,7 @@ export function createAlwaysOn(options: {
       const row = runs.get(id);
       if (!row || (row.status !== "queued" && row.status !== "running")) return false;
       const routine = routines.get(row.routineId);
-      if (!routine || routine.userId !== operatorId) return false;
+      if (!routine || !visible(routine.userId, false)) return false;
       if (leaseHeldByOther(row.leaseOwner, row.leaseExpiresAt, owner)) return false;
       row.status = "running";
       if (!row.startedAt) row.startedAt = stamp();
@@ -306,7 +318,7 @@ export function createAlwaysOn(options: {
       for (const run of runs.values()) {
         if (run.status !== "queued" && run.status !== "running") continue;
         const routine = routines.get(run.routineId);
-        if (routine && routine.userId !== operatorId) continue;
+        if (routine && !visible(routine.userId, true)) continue;
         if (!shouldReapLease({ leaseExpiresAt: run.leaseExpiresAt, ageAnchor: run.createdAt, now })) continue;
         run.status = "failed";
         run.error = INTERRUPTED;
@@ -336,14 +348,14 @@ export function createAlwaysOn(options: {
   const listenerRepo: ListenerRepository = {
     async list(query) {
       return [...listeners.values()]
-        .filter((row) => row.userId === operatorId)
+        .filter((row) => visible(row.userId, false))
         .filter((row) => !query?.agentId || row.agentId === query.agentId)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
         .map(clone);
     },
     async get(id) {
       const row = listeners.get(id);
-      if (!row || row.userId !== operatorId) return null;
+      if (!row || !visible(row.userId, true)) return null;
       return clone(row);
     },
     async create(input: NewListener) {
@@ -351,7 +363,7 @@ export function createAlwaysOn(options: {
       const now = stamp();
       const row: Listener = {
         id: randomUUID(),
-        userId: operatorId,
+        userId: bound(),
         agentId: input.agentId,
         name: input.name,
         kind: input.kind,
@@ -442,7 +454,7 @@ export function createAlwaysOn(options: {
       const row = deliveries.get(id);
       if (!row || row.status !== "accepted") return false;
       const listener = listeners.get(row.listenerId);
-      if (!listener || listener.userId !== operatorId) return false;
+      if (!listener || !visible(listener.userId, false)) return false;
       if (leaseHeldByOther(row.leaseOwner, row.leaseExpiresAt, owner)) return false;
       row.leaseOwner = owner;
       row.leaseExpiresAt = expiresAt;
@@ -470,7 +482,7 @@ export function createAlwaysOn(options: {
       for (const delivery of deliveries.values()) {
         if (delivery.status !== "accepted") continue;
         const listener = listeners.get(delivery.listenerId);
-        if (listener && listener.userId !== operatorId) continue;
+        if (listener && !visible(listener.userId, true)) continue;
         if (!shouldReapLease({ leaseExpiresAt: delivery.leaseExpiresAt, ageAnchor: delivery.receivedAt, now })) {
           continue;
         }
@@ -502,7 +514,7 @@ export function createAlwaysOn(options: {
     async list(opts) {
       const { size, skip } = page(opts?.limit, opts?.offset, 30);
       return [...notifications.values()]
-        .filter((notice) => notice.userId === operatorId)
+        .filter((notice) => visible(notice.userId, false))
         .sort(byNotice)
         .slice(skip, skip + size)
         .map(clone);
@@ -510,19 +522,19 @@ export function createAlwaysOn(options: {
     async unreadCount() {
       let count = 0;
       for (const notice of notifications.values()) {
-        if (notice.userId === operatorId && !notice.readAt) count += 1;
+        if (visible(notice.userId, false) && !notice.readAt) count += 1;
       }
       return count;
     },
     async get(id) {
       const row = notifications.get(id);
-      if (!row || row.userId !== operatorId) return null;
+      if (!row || !visible(row.userId, true)) return null;
       return clone(row);
     },
     async create(input: NewNotification) {
       const row: Notification = {
         id: randomUUID(),
-        userId: operatorId,
+        userId: bound(),
         kind: input.kind,
         title: input.title,
         body: input.body,
@@ -538,7 +550,7 @@ export function createAlwaysOn(options: {
     },
     async markRead(id, now) {
       const row = notifications.get(id);
-      if (!row || row.userId !== operatorId) return null;
+      if (!row || !visible(row.userId, true)) return null;
       if (!row.readAt) row.readAt = now.toISOString();
       return clone(row);
     },
@@ -546,7 +558,7 @@ export function createAlwaysOn(options: {
       const readAt = now.toISOString();
       let count = 0;
       for (const notice of notifications.values()) {
-        if (notice.userId !== operatorId || notice.readAt) continue;
+        if (!visible(notice.userId, false) || notice.readAt) continue;
         notice.readAt = readAt;
         count += 1;
       }
@@ -561,6 +573,11 @@ export function createAlwaysOn(options: {
     listenerDeliveries: deliveryRepo,
     notifications: notificationRepo,
     alwaysOnSettings,
+    reassign(from: string, to: string) {
+      for (const row of routines.values()) if (row.userId === from) row.userId = to;
+      for (const row of listeners.values()) if (row.userId === from) row.userId = to;
+      for (const row of notifications.values()) if (row.userId === from) row.userId = to;
+    },
     onAgentDeleted(agentId) {
       for (const routine of [...routines.values()]) {
         if (routine.agentId === agentId) void routineRepo.delete(routine.id);

@@ -35,7 +35,9 @@ BEGIN
         'memories',
         'roles',
         'routines',
-        'listeners'
+        'listeners',
+        'secrets',
+        'user_settings'
       )
   LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', r.table_name || '_set_updated_at', r.table_name);
@@ -75,8 +77,12 @@ DECLARE
 BEGIN
   SELECT user_id INTO agent_owner FROM agents WHERE id = NEW.agent_id;
   SELECT user_id INTO profile_owner FROM model_profiles WHERE id = NEW.profile_id;
-  IF agent_owner IS DISTINCT FROM NEW.user_id OR profile_owner IS DISTINCT FROM NEW.user_id THEN
-    RAISE EXCEPTION 'chat, agent, and model profile must belong to the same user';
+  IF agent_owner IS DISTINCT FROM NEW.user_id THEN
+    RAISE EXCEPTION 'chat and agent must belong to the same user';
+  END IF;
+  -- A null profile owner is an admin-global profile any user may attach.
+  IF profile_owner IS NOT NULL AND profile_owner IS DISTINCT FROM NEW.user_id THEN
+    RAISE EXCEPTION 'chat and model profile must belong to the same user';
   END IF;
   RETURN NEW;
 END;

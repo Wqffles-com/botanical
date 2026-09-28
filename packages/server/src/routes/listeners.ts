@@ -60,7 +60,7 @@ export function registerListeners(router: Router): void {
     "/api/listeners/:id",
     authed(async (ctx) => {
       const existing = await loadListener(ctx.store, requireParam(ctx.params, "id"));
-      const patch = await readListenerPatch(ctx.config, ctx.request);
+      const patch = await readListenerPatch(ctx.store, ctx.config, ctx.request);
       const listener = await ctx.store.listeners.update(existing.id, patch);
       if (!listener) throw new HttpError(404, "not_found", "Listener not found");
       return json(200, { listener: presentListener(listener, publicOrigin(ctx.config, ctx.url)) });
@@ -215,7 +215,7 @@ async function readListenerBody(store: Store, config: ServerConfig, request: Req
   if (!kind || !isListenerKind(kind)) {
     throw new HttpError(400, "invalid_body", "kind must be webhook");
   }
-  const profile = resolveProfile(config, readRequestedProfileId(body.profileId, true), undefined);
+  const profile = await resolveProfile(store, readRequestedProfileId(body.profileId, true), undefined);
   const promptTemplate =
     body.promptTemplate === undefined
       ? ""
@@ -224,7 +224,7 @@ async function readListenerBody(store: Store, config: ServerConfig, request: Req
   return { agentId: agent.id, name, kind, profileId: profile.id, promptTemplate, enabled };
 }
 
-async function readListenerPatch(config: ServerConfig, request: Request) {
+async function readListenerPatch(store: Store, config: ServerConfig, request: Request) {
   const body = await readJson(request, config);
   if (!isRecord(body)) throw new HttpError(400, "invalid_body", "JSON object expected");
   const patch: { name?: string; profileId?: string; promptTemplate?: string; enabled?: boolean } = {};
@@ -234,7 +234,7 @@ async function readListenerPatch(config: ServerConfig, request: Request) {
     patch.name = name;
   }
   if (body.profileId !== undefined) {
-    patch.profileId = resolveProfile(config, readRequestedProfileId(body.profileId, true), undefined).id;
+    patch.profileId = (await resolveProfile(store, readRequestedProfileId(body.profileId, true), undefined)).id;
   }
   if (body.promptTemplate !== undefined) {
     patch.promptTemplate =

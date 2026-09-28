@@ -8,7 +8,9 @@ VALUES
   ('deployment.mode', '"self_host"'::jsonb),
   ('auth.passcode_env', '"BOTANICAL_PASSWORD"'::jsonb),
   ('auth.passcode_alias_env', '"BOTANICAL_PASSCODE"'::jsonb),
-  ('auth.passcode_hash_env', '"BOTANICAL_PASSWORD_HASH"'::jsonb)
+  ('auth.passcode_hash_env', '"BOTANICAL_PASSWORD_HASH"'::jsonb),
+  ('auth.signup_mode', '"open"'::jsonb),
+  ('providers.allow_global_keys', 'true'::jsonb)
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO secret_refs (logical_name, env_var, provider, description)
@@ -48,7 +50,13 @@ ON CONFLICT (logical_name) DO NOTHING;
 COMMENT ON TABLE secret_refs IS
   'Metadata pointing at server env vars. Do not store secret values in Postgres.';
 COMMENT ON COLUMN users.password_hash IS
-  'Optional password hash for hosted accounts. Never a raw passcode. Self-host v0 uses BOTANICAL_PASSWORD, BOTANICAL_PASSCODE, or BOTANICAL_PASSWORD_HASH from the environment.';
+  'Argon2id password hash. Never a raw password. Null means the bootstrap owner has not been claimed by the first signup.';
+COMMENT ON COLUMN users.role IS
+  'admin or member. The first account to set a password is admin.';
+COMMENT ON TABLE secrets IS
+  'AES-256-GCM ciphertext of provider and speech keys. user_id null is admin-global. last4 is the only display hint.';
+COMMENT ON TABLE invites IS
+  'Single-use signup invites. token_hash is SHA-256 of the link token.';
 COMMENT ON COLUMN model_profiles.config IS
   'Non-secret model options (temperature, maxTokens, baseUrl, apiKeyEnv). Raw API keys are rejected.';
 COMMENT ON TABLE settings IS

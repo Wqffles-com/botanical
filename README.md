@@ -4,7 +4,7 @@ Botanical is an open-source, self-hostable AI agent platform that runs in the cl
 
 Botanical is not tied to one model vendor. It talks to any OpenAI-compatible endpoint and has first-class adapters for **GPT (OpenAI)**, **Claude (Anthropic)**, **Grok (xAI)**, **DeepSeek**, and **OpenRouter**. It can also run subscription coding-agent CLIs (**Grok Build**, **Claude Code**, **Codex**) headless on the server as model profiles.
 
-> **Status: early alpha.** The core loop works end to end (passcode login, agents, streaming chat, tools, MCP, agent-to-agent messaging, memory, roles), but APIs, schema, and configuration can still change without notice. Do not rely on it for anything critical yet.
+> **Status: early alpha.** The core loop works end to end (accounts, agents, streaming chat, tools, MCP, agent-to-agent messaging, memory, roles), but APIs, schema, and configuration can still change without notice. Do not rely on it for anything critical yet.
 >
 > License: [MIT](./LICENSE)
 
@@ -39,7 +39,7 @@ On the roadmap (**not implemented yet**; see [docs/ROADMAP.md](./docs/ROADMAP.md
 ## Architecture
 
 ```
-Browser (web UI) ──passcode──▶ Next.js web ──/api──▶ Bun API server ──▶ model providers
+Browser (web UI) ──account──▶ Next.js web ──/api──▶ Bun API server ──▶ model providers
                                                      │  agents · tools · MCP · A2A · routines · listeners · memory · roles
                                                      └──▶ Postgres
 ```
@@ -72,7 +72,7 @@ Requires Docker with Compose v2.24+.
 git clone https://github.com/Wqffles-com/botanical.git
 cd botanical
 cp .env.example .env
-# Edit .env: set BOTANICAL_PASSCODE, POSTGRES_PASSWORD
+# Edit .env: set BOTANICAL_ENCRYPTION_KEY, POSTGRES_PASSWORD
 # (and the same password inside DATABASE_URL), plus at least one provider key.
 docker compose up --build -d
 ```
@@ -85,7 +85,7 @@ This starts Postgres, the API, and the web app. The server applies database migr
 | API | `127.0.0.1:8788` |
 | Postgres | `127.0.0.1:5433` |
 
-Open the web UI, sign in with your passcode, create an agent, and pick a model profile for the chat. On a public server, put TLS in front (for example Caddy) and set `BOTANICAL_PUBLIC_ORIGIN=https://…` and `BOTANICAL_COOKIE_SECURE=true`. See [docs/DEPLOY.md](./docs/DEPLOY.md) for TLS, backups, upgrades, MCP, and coding CLIs.
+Open the web UI and create the first account. That account is the admin. Then create an agent and pick a model profile for the chat. On a public server, put TLS in front (for example Caddy) and set `BOTANICAL_PUBLIC_ORIGIN=https://…` and `BOTANICAL_COOKIE_SECURE=true`. See [docs/DEPLOY.md](./docs/DEPLOY.md) for TLS, backups, upgrades, MCP, and coding CLIs.
 
 To use Grok Build, Claude Code, or Codex from Docker Desktop (Windows, macOS, or Linux) without installing the CLI on the host:
 
@@ -104,7 +104,7 @@ CI packages a single runnable zip, `botanical-<version>.zip`, with the built API
 
 ```sh
 unzip botanical-<version>.zip && cd botanical-<version>
-cp .env.example .env        # set BOTANICAL_PASSWORD, DATABASE_URL, provider keys
+cp .env.example .env        # set BOTANICAL_ENCRYPTION_KEY, DATABASE_URL, and optional seed keys
 docker compose up -d        # optional: bundled Postgres on 127.0.0.1:5433
 ./start.sh                  # API on 127.0.0.1:8787, web on :3000
 ```
@@ -115,7 +115,7 @@ See [scripts/release/README.md](./scripts/release/README.md).
 
 ```sh
 bun install
-export BOTANICAL_PASSWORD=change-me
+export BOTANICAL_ENCRYPTION_KEY=change-me
 # export DATABASE_URL=postgres://…   # unset = in-memory store, data lost on restart
 bun run db:migrate                  # when DATABASE_URL is set
 bun run dev                         # API on :8787, Next dev server on :3000
@@ -130,7 +130,7 @@ Everything is configured through environment variables. The full annotated list 
 | Variable | Purpose |
 |----------|---------|
 | `DEPLOYMENT_MODE` | `SELF_HOST` (default) or `SAAS`. The container entrypoint normalizes it into `BOTANICAL_DEPLOYMENT_MODE`, which the API reads. Both modes share the same routes, auth, and storage today; SaaS mode changes branding ("Botanical Cloud"). Accounts and billing are not built. |
-| `BOTANICAL_PASSCODE` / `BOTANICAL_PASSWORD` | The single login passcode. `BOTANICAL_PASSWORD_HASH` accepts an argon2 hash from `Bun.password.hash` instead. |
+| `BOTANICAL_ENCRYPTION_KEY` | Encrypts provider keys at rest. Hex, base64, or any other string (hashed to 32 bytes). |
 | `BOTANICAL_SESSION_SECRET` | Reserved. The current API does not read it; sessions are random tokens stored as SHA-256 hashes. |
 | `DATABASE_URL` | Postgres connection. Unset means an in-memory store (development only). |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY` | Provider keys. A set key lists that provider's profiles. It never selects a model. |
@@ -161,7 +161,7 @@ Botanical gives language models real tools on your server. Please read this befo
 - **Run it on a host you trust and control, and don't share that host with anything sensitive.** `shell` and `code_exec` run model-generated commands inside a Linux namespace jail (unprivileged `unshare`, network off by default, read-only `/usr`, scrubbed environment, timeouts, output caps). That boundary is real, but **it is not a hardened sandbox**: no seccomp, no separate uid, no cgroup limits. See [packages/tools-shell/SECURITY.md](./packages/tools-shell/SECURITY.md).
 - **Coding-agent CLIs run with their approval prompts disabled** (for example `--dangerously-bypass-approvals-and-sandbox` for Codex and `--permission-mode bypassPermissions` for Claude Code) inside the agent's workspace directory. Only enable them on a server where that is acceptable.
 - **MCP servers are code you choose to run.** Only add servers you trust.
-- **Auth is a single shared passcode** for one operator. Use a long passcode and serve the UI over HTTPS. Login attempts are rate-limited. Multi-user accounts are not implemented.
+- **Accounts.** The first signup is the admin. Signup can be open, invite-only, or closed. Serve the UI over HTTPS. Login attempts are rate-limited. Billing is not implemented.
 - Keep provider keys in the server environment or a secret store. Never commit `.env`.
 
 To report a vulnerability, see [SECURITY.md](./SECURITY.md). Please do not open a public issue.

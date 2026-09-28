@@ -1,4 +1,10 @@
-import type { AlwaysOnSettingsRepository } from "@botanical/db";
+import type {
+  AccountRepository,
+  AlwaysOnSettingsRepository,
+  AuthUser,
+  PrefsRepository,
+  SecretRepository,
+} from "@botanical/db";
 import type { AgentColor } from "@botanical/core";
 
 /**
@@ -315,6 +321,7 @@ export interface AgentMessageRepository {
 
 export interface Session {
   id: string;
+  userId: string;
   tokenHash: string;
   createdAt: string;
   expiresAt: string;
@@ -611,6 +618,13 @@ export interface NotificationRepository {
 export interface Store {
   /** "memory" is process-local. "postgres" is packages/db. */
   readonly kind: "memory" | "postgres";
+  /** Acting user inside a request or job. Null on the shared store. */
+  readonly scopeUserId: string | null;
+  forUser(userId: string): Store;
+  readonly accounts: AccountRepository;
+  readonly secrets: SecretRepository;
+  readonly prefs: PrefsRepository;
+  readonly globalProfiles: ProfileRepository;
   readonly agents: AgentRepository;
   readonly chats: ChatRepository;
   readonly messages: MessageRepository;
@@ -633,7 +647,9 @@ export interface Store {
   close(): Promise<void>;
 }
 
-/** Single v0 operator. SaaS multi-user accounts are not implemented. */
+/** @deprecated Accounts replaced the single operator. Prefer {@link AuthUser}. */
 export interface Operator {
-  id: "operator";
+  id: string;
 }
+
+export type { AuthUser };

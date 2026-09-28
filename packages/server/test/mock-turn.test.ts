@@ -34,8 +34,11 @@ describe("mock profile and file_list", () => {
     ];
     const { app } = setup({ BOTANICAL_PROFILES: JSON.stringify(profiles) });
     const { token } = await login(app);
+    const me = await readJson<{ user: { id: string } }>(
+      await app.fetch(new Request("http://localhost/api/auth/me", { headers: bearer(token) })),
+    );
     const agent = await createAgent(app, token, { toolIds: ["file_list"] });
-    writeFileSync(join(agentWorkspace(agent.id), "notes.txt"), "garden");
+    writeFileSync(join(agentWorkspace(agent.id, me.user.id), "notes.txt"), "garden");
     const created = await postJson(
       app,
       "/api/chats",

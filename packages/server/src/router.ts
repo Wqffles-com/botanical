@@ -1,3 +1,5 @@
+import { runAsUser, type AuthUser } from "@botanical/db";
+
 import type { ServerConfig } from "./config.ts";
 import { finish, HttpError, jsonError } from "./http.ts";
 import type { LoginRateLimiter } from "./auth/rate-limit.ts";
@@ -12,6 +14,7 @@ export interface RequestContext {
   config: ServerConfig;
   store: Store;
   session: Session | null;
+  user: AuthUser | null;
   clientKey: string;
   now: Date;
   rateLimiter: LoginRateLimiter;
@@ -34,11 +37,20 @@ export interface Router {
 
 export function authed(handler: RouteHandler): RouteHandler {
   return async (ctx) => {
-    if (!ctx.session) {
+    if (!ctx.session || !ctx.user) {
       throw new HttpError(401, "unauthorized", "Authentication required");
     }
     return handler(ctx);
   };
+}
+
+export function adminOnly(handler: RouteHandler): RouteHandler {
+  return authed(async (ctx) => {
+    if (ctx.user?.role !== "admin") {
+      throw new HttpError(403, "forbidden", "Admin only");
+    }
+    return handler(ctx);
+  });
 }
 
 export function createRouter(): Router & {
@@ -91,18 +103,23 @@ export function createRouter(): Router & {
         }
 
         const session = await resolveSession(request, deps.store, deps.config, now);
-        const response = await route.handler({
-          request,
-          url,
-          params,
-          config: deps.config,
-          store: deps.store,
-          session,
-          clientKey: deps.clientKey,
-          now,
-          rateLimiter: deps.rateLimiter,
-          mcp: deps.mcp,
-        });
+        const user = session ? await deps.store.accounts.findById(session.userId) : null;
+        const liveSession = user ? session : null;
+        const run = () =>
+          route.handler({
+            request,
+            url,
+            params,
+            config: deps.config,
+            store: deps.store,
+            session: liveSession,
+            user,
+            clientKey: deps.clientKey,
+            now,
+            rateLimiter: deps.rateLimiter,
+            mcp: deps.mcp,
+          });
+        const response = user ? await runAsUser(user.id, run) : await run();
         return finish(response, deps.config);
       } catch (err) {
         if (err instanceof HttpError) {

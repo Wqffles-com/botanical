@@ -16,9 +16,16 @@ import {
   type Env,
   type ProviderType,
 } from "@botanical/providers";
+import { cliHomeFrom } from "@botanical/providers";
+import { currentUserId } from "@botanical/db";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
+
 import type { CliToolHost } from "../cli-mcp.ts";
 import type { ServerConfig } from "../config.ts";
-import type { ModelProfile } from "../types.ts";
+import type { ProviderFetch } from "../provider-host.ts";
+import { providerKeyEnv } from "../provider-keys.ts";
+import type { ModelProfile, Store } from "../types.ts";
 
 const MOCK_TOOL = "file_list";
 const MOCK_CALL_ID = "call_file_list";
@@ -63,26 +70,32 @@ function messagesSinceLastUser(messages: readonly ChatMessage[]): readonly ChatM
   return messages.slice(lastUser);
 }
 
-export function createServerProfileResolver(config: ServerConfig, env: Env, cliTools?: CliToolHost): ProfileResolver {
-  const byId = new Map(config.profiles.map((profile) => [profile.id, profile]));
+export function createServerProfileResolver(
+  config: ServerConfig,
+  env: Env,
+  cliTools: CliToolHost | undefined,
+  store: Store,
+): ProfileResolver {
   const bridged = config.providers?.runtime;
 
   return {
     async list() {
-      if (bridged) return bridged.list();
-      return config.profiles.map((profile) => ({
+      const profiles = await store.profiles.list();
+      if (profiles.length === 0 && bridged) return bridged.list();
+      return profiles.map((profile) => ({
         id: profile.id,
         providerId: profile.provider,
         model: profile.model,
       }));
     },
     async resolve(profileId) {
-      const profile = byId.get(profileId);
+      const profiles = await store.profiles.list();
+      const profile = profiles.find((item) => item.id === profileId);
       if (profile && (profile.kind === "cli" || profile.provider === "cli")) {
         return {
           profileId: profile.id,
           providerId: "cli",
-          provider: cliProvider(profile, cliTools),
+          provider: cliProvider(profile, cliTools, env),
           model: profile.model,
         };
       }
@@ -94,16 +107,30 @@ export function createServerProfileResolver(config: ServerConfig, env: Env, cliT
           model: profile.model,
         };
       }
-      if (bridged) return bridged.resolve(profileId);
+      if (!profile && bridged) return bridged.resolve(profileId);
       if (!profile) throw new ProfileNotFoundError(profileId);
+      const keys = await providerKeyEnv(store, profile.provider);
       return {
         profileId: profile.id,
         providerId: profile.provider,
-        provider: createProfileProvider(profile, env),
+        provider: createProfileProvider(profile, keys, config.providers.fetchImpl),
         model: profile.model,
       };
     },
   };
+}
+
+function userCliEnv(env: Env): Env {
+  const base: Env = { ...process.env, ...env };
+  const userId = currentUserId();
+  if (!userId) return base;
+  const home = join(cliHomeFrom(base), "users", userId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80));
+  try {
+    mkdirSync(home, { recursive: true });
+  } catch {
+    return base;
+  }
+  return { ...base, HOME: home, BOTANICAL_CLI_HOME: home };
 }
 
 /**
@@ -112,7 +139,7 @@ export function createServerProfileResolver(config: ServerConfig, env: Env, cliT
  * Tool calls from that server are already dispatched; they arrive as settled
  * tool-call events so the loop records them and does not run them twice.
  */
-function cliProvider(profile: ModelProfile, cliTools?: CliToolHost): RuntimeProvider {
+function cliProvider(profile: ModelProfile, cliTools: CliToolHost | undefined, env: Env): RuntimeProvider {
   const exposeTools = profile.botanicalTools !== false && cliTools != null;
   return {
     id: profile.id,
@@ -164,7 +191,7 @@ function cliProvider(profile: ModelProfile, cliTools?: CliToolHost): RuntimeProv
           ...(profile.passModel && profile.model ? { model: profile.model } : {}),
           ...(request.signal ? { signal: request.signal } : {}),
           ...(session ? { mcp: { url: session.url, token: session.token }, toolEvents: session.events } : {}),
-          env: process.env,
+          env: userCliEnv(env),
         })) {
           if (event.type === "tool-call") {
             yield {
@@ -186,7 +213,7 @@ function cliProvider(profile: ModelProfile, cliTools?: CliToolHost): RuntimeProv
   };
 }
 
-function createProfileProvider(profile: ModelProfile, env: Env): RuntimeProvider {
+function createProfileProvider(profile: ModelProfile, env: Env, fetchImpl?: ProviderFetch): RuntimeProvider {
   if (profile.provider === "mock") return mockProvider(profile);
   if (profile.provider === "openai-compat" && !profile.baseUrl) {
     return failingProvider(
@@ -204,9 +231,17 @@ function createProfileProvider(profile: ModelProfile, env: Env): RuntimeProvider
             ...(profile.baseUrl ? { baseURL: profile.baseUrl } : {}),
           },
         ],
-        profiles: [{ id: profile.id, provider: profile.provider, model: profile.model }],
+        profiles: [
+          {
+            id: profile.id,
+            provider: profile.provider,
+            model: profile.model,
+            ...(profile.maxTokens !== undefined ? { maxTokens: profile.maxTokens } : {}),
+            ...(profile.temperature !== undefined ? { temperature: profile.temperature } : {}),
+          },
+        ],
       },
-      { env },
+      { env, ...(fetchImpl ? { fetch: fetchImpl as typeof fetch } : {}) },
     );
     return {
       id: profile.id,

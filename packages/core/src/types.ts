@@ -19,10 +19,18 @@ export interface LoginResult {
   mode: DeploymentMode | null;
 }
 
+export interface AccountUser {
+  id: string;
+  email: string;
+  displayName: string;
+  role: "admin" | "member";
+}
+
 export interface Me {
   authenticated: true;
   mode: DeploymentMode | null;
   brandName: string | null;
+  user: AccountUser | null;
 }
 
 export interface ModelProfile {

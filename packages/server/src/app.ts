@@ -14,13 +14,15 @@ import { SlidingWindowLimiter } from "./listeners/limit.ts";
 import type { ServerConfig } from "./config.ts";
 import { createCliToolHost, registerCliMcp, type CliToolHost } from "./cli-mcp.ts";
 import { createCliService, type CliService } from "./cli-install/service.ts";
+import { seedInstance } from "./db/store.ts";
 import { emptyServerMcp, type ServerMcp } from "./mcp-host.ts";
 import { createRouter } from "./router.ts";
 import { createServerProfileResolver } from "./runtime/profiles.ts";
 import { adaptServerStore } from "./runtime/store.ts";
-import { agentWorkspace, ensureWorkspaceRoot } from "./runtime/workspace.ts";
+import { agentWorkspace, userWorkspaceRoot } from "./runtime/workspace.ts";
 import { registerAgentMessages } from "./routes/agent-messages.ts";
 import { registerAlwaysOnSettings } from "./routes/always-on-settings.ts";
+import { registerAccountSettings } from "./routes/account-settings.ts";
 import { registerAgents } from "./routes/agents.ts";
 import { registerAuth } from "./routes/auth.ts";
 import { registerChats } from "./routes/chats.ts";
@@ -93,6 +95,14 @@ export interface App {
 }
 
 export function createApp(deps: AppDeps): App {
+  let seeded: Promise<void> | null = null;
+  function ensureSeed(): Promise<void> {
+    seeded ??= seedInstance(deps.store, deps.config, deps.env ?? process.env).catch((error: unknown) => {
+      seeded = null;
+      throw error;
+    });
+    return seeded;
+  }
   const turns = createTurnCoordinator({
     concurrency: () => deps.store.alwaysOnSettings.peek().backgroundConcurrency,
   });
@@ -136,6 +146,7 @@ export function createApp(deps: AppDeps): App {
   const router = createRouter();
   registerHealth(router);
   registerAuth(router);
+  registerAccountSettings(router);
   registerAgents(router);
   registerRoles(router);
   registerMemories(router);
@@ -169,14 +180,16 @@ export function createApp(deps: AppDeps): App {
     scheduleOnBoot: deps.scheduler !== false,
     turns,
     fetch(request, extras) {
-      return router.handle(request, {
+      return ensureSeed().then(() =>
+        router.handle(request, {
         config: deps.config,
         store: deps.store,
         clientKey: extras?.clientKey ?? "local",
         rateLimiter,
         now: deps.now,
         mcp,
-      });
+      }),
+      );
     },
   };
 }
@@ -197,7 +210,7 @@ function createRuntime(
     registry.register(createAgentAdminContributor(deps.store));
     registry.register(createNotifyContributor(deps.store));
   }
-  const profiles = deps.profiles ?? createServerProfileResolver(deps.config, env, cliTools);
+  const profiles = deps.profiles ?? createServerProfileResolver(deps.config, env, cliTools, deps.store);
   const store = adaptServerStore(deps.store);
   const bus = createAgentMessageBus(store.agents, store.agentMessages);
   return {
@@ -214,7 +227,7 @@ function createRuntime(
         ...ctx,
         // Shared base. File tools and shell/code_exec narrow this to
         // agents/<agentId> from ctx.agentId. The model does not choose the directory.
-        workspaceRoot: ctx.workspaceRoot ?? ensureWorkspaceRoot(),
+        workspaceRoot: ctx.workspaceRoot ?? userWorkspaceRoot(),
       })),
     },
   };

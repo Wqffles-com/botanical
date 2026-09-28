@@ -294,7 +294,7 @@ describe("routine API", () => {
         token,
       ),
     );
-    expect(created.routine.userId).toBe(MEMORY_OPERATOR_ID);
+    expect(created.routine.userId).toMatch(/^[0-9a-f-]{36}$/);
     const started = await readJson<{ run: { id: string; status: string } }>(
       await post(app, `/api/routines/${created.routine.id}/run`, {}, token),
     );
@@ -338,7 +338,7 @@ describe("routine API", () => {
     const notesAgain = await readJson<{ notifications: { userId: string }[] }>(
       await app.fetch(new Request("http://localhost/api/notifications", { headers: bearer(token) })),
     );
-    expect(notesAgain.notifications[0]?.userId).toBe(MEMORY_OPERATOR_ID);
+    expect(notesAgain.notifications[0]?.userId).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   test("always-on settings are instance admin routes with defaults and clamping", async () => {

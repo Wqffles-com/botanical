@@ -85,7 +85,7 @@ interface AudioUpload {
 
 /** v0 has a single account. A later multi-user layer replaces this with the real user id. */
 function sttContext(ctx: RequestContext): SttResolveContext {
-  return { config: ctx.config, userId: ctx.session ? "operator" : null };
+  return { config: ctx.config, userId: ctx.user?.id ?? null, store: ctx.store };
 }
 
 async function readAudioUpload(

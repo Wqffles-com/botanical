@@ -8,7 +8,7 @@ export function registerCli(router: Router, service: CliService): void {
   router.add(
     "GET",
     "/api/cli",
-    authed(async () => json(200, { clis: await service.list() })),
+    authed(async (ctx) => json(200, { clis: await service.list(ctx.user?.id ?? "") })),
   );
 
   router.add(
@@ -17,7 +17,7 @@ export function registerCli(router: Router, service: CliService): void {
     authed(async (ctx) => {
       const cli = requireEnabled(ctx, service);
       const update = await wantsUpdate(ctx);
-      const row = await service.install(cli, update);
+      const row = await service.install(cli, update, ctx.user?.id ?? "");
       return json(200, { cli: row });
     }),
   );
@@ -28,7 +28,7 @@ export function registerCli(router: Router, service: CliService): void {
     authed((ctx) => {
       const cli = requireEnabled(ctx, service);
       try {
-        return json(200, { login: service.loginStart(cli) });
+        return json(200, { login: service.loginStart(cli, ctx.user?.id ?? "") });
       } catch (error) {
         if (error instanceof LoginBusyError) throw new HttpError(409, "login_in_progress", error.message);
         throw error;
@@ -41,7 +41,7 @@ export function registerCli(router: Router, service: CliService): void {
     "/api/cli/:cli/login",
     authed((ctx) => {
       const cli = requireEnabled(ctx, service);
-      return json(200, { login: service.loginGet(cli) });
+      return json(200, { login: service.loginGet(cli, ctx.user?.id ?? "") });
     }),
   );
 
@@ -55,7 +55,7 @@ export function registerCli(router: Router, service: CliService): void {
         throw new HttpError(400, "invalid_body", "input must be a string");
       }
       try {
-        return json(200, { login: await service.loginInput(cli, body.input) });
+        return json(200, { login: await service.loginInput(cli, ctx.user?.id ?? "", body.input) });
       } catch (error) {
         if (error instanceof LoginBusyError) throw new HttpError(409, "login_in_progress", error.message);
         throw new HttpError(400, "invalid_body", "Login is not waiting for input");
@@ -68,7 +68,7 @@ export function registerCli(router: Router, service: CliService): void {
     "/api/cli/:cli/login",
     authed((ctx) => {
       const cli = requireEnabled(ctx, service);
-      return json(200, { login: service.loginCancel(cli) });
+      return json(200, { login: service.loginCancel(cli, ctx.user?.id ?? "") });
     }),
   );
 }

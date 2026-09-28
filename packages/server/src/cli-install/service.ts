@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { join } from "node:path";
 
 import {
   childEnv,
@@ -46,13 +47,13 @@ export interface CliListItem {
 }
 
 export interface CliService {
-  list(): Promise<CliListItem[]>;
+  list(userId: string): Promise<CliListItem[]>;
   describe(cli: string): EnabledCli | null;
-  install(cli: string, update: boolean): Promise<CliListItem>;
-  loginStart(cli: string): LoginView;
-  loginGet(cli: string): LoginView;
-  loginInput(cli: string, value: string): Promise<LoginView>;
-  loginCancel(cli: string): LoginView;
+  install(cli: string, update: boolean, userId: string): Promise<CliListItem>;
+  loginStart(cli: string, userId: string): LoginView;
+  loginGet(cli: string, userId: string): LoginView;
+  loginInput(cli: string, userId: string, value: string): Promise<LoginView>;
+  loginCancel(cli: string, userId: string): LoginView;
   installEnabled(): Promise<void>;
   close(): void;
 }
@@ -73,17 +74,32 @@ export function createCliService(options: CliServiceOptions): CliService {
   const home = options.homeDir ?? cliHomeFrom(env);
   const io = options.io ?? createNodeInstallIo(env);
   const installer = new CliInstaller(io, { root, home });
-  const login = new LoginManager({
-    timeoutMs: options.loginTimeoutMs,
-    resolveBin: (cli) => {
-      const installed = installer.binPath(cli);
-      return io.exists(installed) ? installed : null;
-    },
-    envFor: (cli) => childEnv(env, home, root, cli),
-    spawn: options.spawnLogin ?? spawnLoginProcess,
-    isLoggedIn: (cli) => loggedIn(io, installer, env, home, root, cli),
-    persistClaudeToken: (token) => writeClaudeToken(io, home, token),
-  });
+  const logins = new Map<string, LoginManager>();
+
+  function userHome(userId: string): string {
+    const safe = userId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80) || "user";
+    return join(home, "users", safe);
+  }
+
+  function loginFor(userId: string): LoginManager {
+    const existing = logins.get(userId);
+    if (existing) return existing;
+    const userDir = userHome(userId);
+    void io.mkdir(userDir);
+    const manager = new LoginManager({
+      timeoutMs: options.loginTimeoutMs,
+      resolveBin: (cli) => {
+        const installed = installer.binPath(cli);
+        return io.exists(installed) ? installed : null;
+      },
+      envFor: (cli) => childEnv(env, userDir, root, cli),
+      spawn: options.spawnLogin ?? spawnLoginProcess,
+      isLoggedIn: (cli) => loggedIn(io, installer, env, userDir, root, cli),
+      persistClaudeToken: (token) => writeClaudeToken(io, userDir, token),
+    });
+    logins.set(userId, manager);
+    return manager;
+  }
 
   function enabled(): EnabledCli[] {
     const seen = new Set<CliName>();
@@ -102,11 +118,13 @@ export function createCliService(options: CliServiceOptions): CliService {
     return enabled().find((item) => item.cli === cli) ?? null;
   }
 
-  async function row(item: EnabledCli): Promise<CliListItem> {
+  async function row(item: EnabledCli, userId: string): Promise<CliListItem> {
     const view = await installer.view(item.cli);
     let logged: boolean | "unknown" = "unknown";
+    const userDir = userHome(userId);
     try {
-      logged = await loggedIn(io, installer, env, home, root, item.cli);
+      await io.mkdir(userDir);
+      logged = await loggedIn(io, installer, env, userDir, root, item.cli);
     } catch {
       logged = "unknown";
     }
@@ -125,42 +143,42 @@ export function createCliService(options: CliServiceOptions): CliService {
 
   return {
     describe,
-    async list() {
+    async list(userId) {
       const items = [];
-      for (const item of enabled()) items.push(await row(item));
+      for (const item of enabled()) items.push(await row(item, userId));
       return items;
     },
-    async install(cli, update) {
+    async install(cli, update, userId) {
       const item = describe(cli);
       if (!item) throw new Error("CLI is not enabled");
       await installer.install(item.cli, { update });
-      return row(item);
+      return row(item, userId);
     },
-    loginStart(cli) {
+    loginStart(cli, userId) {
       const item = describe(cli);
       if (!item) throw new Error("CLI is not enabled");
-      return login.start(item.cli);
+      return loginFor(userId).start(item.cli);
     },
-    loginGet(cli) {
+    loginGet(cli, userId) {
       const item = describe(cli);
       if (!item) throw new Error("CLI is not enabled");
-      return login.view(item.cli);
+      return loginFor(userId).view(item.cli);
     },
-    loginInput(cli, value) {
+    loginInput(cli, userId, value) {
       const item = describe(cli);
       if (!item) throw new Error("CLI is not enabled");
-      return login.input(item.cli, value);
+      return loginFor(userId).input(item.cli, value);
     },
-    loginCancel(cli) {
+    loginCancel(cli, userId) {
       const item = describe(cli);
       if (!item) throw new Error("CLI is not enabled");
-      return login.cancel(item.cli);
+      return loginFor(userId).cancel(item.cli);
     },
     async installEnabled() {
       await installer.installMany(enabled().map((item) => item.cli));
     },
     close() {
-      login.close();
+      for (const manager of logins.values()) manager.close();
     },
   };
 }

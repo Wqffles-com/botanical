@@ -73,7 +73,7 @@ Full name lists are on each package page. Summary of readers:
 | Shell jail limits | `packages/tools-shell/src/shell/options.ts` |
 | Postgres URL | `packages/db/src/client.ts`, `packages/db/src/cli.ts` |
 | Web → API origin | `packages/web/next.config.ts`, `packages/web/src/proxy.ts`, `packages/web/src/lib/server-api.ts` |
-| Compose passcode alias (`BOTANICAL_PASSCODE` → `BOTANICAL_PASSWORD`) | `deploy/scripts/server-entrypoint.sh` |
+| Encryption key warning when `BOTANICAL_ENCRYPTION_KEY` is unset | `deploy/scripts/server-entrypoint.sh` |
 | Alternate bootstrap server (not the main API) | `deploy/server/src/config.ts` |
 | Annotated template | `.env.example` |
 

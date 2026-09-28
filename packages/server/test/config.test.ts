@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { ConfigError, loadConfig } from "../src/config.ts";
+import { loadConfig } from "../src/config.ts";
 import { createStore } from "../src/db/store.ts";
 import { existsSync } from "node:fs";
 import { baseEnv } from "./helpers.ts";
 
 describe("loadConfig", () => {
-  test("requires a password", () => {
-    expect(() => loadConfig({})).toThrow(ConfigError);
+  test("starts without a passcode", () => {
+    const config = loadConfig({});
+    expect(config.deploymentMode).toBe("SELF_HOST");
+    expect(config.encryptionKey).toBeNull();
   });
 
   test("rejects an unknown deployment mode", () => {
@@ -112,16 +114,11 @@ describe("loadConfig", () => {
     ).toThrow(/credentials/);
   });
 
-  test("argon2 hash takes precedence and the plaintext is dropped", async () => {
-    const hash = await Bun.password.hash("hash-secret");
-    const config = loadConfig(
-      baseEnv({
-        BOTANICAL_PASSWORD: "plain-secret",
-        BOTANICAL_PASSWORD_HASH: hash,
-      }),
-    );
-    expect(config.auth).toEqual({ method: "hash", hash });
-    expect(JSON.stringify(config.auth)).not.toContain("plain-secret");
+  test("reads the encryption key and does not require a passcode", () => {
+    const config = loadConfig(baseEnv({ BOTANICAL_ENCRYPTION_KEY: "test-encryption-key" }));
+    expect(config.encryptionKey).toBe("test-encryption-key");
+    expect(JSON.stringify(config)).not.toContain("test-encryption-key-nope");
+    expect(() => loadConfig(baseEnv({ BOTANICAL_PASSWORD: "" }))).not.toThrow();
   });
 
   test("derives OpenAI speech-to-text when only OPENAI_API_KEY is set", () => {
@@ -144,10 +141,7 @@ describe("loadConfig", () => {
     expect(custom.dictation.baseUrl).toBe("https://api.groq.com/openai/v1");
   });
 
-  test("rejects a non-argon2 hash and a bad database URL", () => {
-    expect(() => loadConfig(baseEnv({ BOTANICAL_PASSWORD_HASH: "sha256:nope" }))).toThrow(
-      /argon2/,
-    );
+  test("rejects a bad database URL", () => {
     expect(() => loadConfig(baseEnv({ DATABASE_URL: "mysql://localhost/botanical" }))).toThrow(
       /postgres/,
     );

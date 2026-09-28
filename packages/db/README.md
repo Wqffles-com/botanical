@@ -81,19 +81,14 @@ from usage_events
 group by 1, 2;
 ```
 
-## Secrets stay in the environment
+## Bootstrap environment
 
 | Env var | Role |
 | --- | --- |
 | `DATABASE_URL` | Postgres connection string |
 | `DEPLOYMENT_MODE` | `self_host` or `saas` (`SELF_HOST` / `SAAS` accepted). Alias: `BOTANICAL_DEPLOYMENT_MODE` |
-| `BOTANICAL_PASSWORD` | Self-host passcode. Alias: `BOTANICAL_PASSCODE` |
-| `BOTANICAL_PASSWORD_HASH` | Optional precomputed hash instead of the raw passcode |
-| `OPENAI_API_KEY` | Provider key |
-| `ANTHROPIC_API_KEY` | Provider key |
-| `XAI_API_KEY` | Provider key |
-| `DEEPSEEK_API_KEY` | Provider key |
-| `OPENROUTER_API_KEY` | Provider key |
+| `BOTANICAL_ENCRYPTION_KEY` | Encrypts provider and speech keys in `secrets` |
+| `OPENAI_API_KEY` and the other provider keys | Optional first-boot seed of a global secret when that row is absent |
 
 `bun run migrate` seeds `settings` and `secret_refs` with those **names**. `ON CONFLICT DO NOTHING` keeps operator edits. A trigger rejects `deployment.mode` values other than `self_host` and `saas`, and rejects auth settings that are not env-var names.
 
@@ -101,7 +96,7 @@ The same migrate inserts three example agents once (`Gardener` / Sprout / green,
 
 `model_profiles.config` may contain `apiKeyEnv` (a name). It may not contain `apiKey`, `api_key`, `secret`, `token`, or `password`.
 
-`users.password_hash` is optional and is a hash for later hosted accounts. Self-host login checks the passcode env var. Do not write `BOTANICAL_PASSWORD` into the database.
+`users.password_hash` holds an argon2id hash after signup. The first account to sign up is the admin and claims the unowned bootstrap row. Provider key ciphertext lives in `secrets`, not in `model_profiles.config`.
 
 Missing `DEPLOYMENT_MODE` resolves to `self_host` (`resolveDeploymentMode`). It never defaults to SaaS. There is still no default **model**.
 

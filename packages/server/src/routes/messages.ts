@@ -34,8 +34,8 @@ export function registerMessages(router: Router, runtime: RuntimeDeps, turns: Tu
       if (!content) throw new HttpError(400, "invalid_body", "content is required");
       const stream = wantsStream(ctx.request, body);
 
-      const profile = resolveProfile(
-        ctx.config,
+      const profile = await resolveProfile(
+        ctx.store,
         readRequestedProfileId(body.profileId, true),
         chat.profileId,
       );

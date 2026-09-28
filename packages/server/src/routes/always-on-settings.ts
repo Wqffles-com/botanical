@@ -1,6 +1,6 @@
 import { AlwaysOnSettingsError, type AlwaysOnSettingsPatch } from "@botanical/db";
 import { HttpError, isRecord, json, readJson } from "../http.ts";
-import { authed, type Router } from "../router.ts";
+import { adminOnly, authed, type Router } from "../router.ts";
 
 /**
  * Instance-admin settings for background work.
@@ -20,7 +20,7 @@ export function registerAlwaysOnSettings(router: Router): void {
   router.add(
     "PATCH",
     "/api/settings/always-on",
-    authed(async (ctx) => {
+    adminOnly(async (ctx) => {
       const body = await readJson(ctx.request, ctx.config);
       if (!isRecord(body)) throw new HttpError(400, "invalid_body", "JSON object expected");
       try {

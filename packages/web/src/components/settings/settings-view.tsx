@@ -23,13 +23,14 @@ import { RolesPanel } from "@/components/settings/roles-panel";
 import { fetchMcpServers, fetchProfiles, fetchSettings, fetchTools } from "@/lib/mvp-api";
 import type { AppSettings, CatalogTool, McpSnapshot, ProviderKeyStatus } from "@/lib/mvp-types";
 import { deriveProviderKeys } from "@/lib/parse";
+import { AdminPanel } from "./admin-panel";
 import { BackgroundWorkCard } from "./background-work-card";
 import { DeploymentBadge } from "./deployment-badge";
 
-type SettingsTab = "general" | "profiles" | "memory" | "roles" | "cli";
+type SettingsTab = "general" | "profiles" | "memory" | "roles" | "cli" | "admin";
 
 function normalizeTab(value: string | null): SettingsTab {
-  if (value === "profiles" || value === "memory" || value === "roles" || value === "cli") return value;
+  if (value === "profiles" || value === "memory" || value === "roles" || value === "cli" || value === "admin") return value;
   return "general";
 }
 
@@ -45,6 +46,11 @@ export function SettingsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [admin, setAdmin] = useState(false);
+
+  useEffect(() => {
+    void api.me().then((me) => setAdmin(me.user?.role === "admin")).catch(() => setAdmin(false));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,12 +122,13 @@ export function SettingsView() {
       ) : null}
 
       <Tabs value={tab} onValueChange={selectTab} className="mt-8">
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-5">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-6">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="profiles">Profiles</TabsTrigger>
           <TabsTrigger value="memory">Memory</TabsTrigger>
           <TabsTrigger value="roles">Roles & permissions</TabsTrigger>
           <TabsTrigger value="cli">Coding CLIs</TabsTrigger>
+          {admin ? <TabsTrigger value="admin">Admin</TabsTrigger> : null}
         </TabsList>
 
         <TabsContent value="general" className="mt-4 space-y-4">
@@ -149,6 +156,11 @@ export function SettingsView() {
         <TabsContent value="cli" className="mt-4">
           <CliPanel />
         </TabsContent>
+        {admin ? (
+          <TabsContent value="admin" className="mt-4">
+            <AdminPanel />
+          </TabsContent>
+        ) : null}
       </Tabs>
     </div>
   );
@@ -169,7 +181,7 @@ function ProfilesTab({
         <CardHeader>
           <CardTitle>Provider keys</CardTitle>
           <CardDescription>
-            Configured on the host via environment variables. Mock is always available.
+            Global keys are set by an admin. A personal key overrides the global one. Keys are write-only.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">

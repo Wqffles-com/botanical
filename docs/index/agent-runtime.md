@@ -13,6 +13,7 @@ The agent loop: prompt assembly, provider call, tool dispatch, permissions, and 
 | Path | Purpose |
 |------|---------|
 | `packages/agent-runtime/src/loop.ts` | `prepareTurn`, `runAgentTurn`, `dispatchToolCall` |
+| `packages/agent-runtime/src/context.ts` | `trimToBudget` drops older turns to `maxContext` |
 | `packages/agent-runtime/src/prompt.ts` | `buildSystemPrompt` |
 | `packages/agent-runtime/src/tools.ts` | Collect tools, allowlist, MCP name parse |
 | `packages/agent-runtime/src/registry.ts` | `createToolRegistry`, contributor adapters |
