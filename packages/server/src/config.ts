@@ -32,6 +32,24 @@ const STT_MAX_SECONDS_LIMIT = 600;
 const OPENAI_STT_BASE_URL = "https://api.openai.com/v1";
 const OPENAI_STT_MODEL = "gpt-4o-mini-transcribe";
 const WHISPER_STT_MODEL = "whisper-1";
+const OPENROUTER_STT_BASE_URL = "https://openrouter.ai/api/v1";
+const OPENROUTER_STT_MODEL = "openai/whisper-large-v3";
+const XAI_STT_BASE_URL = "https://api.x.ai/v1";
+const XAI_STT_MODEL = "grok-voice-transcribe-2.0";
+const QWEN_STT_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
+const QWEN_STT_MODEL = "qwen3-asr-flash";
+
+export const STT_PROVIDERS = ["openai-compat", "openrouter", "xai", "qwen"] as const;
+export type SttProvider = (typeof STT_PROVIDERS)[number];
+
+const STT_PROVIDER_DEFAULTS: Record<
+  Exclude<SttProvider, "openai-compat">,
+  { baseUrl: string; model: string; keyEnv: string }
+> = {
+  openrouter: { baseUrl: OPENROUTER_STT_BASE_URL, model: OPENROUTER_STT_MODEL, keyEnv: "OPENROUTER_API_KEY" },
+  xai: { baseUrl: XAI_STT_BASE_URL, model: XAI_STT_MODEL, keyEnv: "XAI_API_KEY" },
+  qwen: { baseUrl: QWEN_STT_BASE_URL, model: QWEN_STT_MODEL, keyEnv: "DASHSCOPE_API_KEY" },
+};
 
 export class ConfigError extends Error {
   constructor(message: string) {
@@ -68,13 +86,17 @@ export interface ServerConfig {
    * recipient's dedicated "Inbox" chat. Default false.
    */
   a2aAutorun: boolean;
-  /** Speech-to-text for composer dictation. The API key is never sent to clients. */
+  /**
+   * Speech-to-text bootstrap from the environment. The API key is never sent to clients.
+   * Request handlers go through `resolveSttConfig` so a later settings layer can replace this.
+   */
   dictation: DictationSettings;
 }
 
 export type DictationSettings =
   | {
       mode: "server";
+      provider: SttProvider;
       baseUrl: string;
       apiKey: string | null;
       model: string;
@@ -474,34 +496,86 @@ function loadDictation(env: Record<string, string | undefined>): DictationSettin
   });
   const limits = { maxBytes, maxSeconds };
   const disabled = parseBool(env.BOTANICAL_STT_DISABLED, "BOTANICAL_STT_DISABLED", false);
+  const provider = readSttProvider(env.BOTANICAL_STT_PROVIDER);
   const baseRaw = env.BOTANICAL_STT_BASE_URL?.trim() ?? "";
   const baseUrl = baseRaw ? parseSttBaseUrl(baseRaw) : null;
   const model = readSttModel(env.BOTANICAL_STT_MODEL);
 
   if (disabled) return browserDictation(limits);
 
-  if (baseUrl) {
-    return {
-      mode: "server",
-      baseUrl,
-      apiKey: readOptionalSecret(env, "BOTANICAL_STT_API_KEY"),
-      model: model ?? WHISPER_STT_MODEL,
-      ...limits,
-    };
+  if (!provider) {
+    if (baseUrl) {
+      return serverDictation(
+        "openai-compat",
+        baseUrl,
+        readOptionalSecret(env, "BOTANICAL_STT_API_KEY"),
+        model ?? WHISPER_STT_MODEL,
+        limits,
+      );
+    }
+    const openaiKey = nonemptyEnv(env.OPENAI_API_KEY);
+    if (openaiKey) {
+      return serverDictation("openai-compat", OPENAI_STT_BASE_URL, openaiKey, model ?? OPENAI_STT_MODEL, limits);
+    }
+    return browserDictation(limits);
   }
 
-  const openaiKey = env.OPENAI_API_KEY?.trim() ?? "";
-  if (openaiKey) {
-    return {
-      mode: "server",
-      baseUrl: OPENAI_STT_BASE_URL,
-      apiKey: openaiKey,
-      model: model ?? OPENAI_STT_MODEL,
-      ...limits,
-    };
+  if (provider === "openai-compat") {
+    const usingDefaultBase = !baseUrl;
+    const key =
+      readOptionalSecret(env, "BOTANICAL_STT_API_KEY") ??
+      (usingDefaultBase ? nonemptyEnv(env.OPENAI_API_KEY) : null);
+    if (usingDefaultBase && !key) {
+      warnMissingSttKey(provider, "OPENAI_API_KEY");
+      return browserDictation(limits);
+    }
+    return serverDictation(
+      provider,
+      baseUrl ?? OPENAI_STT_BASE_URL,
+      key,
+      model ?? (usingDefaultBase ? OPENAI_STT_MODEL : WHISPER_STT_MODEL),
+      limits,
+    );
   }
 
-  return browserDictation(limits);
+  const spec = STT_PROVIDER_DEFAULTS[provider];
+  const key = readOptionalSecret(env, "BOTANICAL_STT_API_KEY") ?? nonemptyEnv(env[spec.keyEnv]);
+  if (!key) {
+    warnMissingSttKey(provider, spec.keyEnv);
+    return browserDictation(limits);
+  }
+  return serverDictation(provider, baseUrl ?? spec.baseUrl, key, model ?? spec.model, limits);
+}
+
+function serverDictation(
+  provider: SttProvider,
+  baseUrl: string,
+  apiKey: string | null,
+  model: string,
+  limits: { maxBytes: number; maxSeconds: number },
+): DictationSettings {
+  return { mode: "server", provider, baseUrl, apiKey, model, ...limits };
+}
+
+function readSttProvider(raw: string | undefined): SttProvider | null {
+  const value = raw?.trim() ?? "";
+  if (!value) return null;
+  if ((STT_PROVIDERS as readonly string[]).includes(value)) return value as SttProvider;
+  throw new ConfigError(
+    `BOTANICAL_STT_PROVIDER must be one of: ${STT_PROVIDERS.join(", ")} (received ${JSON.stringify(value)})`,
+  );
+}
+
+function nonemptyEnv(value: string | undefined): string | null {
+  const text = value?.trim() ?? "";
+  return text ? text : null;
+}
+
+/** Logged once per config load when an explicit provider cannot run. Not logged per request. */
+function warnMissingSttKey(provider: SttProvider, fallbackEnv: string): void {
+  console.warn(
+    `[botanical] BOTANICAL_STT_PROVIDER=${provider} has no API key (BOTANICAL_STT_API_KEY or ${fallbackEnv}). Dictation will use the browser.`,
+  );
 }
 
 function browserDictation(limits: { maxBytes: number; maxSeconds: number }): DictationSettings {
@@ -511,8 +585,8 @@ function browserDictation(limits: { maxBytes: number; maxSeconds: number }): Dic
 function readSttModel(raw: string | undefined): string | null {
   const model = raw?.trim() ?? "";
   if (!model) return null;
-  if (!/^[\w.:-]{1,200}$/.test(model)) {
-    throw new ConfigError("BOTANICAL_STT_MODEL must be 1-200 characters (letters, numbers, . _ : -)");
+  if (!/^[\w./:-]{1,200}$/.test(model)) {
+    throw new ConfigError("BOTANICAL_STT_MODEL must be 1-200 characters (letters, numbers, . _ : - /)");
   }
   return model;
 }

@@ -1,7 +1,7 @@
-import type { DictationSettings } from "../config.ts";
 import { HttpError, json } from "../http.ts";
-import { authed, type Router } from "../router.ts";
-import { transcribeAudio } from "../speech.ts";
+import { authed, type RequestContext, type Router } from "../router.ts";
+import { resolveSttConfig, type ResolvedStt, type SttResolveContext } from "../speech/index.ts";
+import { transcribeAudio } from "../speech/transcribe.ts";
 
 const AUDIO_TYPES = new Set([
   "audio/webm",
@@ -32,13 +32,23 @@ export function registerTranscription(router: Router): void {
   router.add(
     "GET",
     "/api/capabilities",
-    authed((ctx) => {
-      const dictation = ctx.config.dictation;
+    authed(async (ctx) => {
+      const resolved = await resolveSttConfig(sttContext(ctx));
+      if (resolved.mode === "browser") {
+        return json(200, {
+          dictation: {
+            mode: "browser",
+            maxBytes: resolved.limits.maxBytes,
+            maxSeconds: resolved.limits.maxSeconds,
+          },
+        });
+      }
       return json(200, {
         dictation: {
-          mode: dictation.mode,
-          maxBytes: dictation.maxBytes,
-          maxSeconds: dictation.maxSeconds,
+          mode: "server",
+          provider: resolved.provider,
+          maxBytes: resolved.limits.maxBytes,
+          maxSeconds: resolved.limits.maxSeconds,
         },
       });
     }),
@@ -48,15 +58,16 @@ export function registerTranscription(router: Router): void {
     "POST",
     "/api/transcriptions",
     authed(async (ctx) => {
-      const dictation = ctx.config.dictation;
-      if (dictation.mode !== "server") {
+      const resolved = await resolveSttConfig(sttContext(ctx));
+      if (resolved.mode !== "server") {
         throw new HttpError(503, "dictation_unavailable", "Dictation is not configured on this server");
       }
-      const upload = await readAudioUpload(ctx.request, dictation);
+      const upload = await readAudioUpload(ctx.request, resolved.limits);
       const text = await transcribeAudio({
-        baseUrl: dictation.baseUrl,
-        apiKey: dictation.apiKey,
-        model: dictation.model,
+        provider: resolved.provider,
+        baseUrl: resolved.baseUrl,
+        apiKey: resolved.apiKey,
+        model: resolved.model,
         file: upload.file,
         filename: upload.filename,
         ...(upload.language ? { language: upload.language } : {}),
@@ -72,9 +83,17 @@ interface AudioUpload {
   language?: string;
 }
 
-async function readAudioUpload(request: Request, dictation: Extract<DictationSettings, { mode: "server" }>): Promise<AudioUpload> {
+/** v0 has a single account. A later multi-user layer replaces this with the real user id. */
+function sttContext(ctx: RequestContext): SttResolveContext {
+  return { config: ctx.config, userId: ctx.session ? "operator" : null };
+}
+
+async function readAudioUpload(
+  request: Request,
+  limits: Extract<ResolvedStt, { mode: "server" }>["limits"],
+): Promise<AudioUpload> {
   const declared = request.headers.get("content-length");
-  if (declared !== null && (!/^\d+$/.test(declared) || declared.length > 12 || Number(declared) > dictation.maxBytes)) {
+  if (declared !== null && (!/^\d+$/.test(declared) || declared.length > 12 || Number(declared) > limits.maxBytes)) {
     throw new HttpError(413, "payload_too_large", "Request body is too large");
   }
 
@@ -97,7 +116,7 @@ async function readAudioUpload(request: Request, dictation: Extract<DictationSet
   if (raw.size === 0) {
     throw new HttpError(400, "invalid_body", "file is empty");
   }
-  if (raw.size > dictation.maxBytes) {
+  if (raw.size > limits.maxBytes) {
     throw new HttpError(413, "payload_too_large", "Request body is too large");
   }
 
@@ -108,7 +127,7 @@ async function readAudioUpload(request: Request, dictation: Extract<DictationSet
   const file = new File([raw], `dictation.${AUDIO_EXTENSIONS[mediaType] ?? "audio"}`, { type: mediaType });
 
   const language = readLanguage(form.get("language"));
-  readDuration(form.get("durationMs"), dictation.maxSeconds);
+  readDuration(form.get("durationMs"), limits.maxSeconds);
 
   return {
     file,
