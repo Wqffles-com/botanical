@@ -5,7 +5,7 @@ import { isUnauthorized } from "@botanical/core";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
-import { Badge } from "@botanical/ui/components/badge";
+import { StatusBadge } from "@botanical/ui/components/status-badge";
 import { Button } from "@botanical/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@botanical/ui/components/card";
 import {
@@ -390,9 +390,18 @@ function DeliveryList({ deliveries, error }: { deliveries: ListenerDelivery[]; e
       {deliveries.map((delivery) => (
         <li key={delivery.id} className="flex flex-col gap-1 px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
           <span className="flex flex-wrap items-center gap-2">
-            <Badge variant={delivery.status === "failed" || delivery.status === "rejected" ? "destructive" : "secondary"}>
+            <StatusBadge
+              tone={
+                delivery.status === "failed" || delivery.status === "rejected"
+                  ? "danger"
+                  : delivery.status === "succeeded"
+                    ? "success"
+                    : "info"
+              }
+              className="capitalize"
+            >
               {delivery.status}
-            </Badge>
+            </StatusBadge>
             <span>{delivery.httpStatus}</span>
             <span className="text-muted-foreground">{delivery.payloadBytes} bytes</span>
             <span>{formatWhen(delivery.receivedAt)}</span>

@@ -9,6 +9,7 @@ import { AgentAvatar } from "@/components/agent-avatar";
 import { PageHeader } from "@/components/page-header";
 import { useWorkspace } from "@/components/workspace-provider";
 import { Badge } from "@botanical/ui/components/badge";
+import { StatusBadge, type StatusTone } from "@botanical/ui/components/status-badge";
 import { Button } from "@botanical/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
 import { Label } from "@botanical/ui/components/label";
@@ -214,7 +215,7 @@ function MessageRow({
           </div>
           <p className="mt-1 whitespace-pre-wrap text-[13px] text-muted-foreground">{message.body}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <StatusBadge status={message.status} />
+            <MessageStatus status={message.status} />
             {unread ? (
               <Button variant="ghost" size="sm" onClick={() => void onStatus(message.id, "read")}>
                 Mark read
@@ -233,10 +234,19 @@ function MessageRow({
   );
 }
 
-function StatusBadge({ status }: { status: AgentMessageStatus }) {
-  const variant =
-    status === "failed" ? "destructive" : status === "read" ? "secondary" : "default";
-  return <Badge variant={variant}>{status}</Badge>;
+const MESSAGE_TONE: Record<AgentMessageStatus, StatusTone> = {
+  pending: "progress",
+  delivered: "info",
+  read: "neutral",
+  failed: "danger",
+};
+
+function MessageStatus({ status }: { status: AgentMessageStatus }) {
+  return (
+    <StatusBadge tone={MESSAGE_TONE[status]} className="capitalize">
+      {status}
+    </StatusBadge>
+  );
 }
 
 function ComposeCard({

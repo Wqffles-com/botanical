@@ -6,7 +6,7 @@ import { ChevronsUpDown } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
-import { Badge } from "@botanical/ui/components/badge";
+import { StatusBadge, type StatusTone } from "@botanical/ui/components/status-badge";
 import { Button } from "@botanical/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@botanical/ui/components/card";
 import {
@@ -35,7 +35,6 @@ import { Textarea } from "@botanical/ui/components/textarea";
 import { api } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 import { CRON_PRESETS, browserTimeZone, describeCron, formatWhen, presetForCron, timeZones, type CronPresetId } from "@/lib/schedule";
-import { cn } from "@/lib/utils";
 
 const EMPTY = {
   agentId: "",
@@ -243,7 +242,7 @@ export function RoutinesView() {
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <span>Next {formatWhen(routine.nextRunAt, routine.timezone)}</span>
                   <span className="inline-flex items-center gap-1">
-                    Last {routine.lastRun ? <StatusBadge status={routine.lastRun.status} /> : "—"}
+                    Last {routine.lastRun ? <RunStatus status={routine.lastRun.status} /> : "—"}
                     {routine.lastRunAt ? formatWhen(routine.lastRunAt, routine.timezone) : null}
                   </span>
                 </div>
@@ -519,7 +518,7 @@ function RunHistory({ runs, error, timeZone }: { runs: RoutineRun[]; error: stri
       {runs.map((run) => (
         <li key={run.id} className="flex flex-col gap-1 px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
           <span className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={run.status} />
+            <RunStatus status={run.status} />
             <span className="text-muted-foreground">{run.trigger}</span>
             <span>{formatWhen(run.scheduledFor, timeZone)}</span>
           </span>
@@ -537,12 +536,19 @@ function RunHistory({ runs, error, timeZone }: { runs: RoutineRun[]; error: stri
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const variant = status === "failed" || status === "rejected" ? "destructive" : status === "succeeded" ? "default" : "secondary";
+function RunStatus({ status }: { status: string }) {
+  const tone: StatusTone =
+    status === "failed" || status === "rejected"
+      ? "danger"
+      : status === "succeeded"
+        ? "success"
+        : status === "running" || status === "queued"
+          ? "progress"
+          : "neutral";
   return (
-    <Badge variant={variant} className={cn("capitalize")}>
+    <StatusBadge tone={tone} className="capitalize">
       {status}
-    </Badge>
+    </StatusBadge>
   );
 }
 

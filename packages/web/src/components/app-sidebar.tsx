@@ -1,36 +1,43 @@
 "use client";
 
 import type { Agent, Chat } from "@botanical/core";
-import { CalendarClock, Inbox, Plus, Search, Settings, Webhook } from "lucide-react";
+import { CalendarClock, Inbox, Plus, Webhook } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { AgentAvatar } from "@/components/agent-avatar";
+import { CommandMenu, CommandMenuButton } from "@/components/command-menu";
 import { Mark } from "@/components/logo";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { NavUser } from "@/components/nav-user";
 import { useWorkspace } from "@/components/workspace-provider";
 import { Button } from "@botanical/ui/components/button";
-import { Input } from "@botanical/ui/components/input";
-import { ScrollArea } from "@botanical/ui/components/scroll-area";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupAction,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSkeleton,
 } from "@botanical/ui/components/sidebar";
-import { Skeleton } from "@botanical/ui/components/skeleton";
 import { agentIdentity } from "@/lib/agent-identity";
-import { initials, relativeTime } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { relativeTime } from "@/lib/format";
+
+const NAV = [
+  { href: "/inbox", label: "Inbox", icon: Inbox },
+  { href: "/routines", label: "Routines", icon: CalendarClock },
+  { href: "/listeners", label: "Listeners", icon: Webhook },
+] as const;
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { ready, me, agents, chats, error } = useWorkspace();
-  const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
 
   const activeChatId = pathname.startsWith("/chats/") ? pathname.split("/")[2] : undefined;
   const activeAgentId = useMemo(() => {
@@ -38,171 +45,129 @@ export function AppSidebar() {
       const id = pathname.split("/")[2];
       if (id && id !== "new") return id;
     }
-    if (activeChatId) return chats.find((chat) => chat.id === activeChatId)?.agentId;
     return undefined;
-  }, [pathname, activeChatId, chats]);
+  }, [pathname]);
 
-  const filteredAgents = useMemo(() => {
-    if (!q) return agents;
-    return agents.filter((agent) => {
-      const identity = agentIdentity(agent);
-      const roles = agent.roles.map((role) => role.name).join(" ");
-      return (
-        identity.name.toLowerCase().includes(q) ||
-        identity.title.toLowerCase().includes(q) ||
-        identity.description.toLowerCase().includes(q) ||
-        roles.toLowerCase().includes(q)
-      );
-    });
-  }, [agents, q]);
-
-  const recent = useMemo(() => {
-    const sorted = [...chats].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    if (!q) return sorted.slice(0, 20);
-    return sorted
-      .filter((chat) => {
-        const agent = agents.find((item) => item.id === chat.agentId);
-        return chat.title.toLowerCase().includes(q) || (agent?.name.toLowerCase().includes(q) ?? false);
-      })
-      .slice(0, 20);
-  }, [agents, chats, q]);
-
-  const owner = me?.brandName ?? "Botanical";
+  const recent = useMemo(
+    () => [...chats].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 20),
+    [chats],
+  );
 
   return (
     <Sidebar collapsible="offcanvas">
-      <SidebarHeader className="gap-3 border-b px-3 py-3">
-        <Link href="/" className="flex min-w-0 items-center gap-2.5">
-          <Mark className="size-8" />
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-semibold tracking-tight">Botanical</span>
-            <span className="block truncate text-xs text-muted-foreground">
-              {me?.mode === "SAAS" ? "Hosted desk" : "Self-host"}
-            </span>
-          </span>
-        </Link>
+      <SidebarHeader className="gap-2">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" render={<Link href="/" />} className="hover:bg-transparent active:bg-transparent">
+              <Mark className="size-8!" />
+              <span className="grid min-w-0 flex-1 leading-tight">
+                <span className="truncate font-semibold tracking-tight">Botanical</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {me?.brandName && me.brandName !== "Botanical"
+                    ? me.brandName
+                    : me?.mode === "SAAS"
+                      ? "Hosted"
+                      : "Self-host"}
+                </span>
+              </span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <Button nativeButton={false} render={<Link href="/chats/new" />} className="w-full justify-start">
           <Plus />
           New chat
         </Button>
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search"
-            aria-label="Search agents and chats"
-            className="h-8 bg-background pl-8"
-          />
-        </div>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <CommandMenu trigger={(open) => <CommandMenuButton onOpen={open} />} />
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
-        <ScrollArea className="h-full">
-          <div className="px-3 py-3">
-            <p className="px-2 pb-1 text-xs font-medium text-muted-foreground">Agents</p>
-            {!ready ? (
-              <div className="space-y-1 px-2">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            ) : filteredAgents.length === 0 ? (
-              <p className="px-2 py-2 text-xs text-muted-foreground">
-                {agents.length === 0 ? "No agents yet." : "No agents match."}
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-0.5">
-                {filteredAgents.map((agent) => (
-                  <AgentRow key={agent.id} agent={agent} active={agent.id === activeAgentId && !activeChatId} />
-                ))}
-              </ul>
-            )}
+      <SidebarContent className="scrollbar-thin">
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {NAV.map(({ href, label, icon: Icon }) => (
+                <SidebarMenuItem key={href}>
+                  <SidebarMenuButton render={<Link href={href} />} isActive={pathname.startsWith(href)} tooltip={label}>
+                    <Icon />
+                    <span>{label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-            <p className="px-2 pt-4 pb-1 text-xs font-medium text-muted-foreground">Recent</p>
-            {recent.length === 0 ? (
-              <p className="px-2 py-2 text-xs text-muted-foreground">
-                {chats.length === 0 ? "No chats yet." : "No chats match."}
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-0.5">
-                {recent.map((chat) => (
-                  <RecentRow
+        <SidebarGroup>
+          <SidebarGroupLabel render={<Link href="/agents" />} className="hover:text-sidebar-foreground">
+            Agents
+          </SidebarGroupLabel>
+          <SidebarGroupAction render={<Link href="/agents/new" />} title="New agent" aria-label="New agent">
+            <Plus />
+          </SidebarGroupAction>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {!ready ? (
+                Array.from({ length: 3 }, (_, index) => (
+                  <SidebarMenuItem key={index}>
+                    <SidebarMenuSkeleton showIcon />
+                  </SidebarMenuItem>
+                ))
+              ) : agents.length === 0 ? (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground">No agents yet.</p>
+              ) : (
+                agents.map((agent) => (
+                  <AgentItem key={agent.id} agent={agent} active={agent.id === activeAgentId} />
+                ))
+              )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Recent</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {ready && recent.length === 0 ? (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground">No chats yet.</p>
+              ) : (
+                recent.map((chat) => (
+                  <RecentItem
                     key={chat.id}
                     chat={chat}
                     agent={agents.find((item) => item.id === chat.agentId) ?? null}
                     active={chat.id === activeChatId}
                   />
-                ))}
-              </ul>
-            )}
-            {error ? <p className="px-2 pt-3 text-xs text-destructive">{error}</p> : null}
-          </div>
-        </ScrollArea>
+                ))
+              )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        {error ? <p className="px-4 pb-3 text-xs text-destructive">{error}</p> : null}
       </SidebarContent>
 
-      <SidebarFooter className="border-t p-2">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton render={<Link href="/inbox" />} isActive={pathname.startsWith("/inbox")} tooltip="Inbox">
-              <Inbox />
-              <span>Inbox</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton render={<Link href="/routines" />} isActive={pathname.startsWith("/routines")} tooltip="Routines">
-              <CalendarClock />
-              <span>Routines</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton render={<Link href="/listeners" />} isActive={pathname.startsWith("/listeners")} tooltip="Listeners">
-              <Webhook />
-              <span>Listeners</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-        <div className="flex items-center gap-2 px-1 py-1">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-md border text-xs font-medium">
-            {initials(owner)}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm leading-tight font-medium">{owner}</p>
-            <p className="truncate text-xs leading-tight text-muted-foreground">
-              {me?.mode === "SAAS" ? "Hosted" : "Desk owner"}
-            </p>
-          </div>
-          <ThemeToggle />
-          <Button
-            nativeButton={false}
-            render={<Link href="/settings" />}
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Settings"
-          >
-            <Settings className="size-4" />
-          </Button>
-        </div>
+      <SidebarFooter>
+        <NavUser />
       </SidebarFooter>
     </Sidebar>
   );
 }
 
-function AgentRow({ agent, active }: { agent: Agent; active: boolean }) {
+function AgentItem({ agent, active }: { agent: Agent; active: boolean }) {
   const identity = agentIdentity(agent);
   const line =
     identity.title ||
     (agent.roles.length > 0 ? agent.roles.map((role) => role.name).join(", ") : identity.description);
   return (
-    <li>
-      <Link
-        href={`/agents/${agent.id}`}
-        aria-current={active ? "page" : undefined}
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        size="lg"
+        render={<Link href={`/agents/${agent.id}`} />}
+        isActive={active}
         title={identity.description ? `${identity.name} — ${identity.description}` : identity.name}
-        className={cn(
-          "flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-sidebar-accent",
-          active && "bg-sidebar-accent",
-        )}
+        className="h-11"
       >
         <AgentAvatar
           icon={identity.icon}
@@ -210,40 +175,32 @@ function AgentRow({ agent, active }: { agent: Agent; active: boolean }) {
           shape={identity.shape}
           picture={identity.picture}
           name={identity.name}
-          size="sm"
+          size="md"
         />
-        <span className="min-w-0">
-          <span className="block truncate text-sm leading-tight font-medium">{identity.name}</span>
-          {line ? <span className="mt-0.5 block truncate text-xs leading-tight text-muted-foreground">{line}</span> : null}
+        <span className="grid min-w-0 flex-1 leading-tight">
+          <span className="truncate font-medium">{identity.name}</span>
+          {line ? <span className="truncate text-xs text-muted-foreground">{line}</span> : null}
         </span>
-      </Link>
-    </li>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 }
 
-function RecentRow({ chat, agent, active }: { chat: Chat; agent: Agent | null; active: boolean }) {
-  const identity = agent ? agentIdentity(agent) : null;
+function RecentItem({ chat, agent, active }: { chat: Chat; agent: Agent | null; active: boolean }) {
+  const title = chat.title || "Untitled chat";
   return (
-    <li>
-      <Link
-        href={`/chats/${chat.id}`}
-        aria-current={active ? "page" : undefined}
-        title={chat.title || "Untitled chat"}
-        className={cn(
-          "flex w-full flex-col gap-0.5 rounded-lg px-2 py-1.5 text-left hover:bg-sidebar-accent",
-          active && "bg-sidebar-accent",
-        )}
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        render={<Link href={`/chats/${chat.id}`} />}
+        isActive={active}
+        title={agent ? `${title} · ${agent.name}` : title}
+        className="pr-12"
       >
-        <span className="flex items-center gap-2">
-          <span className={cn("min-w-0 flex-1 truncate text-sm", active && "font-medium")}>
-            {chat.title || "Untitled chat"}
-          </span>
-          <time className="shrink-0 text-[11px] whitespace-nowrap text-muted-foreground tabular-nums">
-            {relativeTime(chat.updatedAt)}
-          </time>
-        </span>
-        <span className="truncate text-xs text-muted-foreground">{identity?.name ?? "Agent"}</span>
-      </Link>
-    </li>
+        <span>{title}</span>
+      </SidebarMenuButton>
+      <SidebarMenuBadge className="font-normal text-muted-foreground tabular-nums">
+        {relativeTime(chat.updatedAt)}
+      </SidebarMenuBadge>
+    </SidebarMenuItem>
   );
 }

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
-import { Badge } from "@botanical/ui/components/badge";
+import { StatusBadge } from "@botanical/ui/components/status-badge";
 import { Button } from "@botanical/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
 import { Input } from "@botanical/ui/components/input";
@@ -164,7 +164,7 @@ export function CliPanel() {
             <CardHeader className="pb-3">
               <CardTitle className="flex flex-wrap items-center gap-2">
                 {row.label}
-                <StatusBadge row={row} />
+                <InstallStatus row={row} />
                 <LoginBadge loggedIn={row.loggedIn} />
               </CardTitle>
               <CardDescription className="font-mono text-[12px]">
@@ -289,17 +289,18 @@ function LoginPanel({
   );
 }
 
-function StatusBadge({ row }: { row: CliRow }) {
-  if (row.status === "installed") return <Badge variant="secondary">Installed{row.version ? ` v${row.version}` : ""}</Badge>;
-  if (row.status === "installing") return <Badge variant="outline">Installing…</Badge>;
-  if (row.status === "failed") return <Badge variant="outline">Failed</Badge>;
-  return <Badge variant="outline">Not installed</Badge>;
+function InstallStatus({ row }: { row: CliRow }) {
+  if (row.status === "installed")
+    return <StatusBadge tone="success">Installed{row.version ? ` v${row.version}` : ""}</StatusBadge>;
+  if (row.status === "installing") return <StatusBadge tone="progress">Installing…</StatusBadge>;
+  if (row.status === "failed") return <StatusBadge tone="danger">Failed</StatusBadge>;
+  return <StatusBadge tone="neutral">Not installed</StatusBadge>;
 }
 
 function LoginBadge({ loggedIn }: { loggedIn: CliRow["loggedIn"] }) {
-  if (loggedIn === true) return <Badge>Logged in</Badge>;
-  if (loggedIn === false) return <Badge variant="outline">Not logged in</Badge>;
-  return <Badge variant="outline">Login unknown</Badge>;
+  if (loggedIn === true) return <StatusBadge tone="success">Logged in</StatusBadge>;
+  if (loggedIn === false) return <StatusBadge tone="warning">Not logged in</StatusBadge>;
+  return <StatusBadge tone="neutral">Login unknown</StatusBadge>;
 }
 
 async function copy(text: string) {

@@ -25,7 +25,7 @@ export function ToolCallCard({ call }: { call: UiToolCall }) {
 
   return (
     <div
-      className={cn("my-2 overflow-hidden rounded-md border bg-card text-[12.5px]", failed && "border-foreground/40")}
+      className={cn("my-2 overflow-hidden rounded-lg border bg-card text-xs", failed && "border-destructive/40 bg-destructive/5")}
       data-testid="tool-call"
       data-tool-name={call.name}
     >
@@ -36,19 +36,24 @@ export function ToolCallCard({ call }: { call: UiToolCall }) {
         aria-expanded={open}
       >
         {running ? (
-          <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
+          <LoaderCircle className="size-3.5 shrink-0 animate-spin text-primary" />
         ) : failed ? (
-          <CircleAlert className="size-3.5 shrink-0" />
+          <CircleAlert className="size-3.5 shrink-0 text-destructive" />
         ) : (
-          <Check className="size-3.5 shrink-0" />
+          <Check className="size-3.5 shrink-0 text-success" />
         )}
         <ToolIcon name={call.name} />
-        <span className="shrink-0 font-mono text-[12px]">{call.name}</span>
+        <span className="shrink-0 font-mono text-xs">{call.name}</span>
         <ChevronRight className={cn("size-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
-        <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-muted-foreground">
+        <span className="min-w-0 flex-1 truncate font-mono text-2xs text-muted-foreground">
           {args.replace(/\s+/g, " ")}
         </span>
-        <span className="shrink-0 text-[11px] tracking-wide whitespace-nowrap text-muted-foreground uppercase">
+        <span
+          className={cn(
+            "shrink-0 text-2xs whitespace-nowrap capitalize",
+            failed ? "font-medium text-destructive" : "text-muted-foreground",
+          )}
+        >
           {call.status}
         </span>
       </button>
@@ -56,16 +61,16 @@ export function ToolCallCard({ call }: { call: UiToolCall }) {
         <div className="space-y-2 border-t px-2.5 py-2">
           {args ? (
             <section>
-              <h4 className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Arguments</h4>
-              <pre className="overflow-x-auto font-mono text-[11.5px] whitespace-pre-wrap text-muted-foreground">{args}</pre>
+              <h4 className="mb-1 text-2xs font-medium text-muted-foreground">Arguments</h4>
+              <pre className="overflow-x-auto font-mono text-2xs whitespace-pre-wrap text-muted-foreground">{args}</pre>
             </section>
           ) : null}
           {output ? (
             <section>
-              <h4 className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Result</h4>
+              <h4 className="mb-1 text-2xs font-medium text-muted-foreground">Result</h4>
               <pre
                 className={cn(
-                  "overflow-auto font-mono text-[11.5px] whitespace-pre-wrap text-muted-foreground",
+                  "overflow-auto font-mono text-2xs whitespace-pre-wrap text-muted-foreground",
                   !full && "max-h-40",
                 )}
               >
@@ -74,7 +79,7 @@ export function ToolCallCard({ call }: { call: UiToolCall }) {
               {long ? (
                 <button
                   type="button"
-                  className="mt-1 text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+                  className="mt-1 text-2xs text-muted-foreground underline-offset-2 hover:underline"
                   onClick={() => setFull((value) => !value)}
                 >
                   {full ? "Show less" : "Expand"}
@@ -82,7 +87,7 @@ export function ToolCallCard({ call }: { call: UiToolCall }) {
               ) : null}
             </section>
           ) : running ? (
-            <p className="text-[11.5px] text-muted-foreground">Running…</p>
+            <p className="text-2xs text-muted-foreground">Running…</p>
           ) : null}
         </div>
       ) : null}

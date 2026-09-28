@@ -5,11 +5,10 @@ import { isUnauthorized } from "@botanical/core";
 import { Plug, Server, Wrench } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@botanical/ui/components/badge";
-import { Button } from "@botanical/ui/components/button";
+import { StatusBadge } from "@botanical/ui/components/status-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
 import { Skeleton } from "@botanical/ui/components/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@botanical/ui/components/tabs";
@@ -30,6 +29,15 @@ import { DeploymentBadge } from "./deployment-badge";
 
 type SettingsTab = "general" | "profiles" | "memory" | "roles" | "cli" | "admin";
 
+const SETTINGS_TABS: Array<{ value: SettingsTab; label: string }> = [
+  { value: "general", label: "General" },
+  { value: "profiles", label: "Profiles" },
+  { value: "memory", label: "Memory" },
+  { value: "roles", label: "Roles & permissions" },
+  { value: "cli", label: "Coding CLIs" },
+  { value: "admin", label: "Admin" },
+];
+
 function normalizeTab(value: string | null): SettingsTab {
   if (value === "profiles" || value === "memory" || value === "roles" || value === "cli" || value === "admin") return value;
   return "general";
@@ -46,7 +54,6 @@ export function SettingsView() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [signingOut, setSigningOut] = useState(false);
   const [admin, setAdmin] = useState(false);
 
   useEffect(() => {
@@ -83,18 +90,6 @@ export function SettingsView() {
     [profiles, settings],
   );
 
-  async function onSignOut() {
-    setSigningOut(true);
-    try {
-      await api.logout();
-      router.replace("/login");
-      router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not sign out.");
-      setSigningOut(false);
-    }
-  }
-
   function selectTab(next: string) {
     const value = normalizeTab(next);
     const params = new URLSearchParams(searchParams.toString());
@@ -109,11 +104,6 @@ export function SettingsView() {
       <PageHeader
         title="Settings"
         description="Profiles, memory, and roles live on the server. Keys never enter this browser."
-        actions={
-          <Button variant="outline" onClick={() => void onSignOut()} disabled={signingOut}>
-            {signingOut ? "Signing out…" : "Sign out"}
-          </Button>
-        }
       />
 
       {error ? (
@@ -123,13 +113,15 @@ export function SettingsView() {
       ) : null}
 
       <Tabs value={tab} onValueChange={selectTab} className="mt-8">
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-6">
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="profiles">Profiles</TabsTrigger>
-          <TabsTrigger value="memory">Memory</TabsTrigger>
-          <TabsTrigger value="roles">Roles & permissions</TabsTrigger>
-          <TabsTrigger value="cli">Coding CLIs</TabsTrigger>
-          {admin ? <TabsTrigger value="admin">Admin</TabsTrigger> : null}
+        <TabsList
+          variant="line"
+          className="scrollbar-thin w-full justify-start gap-4 overflow-x-auto overflow-y-hidden border-b px-0 group-data-horizontal/tabs:h-10"
+        >
+          {SETTINGS_TABS.filter((item) => admin || item.value !== "admin").map((item) => (
+            <TabsTrigger key={item.value} value={item.value} className="flex-none px-0.5">
+              {item.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value="general" className="mt-4 space-y-4">
@@ -188,12 +180,10 @@ function ProfilesTab({
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           {providers.map((provider) => (
-            <Badge key={provider.id} variant={provider.configured ? "default" : "outline"}>
+            <StatusBadge key={provider.id} tone={provider.configured ? "success" : "neutral"}>
               {provider.label}
-              <span className="ml-1.5 font-normal opacity-80">
-                {provider.configured ? "key set" : "missing"}
-              </span>
-            </Badge>
+              <span className="font-normal opacity-80">{provider.configured ? "key set" : "no key"}</span>
+            </StatusBadge>
           ))}
         </CardContent>
       </Card>
@@ -323,8 +313,12 @@ function McpTab({ snapshot }: { snapshot: McpSnapshot | null }) {
 }
 
 function McpStateBadge({ state }: { state: string }) {
-  const variant = state === "ready" ? "default" : state === "error" ? "destructive" : "secondary";
-  return <Badge variant={variant}>{state}</Badge>;
+  const tone = state === "ready" ? "success" : state === "error" ? "danger" : "neutral";
+  return (
+    <StatusBadge tone={tone} className="capitalize">
+      {state}
+    </StatusBadge>
+  );
 }
 
 function DeploymentTab({ settings }: { settings: AppSettings | null }) {
@@ -356,9 +350,9 @@ function DeploymentTab({ settings }: { settings: AppSettings | null }) {
         {flagEntries.length > 0 ? (
           <div className="mt-4 flex flex-wrap gap-2">
             {flagEntries.map(([key, value]) => (
-              <Badge key={key} variant={value ? "default" : "outline"}>
+              <StatusBadge key={key} tone={value ? "success" : "neutral"}>
                 {key}: {String(value)}
-              </Badge>
+              </StatusBadge>
             ))}
           </div>
         ) : null}

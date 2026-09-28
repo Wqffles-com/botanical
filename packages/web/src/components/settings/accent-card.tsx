@@ -7,7 +7,7 @@ import { useAccent } from "@/components/accent-provider";
 import { Button } from "@botanical/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
 import { Switch } from "@botanical/ui/components/switch";
-import { ACCENT_COLORS, ACCENT_LABEL, ACCENT_SWATCH } from "@/lib/accent";
+import { ACCENT_COLORS, ACCENT_LABEL, accentSwatch } from "@/lib/accent";
 import { cn } from "@/lib/utils";
 
 export function AccentCard() {
@@ -32,8 +32,8 @@ export function AccentCard() {
       <CardHeader>
         <CardTitle>Accent</CardTitle>
         <CardDescription>
-          Colors buttons, links, focus rings, and switches. The sidebar and page stay black, white, and gray.
-          Neutral keeps the current monochrome primary.
+          Colors buttons, links, focus rings, switches, and the active nav item. Pages and borders stay
+          black, white, and gray, and status colors never change. Neutral keeps the monochrome primary.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -57,7 +57,7 @@ export function AccentCard() {
                 <span
                   className="size-4 rounded-full border border-foreground/20"
                   style={{
-                    background: color === "neutral" ? "var(--foreground)" : ACCENT_SWATCH[color],
+                    background: color === "neutral" ? "var(--foreground)" : accentSwatch(color),
                   }}
                 />
                 {ACCENT_LABEL[color]}

@@ -11,14 +11,13 @@ export const ACCENT_LABEL: Record<AccentColor, string> = {
   violet: "Violet",
 };
 
-/** Swatch fills for the settings picker. Neutral follows the current primary. */
-export const ACCENT_SWATCH: Record<Exclude<AccentColor, "neutral">, string> = {
-  blue: "oklch(0.52 0.17 255)",
-  red: "oklch(0.55 0.19 25)",
-  green: "oklch(0.55 0.14 150)",
-  orange: "oklch(0.64 0.16 55)",
-  violet: "oklch(0.52 0.18 300)",
-};
+/**
+ * Swatch fills for the settings picker. They read the same `--swatch-*` tokens the
+ * accent overrides use (`@botanical/ui/styles.css`), so picker and theme cannot drift.
+ */
+export function accentSwatch(accent: Exclude<AccentColor, "neutral">): string {
+  return `var(--swatch-${accent})`;
+}
 
 export function readStoredAccent(): AccentColor {
   if (typeof window === "undefined") return DEFAULT_ACCENT;

@@ -1,51 +1,30 @@
 "use client";
 
-import { Inbox } from "lucide-react";
-import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
+import { AppBreadcrumbs } from "@/components/app-breadcrumbs";
 import { AppSidebar } from "@/components/app-sidebar";
 import { NotificationBell } from "@/components/notifications/notification-bell";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { WorkspaceProvider } from "@/components/workspace-provider";
-import { Button } from "@botanical/ui/components/button";
 import { Separator } from "@botanical/ui/components/separator";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@botanical/ui/components/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@botanical/ui/components/sidebar";
 
-export function AppShell({
-  title,
-  actions,
-  children,
-}: {
-  title?: ReactNode;
-  actions?: ReactNode;
-  children: ReactNode;
-}) {
+export function AppShell({ actions, children }: { actions?: ReactNode; children: ReactNode }) {
   return (
     <WorkspaceProvider>
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset className="h-svh min-h-0 overflow-hidden">
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
-            <SidebarTrigger />
-            <Separator orientation="vertical" className="h-4" />
-            <div className="min-w-0 flex-1 truncate text-sm font-medium">{title}</div>
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
+            <div className="min-w-0 flex-1">
+              <Suspense fallback={null}>
+                <AppBreadcrumbs />
+              </Suspense>
+            </div>
             <div className="flex items-center gap-1">
               {actions}
               <NotificationBell />
-              <Button
-                nativeButton={false}
-                render={<Link href="/inbox" />}
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Inbox"
-              >
-                <Inbox className="size-4" />
-              </Button>
-              <ThemeToggle />
             </div>
           </header>
           <div className="min-h-0 flex-1 overflow-auto">{children}</div>
