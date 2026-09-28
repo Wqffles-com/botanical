@@ -37,7 +37,7 @@ The `shell` / `code_exec` tests need unprivileged user namespaces (`unshare`). O
 
 ## Project layout
 
-Packages live under `packages/`. See the table in the [README](./README.md#architecture) and [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md). A key rule: only `packages/providers` talks to model vendors. The agent runtime and tools never import a vendor SDK.
+Packages live under `packages/`. See the table in the [README](./README.md#architecture) and [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md). A file-level map for coding agents is [docs/index/README.md](./docs/index/README.md), and agent instructions are in [AGENTS.md](./AGENTS.md). If a change adds, moves, renames, or deletes files, routes, tables, env vars, or packages, update `docs/index/` in the same PR and run `bun run check:index`. A key rule: only `packages/providers` talks to model vendors. The agent runtime and tools never import a vendor SDK.
 
 ## Pull requests
 

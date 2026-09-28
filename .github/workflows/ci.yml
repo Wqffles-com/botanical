@@ -33,6 +33,9 @@ jobs:
           node-version: 22
       - run: bun install --frozen-lockfile
 
+      - name: Codebase index check
+        run: bun run check:index
+
       # web lint has known react-hooks errors and is left out until fixed.
       - name: Typecheck
         run: |

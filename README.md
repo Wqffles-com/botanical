@@ -165,6 +165,7 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md). Please do not open 
 
 | Doc | Contents |
 |-----|----------|
+| [docs/index/README.md](./docs/index/README.md) | Codebase index: where files, routes, tables, and env vars live |
 | [docs/DEPLOY.md](./docs/DEPLOY.md) | Compose deploy, TLS, backups, MCP, coding CLIs, hosted mode |
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System design |
 | [docs/DECISIONS.md](./docs/DECISIONS.md) | Design decisions and their rationale |
