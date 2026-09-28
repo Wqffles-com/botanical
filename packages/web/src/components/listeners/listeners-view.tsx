@@ -1,10 +1,14 @@
 "use client";
 
+import { ConfirmDialog } from "@botanical/ui/components/alert-dialog";
+import { EmptyState } from "@botanical/ui/components/empty-state";
+import { Webhook } from "lucide-react";
+import { pageContainerVariants } from "@botanical/ui/components/page-container";
 import type { Agent, Listener, ListenerDelivery, ModelProfile } from "@botanical/core";
 import { isUnauthorized } from "@botanical/core";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@botanical/ui/components/page-header";
 import { StatusBadge } from "@botanical/ui/components/status-badge";
 import { Button } from "@botanical/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@botanical/ui/components/card";
@@ -163,7 +167,7 @@ export function ListenersView() {
   const agentName = useMemo(() => new Map(agents.map((agent) => [agent.id, agent.name])), [agents]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
+    <div className={pageContainerVariants()}>
       <PageHeader
         title="Listeners"
         description="Inbound webhooks start a new chat for the agent. The payload is untrusted data, not instructions."
@@ -182,11 +186,13 @@ export function ListenersView() {
             <Skeleton className="h-28 w-full" />
           </>
         ) : listeners.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-sm text-muted-foreground">
-              No listeners yet. A webhook URL is created with a secret that is shown once.
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={Webhook}
+            title="No listeners yet"
+            body="A listener gives an agent a webhook URL. Its secret is shown once, when you create it."
+            action={<Button onClick={() => setEditor({ ...EMPTY })}>New listener</Button>}
+            bordered
+          />
         ) : (
           listeners.map((listener) => (
             <Card key={listener.id}>
@@ -234,7 +240,7 @@ export function ListenersView() {
                   >
                     Edit
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setRemoveId(listener.id)}>
+                  <Button size="sm" variant="destructive" className="sm:ml-auto" onClick={() => setRemoveId(listener.id)}>
                     Delete
                   </Button>
                 </div>
@@ -318,22 +324,15 @@ export function ListenersView() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={removeId !== null} onOpenChange={(open) => !open && setRemoveId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete listener?</DialogTitle>
-            <DialogDescription>The webhook stops accepting events. Chats already created stay.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRemoveId(null)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={() => void remove()}>
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={removeId !== null}
+        onOpenChange={(open) => !open && setRemoveId(null)}
+        title="Delete listener?"
+        description="The webhook stops accepting events. Chats already created stay."
+        pending={false}
+        pendingLabel="Deleting…"
+        onConfirm={() => void remove()}
+      />
     </div>
   );
 }

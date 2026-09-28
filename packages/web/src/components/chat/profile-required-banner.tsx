@@ -6,7 +6,7 @@ export function ProfileRequiredBanner({ message, title }: { message?: string; ti
     <div
       role="alert"
       data-testid="profile-required"
-      className="mx-auto flex w-full max-w-[760px] items-start gap-2 rounded-lg border bg-muted px-3 py-2 text-sm"
+      className="mx-auto flex w-full max-w-3xl items-start gap-2 rounded-lg border bg-muted px-3 py-2 text-sm"
     >
       <AlertTriangle className="mt-0.5 size-4 shrink-0" />
       <div>

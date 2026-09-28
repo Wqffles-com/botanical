@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 export function Markdown({ children, className }: { children: string; className?: string }) {
   if (!children) return null;
   return (
-    <div className={cn("space-y-3 text-[14.5px] leading-[1.55] break-words", className)}>
+    <div className={cn("space-y-3 text-sm leading-relaxed break-words", className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -35,7 +35,7 @@ export function Markdown({ children, className }: { children: string; className?
             const fenced = Boolean(codeClass) || text.includes("\n");
             if (!fenced) {
               return (
-                <code className="rounded-[4px] bg-muted px-1 py-0.5 font-mono text-[12.5px] text-primary">
+                <code className="rounded-[4px] bg-muted px-1 py-0.5 font-mono text-xs text-primary">
                   {text}
                 </code>
               );
@@ -55,7 +55,7 @@ function CodeBlock({ language, code }: { language?: string; code: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="my-2 overflow-hidden rounded-md border bg-background">
-      <div className="flex items-center justify-between border-b px-3 py-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+      <div className="flex items-center justify-between border-b px-3 py-1 font-mono text-2xs text-muted-foreground">
         <span>{language || "code"}</span>
         <Button
           type="button"
@@ -71,7 +71,7 @@ function CodeBlock({ language, code }: { language?: string; code: string }) {
           {copied ? "Copied" : "Copy"}
         </Button>
       </div>
-      <pre className="overflow-x-auto p-3 font-mono text-[12.5px] leading-relaxed">
+      <pre className="overflow-x-auto p-3 font-mono text-xs leading-relaxed">
         <code>{code}</code>
       </pre>
     </div>

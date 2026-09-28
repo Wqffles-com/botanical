@@ -1,8 +1,9 @@
 "use client";
 
+import { SquareTerminal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { EmptyState } from "@/components/empty-state";
+import { EmptyState } from "@botanical/ui/components/empty-state";
 import { StatusBadge } from "@botanical/ui/components/status-badge";
 import { Button } from "@botanical/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
@@ -154,9 +155,10 @@ export function CliPanel() {
       ) : null}
       {rows && rows.length === 0 ? (
         <EmptyState
+          icon={SquareTerminal}
           title="No coding CLIs enabled"
           body="Set BOTANICAL_CLI_PROFILES to grok-build, claude-code, or codex (comma-separated) and recreate the server container. Then install and sign in here."
-          className="min-h-40 rounded-xl border border-dashed"
+          bordered
         />
       ) : (
         rows?.map((row) => (
@@ -167,7 +169,7 @@ export function CliPanel() {
                 <InstallStatus row={row} />
                 <LoginBadge loggedIn={row.loggedIn} />
               </CardTitle>
-              <CardDescription className="font-mono text-[12px]">
+              <CardDescription className="font-mono text-xs">
                 {row.cli}
                 {row.arch ? ` · ${row.arch}` : ""}
               </CardDescription>
@@ -207,7 +209,7 @@ export function CliPanel() {
         <CardContent className="space-y-2">
           {(Object.keys(TERMINAL) as CliId[]).map((cli) => (
             <div key={cli} className="flex flex-wrap items-center gap-2">
-              <code className="min-w-0 flex-1 break-all font-mono text-[12px]">{TERMINAL[cli]}</code>
+              <code className="min-w-0 flex-1 break-all font-mono text-xs">{TERMINAL[cli]}</code>
               <Button size="sm" variant="outline" onClick={() => void copy(TERMINAL[cli])}>
                 Copy
               </Button>

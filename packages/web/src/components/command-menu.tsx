@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AgentAvatar } from "@/components/agent-avatar";
 import { useWorkspace } from "@/components/workspace-provider";
 import {
+  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,
@@ -78,86 +79,88 @@ export function CommandMenu({ trigger }: { trigger?: (open: () => void) => React
     <>
       {trigger ? trigger(() => setOpen(true)) : null}
       <CommandDialog open={open} onOpenChange={setOpen} title="Search" description="Jump to an agent, chat, or page">
-        <CommandInput placeholder="Search agents, chats, and pages…" />
-        <CommandList>
-          <CommandEmpty>No results.</CommandEmpty>
-          <CommandGroup heading="Actions">
-            <CommandItem value="new chat" onSelect={() => go("/chats/new")}>
-              <Plus />
-              New chat
-            </CommandItem>
-            <CommandItem value="new agent" onSelect={() => go("/agents/new")}>
-              <Bot />
-              New agent
-            </CommandItem>
-          </CommandGroup>
-          {agents.length > 0 ? (
-            <CommandGroup heading="Agents">
-              {agents.map((agent) => {
-                const identity = agentIdentity(agent);
-                return (
-                  <CommandItem
-                    key={agent.id}
-                    value={`agent ${identity.name} ${identity.title}`}
-                    onSelect={() => go(`/agents/${agent.id}`)}
-                  >
-                    <AgentAvatar
-                      icon={identity.icon}
-                      color={identity.color}
-                      shape={identity.shape}
-                      picture={identity.picture}
-                      name={identity.name}
-                      size="sm"
-                      className="size-5"
-                    />
-                    <span className="truncate">{identity.name}</span>
-                    {identity.title ? (
-                      <span className="truncate text-xs text-muted-foreground">{identity.title}</span>
-                    ) : null}
-                  </CommandItem>
-                );
-              })}
+        <Command>
+          <CommandInput placeholder="Search agents, chats, and pages…" />
+          <CommandList>
+            <CommandEmpty>No results.</CommandEmpty>
+            <CommandGroup heading="Actions">
+              <CommandItem value="new chat" onSelect={() => go("/chats/new")}>
+                <Plus />
+                New chat
+              </CommandItem>
+              <CommandItem value="new agent" onSelect={() => go("/agents/new")}>
+                <Bot />
+                New agent
+              </CommandItem>
             </CommandGroup>
-          ) : null}
-          {recent.length > 0 ? (
-            <CommandGroup heading="Recent chats">
-              {recent.map((chat) => (
-                <CommandItem
-                  key={chat.id}
-                  value={`chat ${chat.title} ${agentName.get(chat.agentId) ?? ""} ${chat.id}`}
-                  onSelect={() => go(`/chats/${chat.id}`)}
-                >
-                  <MessageSquare />
-                  <span className="truncate">{chat.title || "Untitled chat"}</span>
-                  <CommandShortcut>{relativeTime(chat.updatedAt)}</CommandShortcut>
+            {agents.length > 0 ? (
+              <CommandGroup heading="Agents">
+                {agents.map((agent) => {
+                  const identity = agentIdentity(agent);
+                  return (
+                    <CommandItem
+                      key={agent.id}
+                      value={`agent ${identity.name} ${identity.title}`}
+                      onSelect={() => go(`/agents/${agent.id}`)}
+                    >
+                      <AgentAvatar
+                        icon={identity.icon}
+                        color={identity.color}
+                        shape={identity.shape}
+                        picture={identity.picture}
+                        name={identity.name}
+                        size="sm"
+                        className="size-5"
+                      />
+                      <span className="truncate">{identity.name}</span>
+                      {identity.title ? (
+                        <span className="truncate text-xs text-muted-foreground">{identity.title}</span>
+                      ) : null}
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            ) : null}
+            {recent.length > 0 ? (
+              <CommandGroup heading="Recent chats">
+                {recent.map((chat) => (
+                  <CommandItem
+                    key={chat.id}
+                    value={`chat ${chat.title} ${agentName.get(chat.agentId) ?? ""} ${chat.id}`}
+                    onSelect={() => go(`/chats/${chat.id}`)}
+                  >
+                    <MessageSquare />
+                    <span className="truncate">{chat.title || "Untitled chat"}</span>
+                    <CommandShortcut>{relativeTime(chat.updatedAt)}</CommandShortcut>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ) : null}
+            <CommandSeparator />
+            <CommandGroup heading="Pages">
+              {PAGES.map(({ href, label, icon: Icon }) => (
+                <CommandItem key={href} value={`page ${label}`} onSelect={() => go(href)}>
+                  <Icon />
+                  {label}
                 </CommandItem>
               ))}
             </CommandGroup>
-          ) : null}
-          <CommandSeparator />
-          <CommandGroup heading="Pages">
-            {PAGES.map(({ href, label, icon: Icon }) => (
-              <CommandItem key={href} value={`page ${label}`} onSelect={() => go(href)}>
-                <Icon />
-                {label}
+            <CommandGroup heading="Theme">
+              <CommandItem value="theme light" onSelect={() => run(() => setTheme("light"))}>
+                <Sun />
+                Light
               </CommandItem>
-            ))}
-          </CommandGroup>
-          <CommandGroup heading="Theme">
-            <CommandItem value="theme light" onSelect={() => run(() => setTheme("light"))}>
-              <Sun />
-              Light
-            </CommandItem>
-            <CommandItem value="theme dark" onSelect={() => run(() => setTheme("dark"))}>
-              <Moon />
-              Dark
-            </CommandItem>
-            <CommandItem value="theme system" onSelect={() => run(() => setTheme("system"))}>
-              <Monitor />
-              System
-            </CommandItem>
-          </CommandGroup>
-        </CommandList>
+              <CommandItem value="theme dark" onSelect={() => run(() => setTheme("dark"))}>
+                <Moon />
+                Dark
+              </CommandItem>
+              <CommandItem value="theme system" onSelect={() => run(() => setTheme("system"))}>
+                <Monitor />
+                System
+              </CommandItem>
+            </CommandGroup>
+          </CommandList>
+        </Command>
       </CommandDialog>
     </>
   );

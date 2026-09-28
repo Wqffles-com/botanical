@@ -1,5 +1,7 @@
 "use client";
 
+import { pageContainerVariants } from "@botanical/ui/components/page-container";
+import { PageHeader } from "@botanical/ui/components/page-header";
 import type { Agent, ModelProfile } from "@botanical/core";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -42,13 +44,11 @@ export function NewChatForm({
   }, [agents, query]);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-2xl flex-col gap-6 px-6 py-8">
-      <header>
-        <h1 className="font-heading text-3xl tracking-tight">New chat</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Each chat belongs to one agent and runs on the model profile you choose. There is no default model.
-        </p>
-      </header>
+    <div className={pageContainerVariants({ size: "narrow", className: "flex flex-col gap-6" })}>
+      <PageHeader
+        title="New chat"
+        description="Each chat belongs to one agent and runs on the model profile you choose. There is no default model."
+      />
 
       <section className="space-y-2">
         <Label>Agent</Label>
@@ -94,7 +94,7 @@ export function NewChatForm({
                     />
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium">{identity.name}</span>
-                      <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
                         {identity.description || "No description"}
                       </span>
                     </span>
@@ -150,7 +150,7 @@ export function NewChatForm({
         >
           {pending ? "Starting…" : "Start chat"}
         </Button>
-        <ul className="text-[12.5px] text-muted-foreground">
+        <ul className="text-xs text-muted-foreground">
           <li className={agentId ? "text-foreground" : undefined}>Choose one agent for this chat.</li>
           <li className={profileId ? "text-foreground" : undefined}>Choose a model profile for this chat.</li>
         </ul>

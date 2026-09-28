@@ -6,10 +6,10 @@ import { AGENT_ICONS, resolveAgentIconName, type AgentIconName } from "@/lib/age
 import { resolveAgentPicture, resolveAgentShape } from "@/lib/agent-identity";
 
 const SIZE = {
-  sm: { box: "size-6 rounded-[7px]", icon: "size-3.5" },
-  md: { box: "size-8 rounded-[9px]", icon: "size-4" },
-  lg: { box: "size-10 rounded-[11px]", icon: "size-5" },
-  xl: { box: "size-14 rounded-[14px]", icon: "size-7" },
+  sm: { box: "size-6 rounded-sm", icon: "size-3.5" },
+  md: { box: "size-8 rounded-md", icon: "size-4" },
+  lg: { box: "size-10 rounded-lg", icon: "size-5" },
+  xl: { box: "size-14 rounded-xl", icon: "size-7" },
 } as const;
 
 /** Clip the colored mark. A picture replaces the silhouette. */

@@ -1,8 +1,9 @@
 "use client";
 
+import { EmptyState } from "@botanical/ui/components/empty-state";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { LayoutGrid, List, Plus } from "lucide-react";
+import { Bot, LayoutGrid, List, Plus, SearchX } from "lucide-react";
 import { AgentAvatar } from "@/components/agent-avatar";
 import { RoleBadges } from "@/components/role-badges";
 import { Button } from "@botanical/ui/components/button";
@@ -141,7 +142,7 @@ export function AgentPicker({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-wrap items-center gap-2">
-        <Command shouldFilter={false} className="min-w-0 flex-1 overflow-visible rounded-lg border bg-background">
+        <Command shouldFilter={false} className="min-w-0 flex-1 overflow-visible bg-transparent p-0">
           <CommandInput value={search} onValueChange={setSearch} placeholder="Search agents…" />
         </Command>
         <div className="flex items-center gap-1">
@@ -175,17 +176,21 @@ export function AgentPicker({
       </div>
 
       {filtered.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-16 text-center">
-          <p className="text-sm font-medium">{agents.length === 0 ? heading : "No agents match."}</p>
-          <p className="max-w-sm text-sm text-muted-foreground">
-            {agents.length === 0 ? emptyHint : "Try a different name or description."}
-          </p>
-          {showCreate && agents.length === 0 ? (
-            <Button nativeButton={false} render={<Link href={createHref} />} className="mt-2">
-              Create agent
-            </Button>
-          ) : null}
-        </div>
+        <EmptyState
+          icon={agents.length === 0 ? Bot : SearchX}
+          title={agents.length === 0 ? `No ${heading.toLowerCase()} yet` : "No agents match"}
+          body={agents.length === 0 ? emptyHint : "Try a different name or description."}
+          action={
+            agents.length === 0 ? (
+              <Button nativeButton={false} render={<Link href={createHref} />}>
+                <Plus />
+                Create agent
+              </Button>
+            ) : null
+          }
+          bordered
+          className="mt-4 flex-1"
+        />
       ) : view === "grid" ? (
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((agent) => (

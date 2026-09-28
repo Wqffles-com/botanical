@@ -1,12 +1,13 @@
 "use client";
 
+import { pageContainerVariants } from "@botanical/ui/components/page-container";
 import type { ModelProfile } from "@botanical/core";
 import { isUnauthorized } from "@botanical/core";
-import { Plug, Server, Wrench } from "lucide-react";
+import { Layers, Plug, Server, Wrench } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { EmptyState } from "@/components/empty-state";
-import { PageHeader } from "@/components/page-header";
+import { EmptyState } from "@botanical/ui/components/empty-state";
+import { PageHeader } from "@botanical/ui/components/page-header";
 import { Badge } from "@botanical/ui/components/badge";
 import { StatusBadge } from "@botanical/ui/components/status-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
@@ -100,7 +101,7 @@ export function SettingsView() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-10">
+    <div className={pageContainerVariants()}>
       <PageHeader
         title="Settings"
         description="Profiles, memory, and roles live on the server. Keys never enter this browser."
@@ -189,9 +190,10 @@ function ProfilesTab({
       </Card>
       {keysOnly ? null : profiles.length === 0 ? (
         <EmptyState
+          icon={Layers}
           title="No model profiles"
           body="The server only lists profiles whose provider key is set, plus mock. Set a key and reload."
-          className="min-h-40 rounded-xl border border-dashed"
+          bordered
         />
       ) : (
         <div className="grid gap-2.5 sm:grid-cols-2">
@@ -201,7 +203,7 @@ function ProfilesTab({
                 <CardTitle>{profile.name}</CardTitle>
                 <CardDescription>{profile.description ?? "Operator-configured profile."}</CardDescription>
               </CardHeader>
-              <CardContent className="font-mono text-[11.5px] text-muted-foreground">
+              <CardContent className="font-mono text-2xs text-muted-foreground">
                 {providerLabel(profile.provider)} · {profile.model}
               </CardContent>
             </Card>
@@ -218,9 +220,10 @@ function ToolsTab({ tools }: { tools: CatalogTool[] }) {
   if (tools.length === 0) {
     return (
       <EmptyState
+        icon={Wrench}
         title="No tools advertised"
         body="GET /api/tools is empty or not implemented yet. Built-ins and MCP tools will show here with their source."
-        className="min-h-40 rounded-xl border border-dashed"
+        bordered
       />
     );
   }
@@ -257,13 +260,13 @@ function ToolGroup({
         {tools.map((tool) => (
           <div key={tool.id || tool.name} className="rounded-md border px-3 py-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[13px]">{tool.name}</span>
+              <span className="font-mono text-sm">{tool.name}</span>
               <Badge variant="outline">{tool.source}</Badge>
               {tool.serverId ? <Badge variant="secondary">{tool.serverId}</Badge> : null}
               {tool.risk ? <Badge variant="outline">{tool.risk}</Badge> : null}
             </div>
             {tool.description ? (
-              <p className="mt-1 text-[13px] text-muted-foreground">{tool.description}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{tool.description}</p>
             ) : null}
           </div>
         ))}
@@ -277,12 +280,13 @@ function McpTab({ snapshot }: { snapshot: McpSnapshot | null }) {
   if (servers.length === 0) {
     return (
       <EmptyState
+        icon={Plug}
         title={snapshot?.disabled ? "MCP is disabled" : "No MCP servers"}
         body={
           snapshot?.configError ??
           "GET /api/mcp/servers will list configured servers and their status once the MCP agent lands."
         }
-        className="min-h-40 rounded-xl border border-dashed"
+        bordered
       />
     );
   }
@@ -341,11 +345,11 @@ function DeploymentTab({ settings }: { settings: AppSettings | null }) {
       <CardContent>
         <dl className="grid grid-cols-[7rem_1fr] gap-y-1.5 text-sm">
           <dt className="text-muted-foreground">Brand</dt>
-          <dd className="font-mono text-[12.5px]">{settings?.brandName ?? "—"}</dd>
+          <dd className="font-mono text-xs">{settings?.brandName ?? "—"}</dd>
           <dt className="text-muted-foreground">Version</dt>
-          <dd className="font-mono text-[12.5px]">{settings?.version ?? "—"}</dd>
+          <dd className="font-mono text-xs">{settings?.version ?? "—"}</dd>
           <dt className="text-muted-foreground">Mode</dt>
-          <dd className="font-mono text-[12.5px]">{mode ?? "—"}</dd>
+          <dd className="font-mono text-xs">{mode ?? "—"}</dd>
         </dl>
         {flagEntries.length > 0 ? (
           <div className="mt-4 flex flex-wrap gap-2">

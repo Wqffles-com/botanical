@@ -1,5 +1,6 @@
 "use client";
 
+import { pageContainerVariants } from "@botanical/ui/components/page-container";
 import type { RoleRecord } from "@botanical/core";
 import { useEffect, useMemo, useState } from "react";
 import { AgentForm } from "@/components/agents/agent-form";
@@ -50,7 +51,7 @@ export function AgentEditorPage({ agentId }: { agentId?: string }) {
 
   if (!ready || (agentId && !agent && agents.length === 0)) {
     return (
-      <div className="mx-auto w-full max-w-2xl space-y-4 px-6 py-8">
+      <div className={pageContainerVariants({ size: "narrow", className: "space-y-4" })}>
         <Skeleton className="size-14 rounded-xl" />
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-10 w-full" />

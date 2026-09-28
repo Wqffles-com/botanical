@@ -75,7 +75,7 @@ export function AgentToolAllowlist({
               {tool.description ? (
                 <span className="mt-0.5 block text-xs text-muted-foreground">{tool.description}</span>
               ) : (
-                <span className="mt-0.5 block font-mono text-[11px] text-muted-foreground">{tool.id}</span>
+                <span className="mt-0.5 block font-mono text-2xs text-muted-foreground">{tool.id}</span>
               )}
             </span>
           </label>

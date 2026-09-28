@@ -1,10 +1,11 @@
 "use client";
 
+import { MessageSquareOff } from "lucide-react";
 import type { Agent, Chat, ChatMessage, ModelProfile } from "@botanical/core";
 import { useEffect, useRef } from "react";
 import { ChatAgentHeader } from "@/components/chat/chat-agent-header";
 import { Composer } from "@/components/chat/composer";
-import { EmptyState } from "@/components/chat/empty-state";
+import { EmptyState } from "@botanical/ui/components/empty-state";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { ProfileRequiredBanner } from "@/components/chat/profile-required-banner";
 import { ChatThreadSkeleton } from "@/components/chat/skeletons";
@@ -62,7 +63,9 @@ export function ChatThread({
   if (missing || !chat) {
     return (
       <EmptyState
+        icon={MessageSquareOff}
         title="Chat not found"
+        className="h-full"
         body="This thread may have been deleted, or the id is wrong."
       />
     );
@@ -102,14 +105,14 @@ export function ChatThread({
         className="min-h-0 flex-1 overflow-y-auto"
       >
         {messages.length === 0 && !live ? (
-          <div className="mx-auto flex h-full max-w-[760px] flex-col items-center justify-center px-6 text-center">
-            <h2 className="font-heading text-4xl tracking-tight">{identity?.name ?? "New chat"}</h2>
+          <div className="mx-auto flex h-full max-w-3xl flex-col items-center justify-center px-6 text-center">
+            <h2 className="text-2xl font-semibold tracking-tight">{identity?.name ?? "New chat"}</h2>
             <p className="mt-2 max-w-md text-sm text-muted-foreground">
               {identity?.description || "Send a message when a model profile is selected."}
             </p>
           </div>
         ) : (
-          <div className="mx-auto flex min-h-full max-w-[760px] flex-col justify-end gap-5 px-4 py-6">
+          <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-end gap-5 px-4 py-6">
             {rows.map((row) => (
               <MessageBubble
                 key={row.key}

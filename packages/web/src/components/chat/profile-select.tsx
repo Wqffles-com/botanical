@@ -66,7 +66,7 @@ export function ProfileSelect({
         </SelectContent>
       </Select>
       {unavailable && selected?.unavailableReason ? (
-        <p className="mt-1 truncate text-[11px] text-muted-foreground" title={selected.unavailableReason}>
+        <p className="mt-1 truncate text-2xs text-muted-foreground" title={selected.unavailableReason}>
           {selected.unavailableReason}
         </p>
       ) : null}
@@ -90,7 +90,7 @@ function ProfileGroup({ label, profiles }: { label: string; profiles: ModelProfi
           >
             <span className="flex min-w-0 flex-col items-start">
               <span className={cn("truncate", !available && "text-muted-foreground")}>{profile.name}</span>
-              <span className="truncate text-[11px] font-normal text-muted-foreground">
+              <span className="truncate text-2xs font-normal text-muted-foreground">
                 {available ? profileLabel(profile).replace(`${profile.name} · `, "") : profile.unavailableReason || "Unavailable"}
               </span>
             </span>

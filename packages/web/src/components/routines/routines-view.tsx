@@ -1,11 +1,14 @@
 "use client";
 
+import { ConfirmDialog } from "@botanical/ui/components/alert-dialog";
+import { EmptyState } from "@botanical/ui/components/empty-state";
+import { pageContainerVariants } from "@botanical/ui/components/page-container";
 import type { Agent, ModelProfile, Routine, RoutineRun } from "@botanical/core";
 import { isUnauthorized } from "@botanical/core";
-import { ChevronsUpDown } from "lucide-react";
+import { CalendarClock, ChevronsUpDown } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@botanical/ui/components/page-header";
 import { StatusBadge, type StatusTone } from "@botanical/ui/components/status-badge";
 import { Button } from "@botanical/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@botanical/ui/components/card";
@@ -192,7 +195,7 @@ export function RoutinesView() {
   const agentName = useMemo(() => new Map(agents.map((agent) => [agent.id, agent.name])), [agents]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
+    <div className={pageContainerVariants()}>
       <PageHeader
         title="Routines"
         description="Scheduled runs. Each run opens a new chat so the history stays bounded to that slot."
@@ -210,11 +213,13 @@ export function RoutinesView() {
             <Skeleton className="h-28 w-full" />
           </>
         ) : routines.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-sm text-muted-foreground">
-              No routines yet. Create one to run an agent on a schedule while you are away.
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={CalendarClock}
+            title="No routines yet"
+            body="Run an agent on a schedule while you are away. Each run opens its own chat."
+            action={<Button onClick={openCreate}>New routine</Button>}
+            bordered
+          />
         ) : (
           routines.map((routine) => (
             <Card key={routine.id}>
@@ -224,7 +229,7 @@ export function RoutinesView() {
                   <p className="mt-1 text-sm text-muted-foreground">
                     {agentName.get(routine.agentId) ?? "Unknown agent"} · {describeCron(routine.cron)} · {routine.timezone}
                   </p>
-                  <p className="mt-0.5 font-mono text-[11.5px] text-muted-foreground">{routine.cron}</p>
+                  <p className="mt-0.5 font-mono text-2xs text-muted-foreground">{routine.cron}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Label htmlFor={`enabled-${routine.id}`} className="text-xs text-muted-foreground">
@@ -256,7 +261,7 @@ export function RoutinesView() {
                   <Button size="sm" variant="outline" onClick={() => openEdit(routine)}>
                     Edit
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setRemoveId(routine.id)}>
+                  <Button size="sm" variant="destructive" className="sm:ml-auto" onClick={() => setRemoveId(routine.id)}>
                     Delete
                   </Button>
                 </div>
@@ -294,22 +299,15 @@ export function RoutinesView() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={removeId !== null} onOpenChange={(open) => !open && setRemoveId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete routine?</DialogTitle>
-            <DialogDescription>Past chats stay. The schedule and its run history are removed.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRemoveId(null)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={() => void remove()}>
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={removeId !== null}
+        onOpenChange={(open) => !open && setRemoveId(null)}
+        title="Delete routine?"
+        description="Past chats stay. The schedule and its run history are removed."
+        pending={false}
+        pendingLabel="Deleting…"
+        onConfirm={() => void remove()}
+      />
     </div>
   );
 }
@@ -440,7 +438,7 @@ function RoutineForm({
       ) : null}
       <div className="space-y-0.5">
         <p className="text-sm">{value.cron.trim() ? describeCron(value.cron) : "Choose a schedule"}</p>
-        <p className="font-mono text-[11.5px] text-muted-foreground">{value.cron.trim() || "—"}</p>
+        <p className="font-mono text-2xs text-muted-foreground">{value.cron.trim() || "—"}</p>
       </div>
       <Field label="Timezone">
         <TimeZoneField zones={zones} value={value.timezone} onChange={(timezone) => onChange({ ...value, timezone })} />
