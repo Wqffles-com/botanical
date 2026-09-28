@@ -48,6 +48,8 @@ Whenever you create an issue or pull request in GitHub, add `Wqffles-com` as ass
 
 Whenever you create a pull request, unless told otherwise, watch it until CI is green: if it goes red, fix it and push; once it is green, merge it.
 
+Whenever you pick up a GitHub issue in a session, add the `working on` label to it.
+
 ## Secrets
 
 Do not commit secrets, `.env` files, or real API keys. Use `.env.example` for placeholders. See `SECURITY.md`.
