@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { BotanicalApiError, ProfileRequiredError, type Agent, type Chat, type ChatMessage } from "@botanical/core";
 import { agentDefaultProfileId, canStartChat, chatsByAgent } from "./chat-groups";
-import { applyStreamEvent, emptyDraft, presentThread, toolResultStatus } from "./chat-stream";
+import { presentThread, toolResultStatus } from "./chat-stream";
 import { isProfileRequired, isProfileUnavailable, profileRequiredMessage, profileUnavailableText } from "./errors";
 
 describe("new chat gates", () => {
@@ -26,37 +26,9 @@ describe("new chat gates", () => {
   });
 });
 
-describe("applyStreamEvent", () => {
-  test("accumulates text, tool calls, and tool results", () => {
-    let draft = emptyDraft("chat-1");
-    draft = applyStreamEvent(draft, { type: "message-start", messageId: "a1", role: "assistant" });
-    draft = applyStreamEvent(draft, {
-      type: "tool-call",
-      id: "t1",
-      name: "file_list",
-      arguments: { path: "." },
-    });
-    expect(draft.toolCalls).toEqual([
-      { id: "t1", name: "file_list", arguments: { path: "." }, status: "running" },
-    ]);
-    draft = applyStreamEvent(draft, { type: "tool-result", id: "t1", content: "README.md" });
-    expect(draft.toolCalls[0]).toMatchObject({ result: "README.md", status: "done" });
-    draft = applyStreamEvent(draft, { type: "text-delta", text: "Hel" });
-    draft = applyStreamEvent(draft, { type: "text-delta", text: "lo" });
-    draft = applyStreamEvent(draft, { type: "usage", inputTokens: 3, outputTokens: 2 });
-    draft = applyStreamEvent(draft, { type: "done", messageId: "a1" });
-    expect(draft).toMatchObject({
-      id: "a1",
-      content: "Hello",
-      usage: { inputTokens: 3, outputTokens: 2 },
-    });
-  });
-
-  test("marks a tool result as an error when the stream says so", () => {
-    let draft = emptyDraft("chat-1");
-    draft = applyStreamEvent(draft, { type: "tool-call", id: "t1", name: "file_write", arguments: {} });
-    draft = applyStreamEvent(draft, { type: "tool-result", id: "t1", content: "denied", isError: true });
-    expect(draft.toolCalls[0]?.status).toBe("error");
+describe("toolResultStatus", () => {
+  test("reads error-shaped results as errors", () => {
+    expect(toolResultStatus("denied", true)).toBe("error");
     expect(toolResultStatus('{"error":"permission denied: file.write"}')).toBe("error");
     expect(toolResultStatus("README.md")).toBe("done");
   });

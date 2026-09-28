@@ -58,7 +58,7 @@ Only `packages/providers` implements vendor HTTP and CLI adapters. The runtime a
 1. Browser loads the Next app in `packages/web`. `packages/web/src/proxy.ts` calls `GET /api/auth/me` and redirects anonymous users to `/login`.
 2. Browser calls same-origin `/api/*`. `packages/web/next.config.ts` rewrites that prefix to `BOTANICAL_API_URL` (default `http://127.0.0.1:8787`). The browser client is `packages/web/src/lib/api.ts` (`BotanicalClient` from `packages/core/src/client.ts`).
 3. `packages/server/src/serve.ts` loads config, opens the store, connects MCP, builds the tool registry, and serves `createApp` (`packages/server/src/app.ts`) on Bun.
-4. `POST /api/chats/:id/messages` in `packages/server/src/routes/messages.ts` runs a turn through `packages/server/src/runtime/turn.ts` into `runAgentTurn` (`packages/agent-runtime/src/loop.ts`).
+4. `POST /api/chats/:id/messages` in `packages/server/src/routes/messages.ts` runs a turn through `packages/server/src/runtime/turn.ts` into `runAgentTurn` (`packages/agent-runtime/src/loop.ts`). The web client sends with `async: true`: the message is queued in `packages/server/src/runtime/chat-queue.ts`, the turn runs detached from the request, and finished messages arrive on `GET /api/chats/:id/events`.
 5. The loop asks `packages/providers` for a stream (`packages/server/src/runtime/profiles.ts`), dispatches tools (`packages/agent-runtime/src/tools.ts`, registry from `packages/server/src/tools/catalog.ts`), and reads or writes the store (`packages/server/src/db/store.ts` → memory, or `packages/db` when `DATABASE_URL` is set).
 6. SSE replies are encoded in `packages/server/src/streaming.ts`. There is no WebSocket upgrade handler.
 

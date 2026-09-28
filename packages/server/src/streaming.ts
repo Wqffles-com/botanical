@@ -35,6 +35,7 @@ export function sseStream(events: AsyncIterable<SseEvent>, options: { heartbeatM
   const encoder = new TextEncoder();
   const heartbeatMs = options.heartbeatMs ?? SSE_HEARTBEAT_MS;
   let heartbeat: ReturnType<typeof setInterval> | undefined;
+  let cancelled = false;
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let lastWrite = Date.now();
@@ -52,10 +53,12 @@ export function sseStream(events: AsyncIterable<SseEvent>, options: { heartbeatM
       }
       try {
         for await (const event of events) {
+          if (cancelled) break;
           controller.enqueue(encoder.encode(encodeSse(event)));
           lastWrite = Date.now();
         }
       } catch (error) {
+        if (cancelled) return;
         const message = error instanceof Error ? error.message : "The model request failed";
         controller.enqueue(
           encoder.encode(encodeSse({ event: "error", data: { type: "error", error: message, code: "internal_error" } })),
@@ -63,10 +66,11 @@ export function sseStream(events: AsyncIterable<SseEvent>, options: { heartbeatM
         controller.enqueue(encoder.encode(encodeSse({ event: "done", data: { type: "done" } })));
       } finally {
         if (heartbeat) clearInterval(heartbeat);
-        controller.close();
+        if (!cancelled) controller.close();
       }
     },
     cancel() {
+      cancelled = true;
       if (heartbeat) clearInterval(heartbeat);
     },
   });

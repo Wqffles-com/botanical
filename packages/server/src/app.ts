@@ -39,6 +39,7 @@ import { registerRoles } from "./routes/roles.ts";
 import { registerRoutines } from "./routes/routines.ts";
 import { registerTools } from "./routes/tools.ts";
 import { registerTranscription } from "./routes/transcription.ts";
+import { createChatQueue, type ChatQueue } from "./runtime/chat-queue.ts";
 import { createBackgroundJobs } from "./runtime/jobs.ts";
 import { createTurnCoordinator, type TurnCoordinator } from "./runtime/turns.ts";
 import { createScheduler, type Scheduler } from "./routines/scheduler.ts";
@@ -93,6 +94,8 @@ export interface App {
   scheduleOnBoot: boolean;
   /** Per-chat turn lock and the background concurrency cap. */
   turns: TurnCoordinator;
+  /** Async chat messages: queued turns that run detached from the request. Tests wait on `whenIdle`. */
+  chatQueue: ChatQueue;
 }
 
 export function createApp(deps: AppDeps): App {
@@ -131,6 +134,7 @@ export function createApp(deps: AppDeps): App {
     config: deps.config,
     turns,
   });
+  const chatQueue = createChatQueue({ store: deps.store, runtime: runtime.deps, turns });
   const scheduler = createScheduler({
     store: deps.store,
     turns,
@@ -152,7 +156,7 @@ export function createApp(deps: AppDeps): App {
   registerRoles(router);
   registerMemories(router);
   registerChats(router);
-  registerMessages(router, runtime.deps, turns);
+  registerMessages(router, runtime.deps, turns, chatQueue);
   registerRoutines(router, jobs);
   registerListeners(router);
   registerHooks(router, { jobs, limiter: hookLimiter });
@@ -181,6 +185,7 @@ export function createApp(deps: AppDeps): App {
     scheduler,
     scheduleOnBoot: deps.scheduler !== false,
     turns,
+    chatQueue,
     fetch(request, extras) {
       return ensureSeed().then(() =>
         router.handle(request, {

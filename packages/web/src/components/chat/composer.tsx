@@ -16,7 +16,7 @@ export function Composer({
   onChange,
   onSubmit,
   onStop,
-  streaming,
+  working,
   disabled,
   placeholder,
   profiles,
@@ -28,7 +28,8 @@ export function Composer({
   onChange: (value: string) => void;
   onSubmit: () => void;
   onStop: () => void;
-  streaming: boolean;
+  /** The agent is on a turn. Sending still works; the message joins the queue. */
+  working: boolean;
   disabled?: boolean;
   placeholder: string;
   profiles?: ModelProfile[];
@@ -60,11 +61,11 @@ export function Composer({
   }
 
   const dictation = useDictation({
-    blocked: Boolean(disabled) || streaming,
+    blocked: Boolean(disabled),
     onInsert: insertTranscript,
   });
   const recording = dictation.phase === "recording";
-  const canSubmit = !disabled && !streaming && !recording && !unavailableHint && value.trim().length > 0;
+  const canSubmit = !disabled && !recording && !unavailableHint && value.trim().length > 0;
 
   useEffect(() => {
     const el = ref.current;
@@ -91,8 +92,7 @@ export function Composer({
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (streaming) onStop();
-    else if (canSubmit) onSubmit();
+    if (canSubmit) onSubmit();
   }
 
   return (
@@ -114,7 +114,7 @@ export function Composer({
           }}
           onKeyDown={handleKey}
           placeholder={placeholder}
-          disabled={disabled || streaming}
+          disabled={disabled}
           rows={1}
           className="max-h-[200px] min-h-[44px] w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
           aria-describedby={unavailableHint ? "composer-unavailable" : undefined}
@@ -149,11 +149,12 @@ export function Composer({
           )}
           <span className="ml-auto flex items-center gap-2">
             <DictationActions dictation={dictation} />
-            {streaming ? (
+            {working ? (
               <Button type="button" variant="outline" size="icon" data-testid="stop" onClick={onStop} aria-label="Stop">
                 <Square className="size-3.5 fill-current" />
               </Button>
-            ) : recording ? null : (
+            ) : null}
+            {recording ? null : (
               <Button type="submit" size="icon" data-testid="send" disabled={!canSubmit} aria-label="Send">
                 <Send className="size-3.5" />
               </Button>
