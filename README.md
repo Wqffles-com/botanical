@@ -23,7 +23,7 @@ What ships today:
 - **Core tools.** `file_read` / `file_write` / `file_list` / `file_delete` (confined to the agent's own directory), `shell` and `code_exec` (inside a Linux namespace jail), and `web_search` / `web_fetch` (Brave, Tavily, Serper, or SearXNG).
 - **Opt-in MCP.** Connect stdio or HTTP MCP servers from a JSON config. The default config has no servers.
 - **Web UI.** Next.js App Router + shadcn/ui: agents, chats with streamed replies and tool-call cards, agent inbox, and settings (profiles, tools, MCP, memory, roles, deployment).
-- **Dictation.** A microphone button in the composer turns speech into text you can edit before sending. Speech-to-text runs on the server through any Whisper-compatible endpoint (OpenAI, Groq, or a local Whisper). When no speech backend is configured, the browser's built-in speech recognition is used instead. The message is not sent until you press Send.
+- **Dictation.** A microphone button in the composer turns speech into text you can edit before sending. Speech-to-text runs on the server through a selectable provider (OpenAI-compatible, OpenRouter, xAI, or Qwen). When no speech backend is configured, the browser's built-in speech recognition is used instead. The message is not sent until you press Send.
 - **Postgres persistence** with migrations applied automatically on boot.
 - **One codebase, two deployment modes.** `SELF_HOST` (default) or `SAAS`, selected by `DEPLOYMENT_MODE`. Chat, tools, and MCP behave the same in both modes.
 

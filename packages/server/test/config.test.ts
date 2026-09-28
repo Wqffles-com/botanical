@@ -117,6 +117,7 @@ describe("loadConfig", () => {
     const config = loadConfig(baseEnv({ OPENAI_API_KEY: "sk-openai-test" }));
     expect(config.dictation).toEqual({
       mode: "server",
+      provider: "openai-compat",
       baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-openai-test",
       model: "gpt-4o-mini-transcribe",

@@ -40,7 +40,6 @@ export function Composer({
   const valueRef = useRef(value);
   const caretRef = useRef<number | null>(null);
   const unavailableHint = unavailableProfileHint(profiles?.find((profile) => profile.id === profileId) ?? null);
-  const canSubmit = !disabled && !streaming && !unavailableHint && value.trim().length > 0;
 
   useEffect(() => {
     valueRef.current = value;
@@ -64,6 +63,8 @@ export function Composer({
     blocked: Boolean(disabled) || streaming,
     onInsert: insertTranscript,
   });
+  const recording = dictation.phase === "recording";
+  const canSubmit = !disabled && !streaming && !recording && !unavailableHint && value.trim().length > 0;
 
   useEffect(() => {
     const el = ref.current;
@@ -152,7 +153,7 @@ export function Composer({
               <Button type="button" variant="outline" size="icon" data-testid="stop" onClick={onStop} aria-label="Stop">
                 <Square className="size-3.5 fill-current" />
               </Button>
-            ) : (
+            ) : recording ? null : (
               <Button type="submit" size="icon" data-testid="send" disabled={!canSubmit} aria-label="Send">
                 <Send className="size-3.5" />
               </Button>

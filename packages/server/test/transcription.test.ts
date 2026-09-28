@@ -1,8 +1,9 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ConfigError, loadConfig } from "../src/config.ts";
+import { resolveSttConfig, sttConfig } from "../src/speech/resolve.ts";
 import { baseEnv, bearer, login, readJson, setup } from "./helpers.ts";
 
 const SECRET = "test-stt-key";
@@ -13,6 +14,7 @@ describe("dictation config", () => {
     const config = loadConfig(baseEnv({ OPENAI_API_KEY: "sk-openai-test" }));
     expect(config.dictation).toEqual({
       mode: "server",
+      provider: "openai-compat",
       baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-openai-test",
       model: "gpt-4o-mini-transcribe",
@@ -44,6 +46,7 @@ describe("dictation config", () => {
     );
     expect(config.dictation).toEqual({
       mode: "server",
+      provider: "openai-compat",
       baseUrl: "http://whisper:8000/v1",
       apiKey: "gsk-test",
       model: "whisper-large-v3-turbo",
@@ -126,6 +129,176 @@ describe("dictation config", () => {
       loadConfig(baseEnv({ BOTANICAL_STT_BASE_URL: "http://user:secret@127.0.0.1:9/v1" })),
     ).toThrow(/credentials/);
   });
+
+  test("rejects an unknown provider and accepts a model with a slash", () => {
+    expect(() => loadConfig(baseEnv({ BOTANICAL_STT_PROVIDER: "whisper" }))).toThrow(
+      /BOTANICAL_STT_PROVIDER must be one of: openai-compat, openrouter, xai, qwen/,
+    );
+    expect(() => loadConfig(baseEnv({ BOTANICAL_STT_PROVIDER: "XAI" }))).toThrow(/openai-compat, openrouter, xai, qwen/);
+    expect(() =>
+      loadConfig(baseEnv({ BOTANICAL_STT_PROVIDER: "openrouter", OPENROUTER_API_KEY: "or-test", BOTANICAL_STT_MODEL: "bad model" })),
+    ).toThrow(/BOTANICAL_STT_MODEL/);
+
+    const config = loadConfig(
+      baseEnv({
+        BOTANICAL_STT_PROVIDER: "openrouter",
+        OPENROUTER_API_KEY: "or-test",
+        BOTANICAL_STT_MODEL: "openai/whisper-large-v3",
+      }),
+    );
+    expect(config.dictation).toMatchObject({
+      mode: "server",
+      provider: "openrouter",
+      model: "openai/whisper-large-v3",
+      baseUrl: "https://openrouter.ai/api/v1",
+      apiKey: "or-test",
+    });
+  });
+
+  test("uses each provider's default base URL and model", () => {
+    const openrouter = loadConfig(baseEnv({ BOTANICAL_STT_PROVIDER: "openrouter", OPENROUTER_API_KEY: "or-test" }));
+    expect(openrouter.dictation).toMatchObject({
+      mode: "server",
+      provider: "openrouter",
+      baseUrl: "https://openrouter.ai/api/v1",
+      model: "openai/whisper-large-v3",
+      apiKey: "or-test",
+    });
+
+    const xai = loadConfig(baseEnv({ BOTANICAL_STT_PROVIDER: "xai" }));
+    expect(xai.dictation).toMatchObject({
+      mode: "server",
+      provider: "xai",
+      baseUrl: "https://api.x.ai/v1",
+      model: "grok-voice-transcribe-2.0",
+      apiKey: "test-xai-key",
+    });
+
+    const qwen = loadConfig(baseEnv({ BOTANICAL_STT_PROVIDER: "qwen", DASHSCOPE_API_KEY: "dash-test" }));
+    expect(qwen.dictation).toMatchObject({
+      mode: "server",
+      provider: "qwen",
+      baseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      model: "qwen3-asr-flash",
+      apiKey: "dash-test",
+    });
+
+    const openai = loadConfig(
+      baseEnv({ BOTANICAL_STT_PROVIDER: "openai-compat", OPENAI_API_KEY: "sk-openai-test" }),
+    );
+    expect(openai.dictation).toMatchObject({
+      mode: "server",
+      provider: "openai-compat",
+      baseUrl: "https://api.openai.com/v1",
+      model: "gpt-4o-mini-transcribe",
+      apiKey: "sk-openai-test",
+    });
+
+    const custom = loadConfig(
+      baseEnv({ BOTANICAL_STT_PROVIDER: "openai-compat", BOTANICAL_STT_BASE_URL: "http://whisper:8000/v1" }),
+    );
+    expect(custom.dictation).toMatchObject({
+      mode: "server",
+      provider: "openai-compat",
+      baseUrl: "http://whisper:8000/v1",
+      model: "whisper-1",
+      apiKey: null,
+    });
+  });
+
+  test("prefers BOTANICAL_STT_API_KEY over provider keys, including a key file", () => {
+    const xai = loadConfig(
+      baseEnv({ BOTANICAL_STT_PROVIDER: "xai", BOTANICAL_STT_API_KEY: "botanical-xai" }),
+    );
+    expect(xai.dictation).toMatchObject({ apiKey: "botanical-xai" });
+
+    const openrouter = loadConfig(
+      baseEnv({
+        BOTANICAL_STT_PROVIDER: "openrouter",
+        OPENROUTER_API_KEY: "or-fallback",
+        BOTANICAL_STT_API_KEY: "botanical-or",
+      }),
+    );
+    expect(openrouter.dictation).toMatchObject({ apiKey: "botanical-or" });
+
+    const qwen = loadConfig(
+      baseEnv({
+        BOTANICAL_STT_PROVIDER: "qwen",
+        DASHSCOPE_API_KEY: "dash-fallback",
+        BOTANICAL_STT_API_KEY: "botanical-dash",
+      }),
+    );
+    expect(qwen.dictation).toMatchObject({ apiKey: "botanical-dash" });
+
+    const dir = mkdtempSync(join(tmpdir(), "botanical-stt-"));
+    try {
+      const file = join(dir, "key");
+      writeFileSync(file, "file-xai\n");
+      const fromFile = loadConfig(
+        baseEnv({
+          BOTANICAL_STT_PROVIDER: "xai",
+          BOTANICAL_STT_API_KEY: " ",
+          BOTANICAL_STT_API_KEY_FILE: file,
+        }),
+      );
+      expect(fromFile.dictation).toMatchObject({ mode: "server", apiKey: "file-xai" });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("an explicit provider without a key uses the browser and warns once at load", () => {
+    const warnings: string[] = [];
+    const original = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args.map(String).join(" "));
+    };
+    try {
+      const qwen = loadConfig(baseEnv({ BOTANICAL_STT_PROVIDER: "qwen", DASHSCOPE_API_KEY: "" }));
+      expect(qwen.dictation.mode).toBe("browser");
+      const xai = loadConfig(baseEnv({ BOTANICAL_STT_PROVIDER: "xai", XAI_API_KEY: "" }));
+      expect(xai.dictation.mode).toBe("browser");
+      const openrouter = loadConfig(baseEnv({ BOTANICAL_STT_PROVIDER: "openrouter" }));
+      expect(openrouter.dictation.mode).toBe("browser");
+      const openai = loadConfig(baseEnv({ BOTANICAL_STT_PROVIDER: "openai-compat" }));
+      expect(openai.dictation.mode).toBe("browser");
+      const disabled = loadConfig(
+        baseEnv({ BOTANICAL_STT_PROVIDER: "qwen", BOTANICAL_STT_DISABLED: "true" }),
+      );
+      expect(disabled.dictation.mode).toBe("browser");
+    } finally {
+      console.warn = original;
+    }
+    const joined = warnings.join("\n");
+    expect(joined).toContain("BOTANICAL_STT_PROVIDER=qwen");
+    expect(joined).toContain("DASHSCOPE_API_KEY");
+    expect(joined).toContain("BOTANICAL_STT_PROVIDER=xai");
+    expect(joined).toContain("XAI_API_KEY");
+    expect(joined).toContain("BOTANICAL_STT_PROVIDER=openrouter");
+    expect(joined).toContain("OPENROUTER_API_KEY");
+    expect(joined).toContain("BOTANICAL_STT_PROVIDER=openai-compat");
+    expect(joined).toContain("OPENAI_API_KEY");
+    expect(joined).not.toContain("test-xai-key");
+    const qwenWarnings = warnings.filter((line) => line.includes("PROVIDER=qwen"));
+    expect(qwenWarnings).toHaveLength(1);
+  });
+
+  test("resolveSttConfig returns the env bootstrap, including browser mode", async () => {
+    const server = loadConfig(baseEnv({ OPENAI_API_KEY: "sk-openai-test" }));
+    expect(await resolveSttConfig({ config: server, userId: "operator" })).toEqual({
+      mode: "server",
+      provider: "openai-compat",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "sk-openai-test",
+      model: "gpt-4o-mini-transcribe",
+      limits: { maxBytes: 10_000_000, maxSeconds: 120 },
+    });
+    const browser = loadConfig(baseEnv());
+    expect(await resolveSttConfig({ config: browser, userId: null })).toEqual({
+      mode: "browser",
+      limits: { maxBytes: 10_000_000, maxSeconds: 120 },
+    });
+  });
 });
 
 describe("transcription routes", () => {
@@ -159,8 +332,15 @@ describe("transcription routes", () => {
       new Request("http://localhost/api/capabilities", { headers: bearer(token) }),
     );
     expect(response.status).toBe(200);
-    const body = await readJson<{ dictation: { mode: string; maxBytes: number; maxSeconds: number } }>(response);
-    expect(body.dictation).toEqual({ mode: "server", maxBytes: 10_000_000, maxSeconds: 120 });
+    const body = await readJson<{
+      dictation: { mode: string; provider?: string; maxBytes: number; maxSeconds: number };
+    }>(response);
+    expect(body.dictation).toEqual({
+      mode: "server",
+      provider: "openai-compat",
+      maxBytes: 10_000_000,
+      maxSeconds: 120,
+    });
     const raw = JSON.stringify(body);
     expect(raw).not.toContain("sk-openai-test");
     expect(raw).not.toContain("api.openai.com");
@@ -291,6 +471,83 @@ describe("transcription routes", () => {
       expect(await readJson<{ text: string }>(response)).toEqual({ text: "local" });
       expect(authorization).toBeNull();
     } finally {
+      await upstream.stop(true);
+    }
+  });
+
+  test("uses the resolver's provider, endpoint, key, model, and limits", async () => {
+    const seen: Record<string, string | null> = {};
+    const upstream = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      async fetch(request) {
+        const url = new URL(request.url);
+        seen.pathname = url.pathname;
+        seen.authorization = request.headers.get("authorization");
+        const form = await request.formData();
+        seen.model = stringField(form.get("model"));
+        const names = [...form.keys()];
+        seen.last = names[names.length - 1] ?? null;
+        return Response.json({ text: "from resolver", language: "en", duration: 1, words: [] });
+      },
+    });
+    const spy = spyOn(sttConfig, "resolve").mockImplementation(async (context) => {
+      expect(context.userId).toBe("operator");
+      expect(context.config.dictation).toMatchObject({
+        mode: "server",
+        apiKey: "config-key",
+        model: "config-model",
+      });
+      return {
+        mode: "server",
+        provider: "xai",
+        baseUrl: `http://127.0.0.1:${upstream.port}/v1`,
+        apiKey: "resolver-key",
+        model: "resolver-model",
+        limits: { maxBytes: 10_000_000, maxSeconds: 4 },
+      };
+    });
+    try {
+      const { app } = setup({
+        BOTANICAL_STT_BASE_URL: "http://127.0.0.1:9/v1",
+        BOTANICAL_STT_API_KEY: "config-key",
+        BOTANICAL_STT_MODEL: "config-model",
+      });
+      const { token } = await login(app);
+      const capabilities = await app.fetch(
+        new Request("http://localhost/api/capabilities", { headers: bearer(token) }),
+      );
+      const caps = await readJson<{
+        dictation: { mode: string; provider?: string; maxBytes: number; maxSeconds: number };
+      }>(capabilities);
+      expect(caps.dictation).toEqual({
+        mode: "server",
+        provider: "xai",
+        maxBytes: 10_000_000,
+        maxSeconds: 4,
+      });
+      expect(JSON.stringify(caps)).not.toContain("resolver-key");
+      expect(JSON.stringify(caps)).not.toContain("config-key");
+      expect(JSON.stringify(caps)).not.toContain("127.0.0.1");
+
+      const tooLong = await postAudio(app, token, (form) => {
+        form.set("file", clip());
+        form.set("durationMs", "5000");
+      });
+      expect(tooLong.status).toBe(400);
+
+      const response = await postAudio(app, token, (form) => {
+        form.set("file", clip());
+        form.set("language", "en");
+      });
+      expect(response.status).toBe(200);
+      expect(await readJson<{ text: string }>(response)).toEqual({ text: "from resolver" });
+      expect(seen.pathname).toBe("/v1/stt");
+      expect(seen.authorization).toBe("Bearer resolver-key");
+      expect(seen.model).toBe("resolver-model");
+      expect(seen.last).toBe("file");
+    } finally {
+      spy.mockRestore();
       await upstream.stop(true);
     }
   });
