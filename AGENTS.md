@@ -21,7 +21,7 @@ Start at [docs/index/README.md](docs/index/README.md). Product decisions are in 
 ## Conventions
 
 - Bun is the package manager and the API runtime (`package.json`). TypeScript across `packages/`.
-- Web UI is monochrome shadcn. Theme tokens and primitives live in `@botanical/ui` (`packages/ui/src/styles.css`, `packages/ui/src/components`); add primitives with the shadcn CLI from `packages/ui` (`packages/ui/components.json`). App screens stay in `packages/web`.
+- Web UI is monochrome shadcn. Theme tokens and primitives live in `@botanical/ui` (`packages/ui/src/styles.css`, `packages/ui/src/components`); add primitives with the shadcn CLI from `packages/ui` (`packages/ui/components.json`). App screens stay in `packages/web`. Color means something: status uses `StatusBadge` tones and the `--success`/`--warning`/`--info`/`--destructive` tokens, identity uses agent colors, and the user's accent only touches `--primary`. No raw palette classes (`bg-amber-500`) or hex in app code.
 - Postgres schema lives in `packages/db`. SQL files under `packages/db/migrations` are ordered by `packages/db/migrations/meta/_journal.json` (`NNNN_tag.sql` matches the journal tag). `migrateDatabase` in `packages/db/src/migrate.ts` applies that journal, then `packages/db/sql/guards.sql`, `packages/db/sql/bootstrap.sql`, and `packages/db/sql/seed-agents.sql`. Root `bun run db:migrate` runs `packages/db/src/cli.ts`. The API also migrates on boot when `DATABASE_URL` is set (`packages/db/src/store.ts`).
 - Only `packages/providers` talks to model vendors.
 
