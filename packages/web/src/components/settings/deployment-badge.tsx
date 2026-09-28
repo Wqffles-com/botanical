@@ -1,6 +1,6 @@
 import type { DeploymentMode } from "@botanical/core";
 import { Cloud, House } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@botanical/ui/components/badge";
 import { cn } from "@/lib/utils";
 
 export function DeploymentBadge({

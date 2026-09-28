@@ -121,28 +121,52 @@
         "typescript": "^7.0.2",
       },
     },
+    "packages/ui": {
+      "name": "@botanical/ui",
+      "version": "0.0.1",
+      "dependencies": {
+        "@base-ui/react": "^1.8.0",
+        "class-variance-authority": "^0.7.1",
+        "cmdk": "^1.1.1",
+        "cn": "^0.4.0",
+        "lucide-react": "^1.48.0",
+        "react-hook-form": "^7.88.0",
+        "shadcn": "^4.21.0",
+        "sonner": "^2.0.8",
+        "tw-animate-css": "^1.4.0",
+      },
+      "devDependencies": {
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "next-themes": "^0.4.6",
+        "react": "19.2.8",
+        "react-dom": "19.2.8",
+        "tailwindcss": "^4",
+        "typescript": "^5",
+      },
+      "peerDependencies": {
+        "next-themes": "^0.4.6",
+        "react": "^19",
+        "react-dom": "^19",
+        "tailwindcss": "^4",
+      },
+    },
     "packages/web": {
       "name": "@botanical/web",
       "version": "0.0.1",
       "dependencies": {
-        "@base-ui/react": "^1.8.0",
         "@botanical/core": "file:../core",
+        "@botanical/ui": "workspace:*",
         "@hookform/resolvers": "^5.9.1",
-        "class-variance-authority": "^0.7.1",
-        "cmdk": "^1.1.1",
-        "cn": "^0.4.0",
         "geist": "^1.7.2",
         "lucide-react": "^1.48.0",
         "next": "16.3.6",
         "next-themes": "^0.4.6",
         "react": "19.2.8",
         "react-dom": "19.2.8",
-        "react-hook-form": "^7.88.0",
         "react-markdown": "^10.1.0",
         "remark-gfm": "^4.0.1",
-        "shadcn": "^4.21.0",
         "sonner": "^2.0.8",
-        "tw-animate-css": "^1.4.0",
         "zod": "^4.6.5",
       },
       "devDependencies": {
@@ -241,6 +265,8 @@
     "@botanical/tools-shell": ["@botanical/tools-shell@workspace:packages/tools-shell"],
 
     "@botanical/tools-web": ["@botanical/tools-web@workspace:packages/tools-web"],
+
+    "@botanical/ui": ["@botanical/ui@workspace:packages/ui"],
 
     "@botanical/web": ["@botanical/web@workspace:packages/web"],
 
@@ -1807,6 +1833,10 @@
     "@botanical/tools/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "@botanical/tools-shell/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@botanical/ui/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@botanical/web/@botanical/core": ["@botanical/core@file:packages/core", { "devDependencies": { "@types/bun": "^1.2.21", "typescript": "^5.8.3" } }],
 
     "@botanical/web/@types/node": ["@types/node@20.19.43", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-6oYBAi5ikg4Pl+kGsoYtawUMBT2zZMCvPNF7pVLnHZfd1zf38DRiWn/gT01RYCdUqkv7Fhr+C9ot4/tb+2sVvA=="],
 

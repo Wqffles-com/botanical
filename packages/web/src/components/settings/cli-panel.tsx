@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@botanical/ui/components/badge";
+import { Button } from "@botanical/ui/components/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
+import { Input } from "@botanical/ui/components/input";
+import { Skeleton } from "@botanical/ui/components/skeleton";
 import {
   cancelCliLogin,
   fetchCliList,

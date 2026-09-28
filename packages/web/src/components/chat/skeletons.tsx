@@ -1,4 +1,4 @@
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@botanical/ui/components/skeleton";
 
 export function ChatListSkeleton() {
   return (

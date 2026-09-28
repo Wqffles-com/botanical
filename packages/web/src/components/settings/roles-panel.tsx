@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PermissionsSummary } from "@/components/permissions-summary";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@botanical/ui/components/badge";
+import { Button } from "@botanical/ui/components/button";
 import {
   Dialog,
   DialogContent,
@@ -15,11 +15,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+} from "@botanical/ui/components/dialog";
+import { Input } from "@botanical/ui/components/input";
+import { Label } from "@botanical/ui/components/label";
+import { Switch } from "@botanical/ui/components/switch";
+import { Textarea } from "@botanical/ui/components/textarea";
 import { api } from "@/lib/api";
 import { errorText, roleDeleteText } from "@/lib/errors";
 import { fetchMcpServers } from "@/lib/mvp-api";

@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { AgentPicker } from "@/components/agents/agent-picker";
 import { useWorkspace } from "@/components/workspace-provider";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@botanical/ui/components/skeleton";
 import { identityFromUnknown } from "@/lib/agent-identity";
 
 export function AgentsIndex() {

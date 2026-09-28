@@ -1,6 +1,6 @@
 # Codebase index
 
-Map of this repo for coding agents. Per-package pages: [server](server.md), [agent-runtime](agent-runtime.md), [providers](providers.md), [tools](tools.md), [mcp](mcp.md), [db](db.md), [core](core.md), [web](web.md), [e2e](e2e.md), [deploy and CI](deploy-and-ci.md).
+Map of this repo for coding agents. Per-package pages: [server](server.md), [agent-runtime](agent-runtime.md), [providers](providers.md), [tools](tools.md), [mcp](mcp.md), [db](db.md), [core](core.md), [web](web.md), [ui](ui.md), [e2e](e2e.md), [deploy and CI](deploy-and-ci.md).
 
 ## Repo layout
 
@@ -37,7 +37,8 @@ Declared `@botanical/*` dependencies, and matching imports under each package's 
 | Package | `package.json` deps | Imports in `src` |
 |---------|---------------------|------------------|
 | `@botanical/server` | agent-runtime, core, db, mcp, providers, tools, tools-shell, tools-web | same set |
-| `@botanical/web` | core (`file:../core`) | core |
+| `@botanical/web` | core (`file:../core`), ui | core, ui |
+| `@botanical/ui` | none | none |
 | `@botanical/tools-shell` | tools | tools |
 | `@botanical/tools-web` | tools | tools |
 | `@botanical/agent-runtime` | none | none |

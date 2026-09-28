@@ -1,6 +1,6 @@
 import { Sprout } from "lucide-react";
 import type { ReactNode } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@botanical/ui/components/button";
 
 export function EmptyState({
   title,

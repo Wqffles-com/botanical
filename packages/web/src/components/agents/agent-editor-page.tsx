@@ -4,7 +4,7 @@ import type { RoleRecord } from "@botanical/core";
 import { useEffect, useMemo, useState } from "react";
 import { AgentForm } from "@/components/agents/agent-form";
 import { useWorkspace } from "@/components/workspace-provider";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@botanical/ui/components/skeleton";
 import { api } from "@/lib/api";
 import { listProfiles, listTools } from "@/lib/agent-api";
 import { identityFromUnknown, type ProfileInfo, type ToolInfo } from "@/lib/agent-identity";

@@ -13,7 +13,7 @@ import { AgentIconPicker } from "@/components/agents/agent-icon-picker";
 import { AgentShapePicker } from "@/components/agents/agent-shape-picker";
 import { AgentToolAllowlist } from "@/components/agents/agent-tool-allowlist";
 import { useWorkspace } from "@/components/workspace-provider";
-import { Button } from "@/components/ui/button";
+import { Button } from "@botanical/ui/components/button";
 import {
   Dialog,
   DialogContent,
@@ -21,10 +21,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@botanical/ui/components/dialog";
+import { Input } from "@botanical/ui/components/input";
+import { Label } from "@botanical/ui/components/label";
+import { Textarea } from "@botanical/ui/components/textarea";
 import { previewEffective } from "@/lib/permissions";
 import { createAgent, deleteAgent, updateAgent } from "@/lib/agent-api";
 import { fileToAgentPicture } from "@/lib/agent-picture";

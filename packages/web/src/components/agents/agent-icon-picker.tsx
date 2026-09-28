@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChevronsUpDown } from "lucide-react";
 import { AgentAvatar } from "@/components/agent-avatar";
-import { Button } from "@/components/ui/button";
+import { Button } from "@botanical/ui/components/button";
 import {
   Command,
   CommandEmpty,
@@ -11,8 +11,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+} from "@botanical/ui/components/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@botanical/ui/components/popover";
 import type { AgentColor } from "@/lib/agent-colors";
 import { searchAgentIcons, type AgentIconName } from "@/lib/agent-icons";
 

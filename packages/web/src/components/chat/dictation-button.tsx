@@ -1,8 +1,8 @@
 "use client";
 
 import { LoaderCircle, Mic, Square, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@botanical/ui/components/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@botanical/ui/components/tooltip";
 import type { DictationController } from "./use-dictation";
 
 export function DictationNotice({ dictation }: { dictation: DictationController }) {

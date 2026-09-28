@@ -8,7 +8,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { AgentAvatar } from "@/components/agent-avatar";
 import { ChatListSkeleton } from "@/components/chat/skeletons";
-import { Button } from "@/components/ui/button";
+import { Button } from "@botanical/ui/components/button";
 import {
   Dialog,
   DialogContent,
@@ -16,14 +16,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@botanical/ui/components/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+} from "@botanical/ui/components/dropdown-menu";
+import { Input } from "@botanical/ui/components/input";
 import {
   SidebarGroup,
   SidebarGroupAction,
@@ -33,7 +33,7 @@ import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@botanical/ui/components/sidebar";
 import { useWorkspace } from "@/components/workspace-provider";
 import { agentIdentity } from "@/lib/agent-identity";
 import { chatsByAgent } from "@/lib/chat-groups";

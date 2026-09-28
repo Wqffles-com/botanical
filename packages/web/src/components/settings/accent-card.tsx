@@ -4,9 +4,9 @@ import type { AccentColor } from "@botanical/core";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAccent } from "@/components/accent-provider";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
+import { Button } from "@botanical/ui/components/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
+import { Switch } from "@botanical/ui/components/switch";
 import { ACCENT_COLORS, ACCENT_LABEL, ACCENT_SWATCH } from "@/lib/accent";
 import { cn } from "@/lib/utils";
 

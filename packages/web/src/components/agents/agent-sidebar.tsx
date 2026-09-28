@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Plus } from "lucide-react";
 import { AgentAvatar } from "@/components/agent-avatar";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@botanical/ui/components/button";
+import { ScrollArea } from "@botanical/ui/components/scroll-area";
 import type { AgentIdentity } from "@/lib/agent-identity";
 import { cn } from "@/lib/utils";
 

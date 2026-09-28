@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { LayoutGrid, List, Plus } from "lucide-react";
 import { AgentAvatar } from "@/components/agent-avatar";
 import { RoleBadges } from "@/components/role-badges";
-import { Button } from "@/components/ui/button";
+import { Button } from "@botanical/ui/components/button";
 import {
   Command,
   CommandEmpty,
@@ -13,8 +13,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+} from "@botanical/ui/components/command";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@botanical/ui/components/dialog";
 import type { AgentIdentity } from "@/lib/agent-identity";
 import { filterAgents } from "@/lib/agent-identity";
 import { cn } from "@/lib/utils";
