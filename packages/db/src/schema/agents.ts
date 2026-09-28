@@ -11,7 +11,7 @@ import { users } from './users.ts';
  * `title` is a short role label. `icon` is a Lucide component name (default Bot).
  * `shape` is the avatar silhouette (default squircle). `picture` is an optional data-URL image.
  * `color` is the picker swatch (default green).
- * `defaultProfileId` is a suggestion only — chats still require an explicit profile.
+ * `defaultProfileId` is pre-selected by the client — chats still require an explicit profile.
  */
 export const agents = pgTable(
   'agents',

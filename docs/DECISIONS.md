@@ -328,6 +328,14 @@ Short entries. Earlier entries still hold unless a status line here changes them
 
 **Status:** Planned. Agents can already create agents inside their permission ceiling. The other app actions are not tools.
 
+### Agent default model
+
+**Decision:** An agent can name a default model profile. Starting a chat with that agent pre-selects it in the new-chat form, and the user can pick another profile for that chat. The server is unchanged: every chat and message still carries an explicit `profileId`.
+
+**Reason:** Picking the same profile for every chat with an agent is busywork ([#58](https://github.com/Wqffles-com/botanical/issues/58)). A pre-selected, visible pick keeps the rule that nothing is silently auto-selected.
+
+**Status:** Shipped. The default is skipped when that profile is no longer listed or is unavailable.
+
 ### Knowledge bases
 
 **Decision:** There is one shared knowledge base the user can edit, visible across bots, plus one knowledge base per bot. Both use the same layout: organized Markdown files edited with a block editor.

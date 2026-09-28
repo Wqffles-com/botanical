@@ -12,7 +12,7 @@ import { Button } from "@botanical/ui/components/button";
 import { Input } from "@botanical/ui/components/input";
 import { Label } from "@botanical/ui/components/label";
 import { agentIdentity } from "@/lib/agent-identity";
-import { canStartChat } from "@/lib/chat-groups";
+import { agentDefaultProfileId, canStartChat } from "@/lib/chat-groups";
 import { cn } from "@/lib/utils";
 
 export function NewChatForm({
@@ -32,7 +32,11 @@ export function NewChatForm({
 }) {
   const [query, setQuery] = useState("");
   const [agentId, setAgentId] = useState<string | null>(initialAgentId ?? null);
-  const [profileId, setProfileId] = useState<string | null>(null);
+  // Until the user picks a profile, the selection follows the chosen agent's default.
+  const [pickedProfileId, setPickedProfileId] = useState<string | null | undefined>(undefined);
+  const agent = agents.find((item) => item.id === agentId) ?? null;
+  const agentDefault = agentDefaultProfileId(agent, profiles);
+  const profileId = pickedProfileId === undefined ? agentDefault : pickedProfileId;
   const [title, setTitle] = useState("");
   const ready = canStartChat(agentId, profileId);
   const missing =
@@ -56,7 +60,7 @@ export function NewChatForm({
     <div className={pageContainerVariants({ size: "narrow", className: "flex flex-col gap-6" })}>
       <PageHeader
         title="New chat"
-        description="Each chat belongs to one agent and runs on the model profile you choose. There is no default model."
+        description="Each chat belongs to one agent and runs on the model profile shown here. An agent's default is pre-selected and you can change it."
       />
 
       <section className="space-y-2">
@@ -130,8 +134,13 @@ export function NewChatForm({
           </div>
         ) : (
           // No `needed` here: nothing is wrong until the user tries to start, and the button hint says what is missing.
-          <ProfileSelect id="new-chat-profile" profiles={profiles} value={profileId} onChange={setProfileId} />
+          <ProfileSelect id="new-chat-profile" profiles={profiles} value={profileId} onChange={setPickedProfileId} />
         )}
+        {agentDefault && profileId === agentDefault ? (
+          <p data-testid="profile-default-hint" className="text-xs text-muted-foreground">
+            {agent?.name ?? "This agent"}&apos;s default. Pick another profile to override it for this chat.
+          </p>
+        ) : null}
       </section>
 
       <section className="space-y-2">
