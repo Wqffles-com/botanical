@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import {
   mergeCliProfiles,
   parseCliProfileShortcut,
@@ -23,6 +25,13 @@ export const SERVER_VERSION = "0.1.0";
 
 const SESSION_TTL_DEFAULT = 60 * 60 * 24 * 14;
 const MAX_BODY_DEFAULT = 1_000_000;
+const STT_MAX_BYTES_DEFAULT = 10_000_000;
+const STT_MAX_BYTES_LIMIT = 25_000_000;
+const STT_MAX_SECONDS_DEFAULT = 120;
+const STT_MAX_SECONDS_LIMIT = 600;
+const OPENAI_STT_BASE_URL = "https://api.openai.com/v1";
+const OPENAI_STT_MODEL = "gpt-4o-mini-transcribe";
+const WHISPER_STT_MODEL = "whisper-1";
 
 export class ConfigError extends Error {
   constructor(message: string) {
@@ -59,7 +68,27 @@ export interface ServerConfig {
    * recipient's dedicated "Inbox" chat. Default false.
    */
   a2aAutorun: boolean;
+  /** Speech-to-text for composer dictation. The API key is never sent to clients. */
+  dictation: DictationSettings;
 }
+
+export type DictationSettings =
+  | {
+      mode: "server";
+      baseUrl: string;
+      apiKey: string | null;
+      model: string;
+      maxBytes: number;
+      maxSeconds: number;
+    }
+  | {
+      mode: "browser";
+      baseUrl: null;
+      apiKey: null;
+      model: null;
+      maxBytes: number;
+      maxSeconds: number;
+    };
 
 export interface LoadConfigOptions {
   /** Replaces global fetch for provider calls. Tests pass a mock. */
@@ -131,6 +160,7 @@ export function loadConfig(
       name: "BOTANICAL_MAX_BODY_BYTES",
     }),
     a2aAutorun: parseBool(env.BOTANICAL_A2A_AUTORUN, "BOTANICAL_A2A_AUTORUN", false),
+    dictation: loadDictation(env),
   };
 }
 
@@ -429,4 +459,98 @@ function readProfileField(value: unknown, label: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function loadDictation(env: Record<string, string | undefined>): DictationSettings {
+  const maxBytes = parsePositiveInt(env.BOTANICAL_STT_MAX_BYTES, STT_MAX_BYTES_DEFAULT, {
+    min: 1,
+    max: STT_MAX_BYTES_LIMIT,
+    name: "BOTANICAL_STT_MAX_BYTES",
+  });
+  const maxSeconds = parsePositiveInt(env.BOTANICAL_STT_MAX_SECONDS, STT_MAX_SECONDS_DEFAULT, {
+    min: 1,
+    max: STT_MAX_SECONDS_LIMIT,
+    name: "BOTANICAL_STT_MAX_SECONDS",
+  });
+  const limits = { maxBytes, maxSeconds };
+  const disabled = parseBool(env.BOTANICAL_STT_DISABLED, "BOTANICAL_STT_DISABLED", false);
+  const baseRaw = env.BOTANICAL_STT_BASE_URL?.trim() ?? "";
+  const baseUrl = baseRaw ? parseSttBaseUrl(baseRaw) : null;
+  const model = readSttModel(env.BOTANICAL_STT_MODEL);
+
+  if (disabled) return browserDictation(limits);
+
+  if (baseUrl) {
+    return {
+      mode: "server",
+      baseUrl,
+      apiKey: readOptionalSecret(env, "BOTANICAL_STT_API_KEY"),
+      model: model ?? WHISPER_STT_MODEL,
+      ...limits,
+    };
+  }
+
+  const openaiKey = env.OPENAI_API_KEY?.trim() ?? "";
+  if (openaiKey) {
+    return {
+      mode: "server",
+      baseUrl: OPENAI_STT_BASE_URL,
+      apiKey: openaiKey,
+      model: model ?? OPENAI_STT_MODEL,
+      ...limits,
+    };
+  }
+
+  return browserDictation(limits);
+}
+
+function browserDictation(limits: { maxBytes: number; maxSeconds: number }): DictationSettings {
+  return { mode: "browser", baseUrl: null, apiKey: null, model: null, ...limits };
+}
+
+function readSttModel(raw: string | undefined): string | null {
+  const model = raw?.trim() ?? "";
+  if (!model) return null;
+  if (!/^[\w.:-]{1,200}$/.test(model)) {
+    throw new ConfigError("BOTANICAL_STT_MODEL must be 1-200 characters (letters, numbers, . _ : -)");
+  }
+  return model;
+}
+
+function parseSttBaseUrl(raw: string): string {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new ConfigError("BOTANICAL_STT_BASE_URL must be an http(s) URL");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new ConfigError("BOTANICAL_STT_BASE_URL must be an http(s) URL");
+  }
+  if (url.username || url.password) {
+    throw new ConfigError("BOTANICAL_STT_BASE_URL must not include credentials");
+  }
+  if (url.search || url.hash) {
+    throw new ConfigError("BOTANICAL_STT_BASE_URL must not include a query or hash");
+  }
+  const path = url.pathname.replace(/\/+$/, "");
+  return `${url.origin}${path}`;
+}
+
+/** A non-empty plain value wins. An empty `*_FILE` is an error. The file contents are not logged. */
+function readOptionalSecret(env: Record<string, string | undefined>, name: string): string | null {
+  const direct = env[name]?.trim() ?? "";
+  if (direct) return direct;
+  const fileKey = `${name}_FILE`;
+  const filePath = env[fileKey]?.trim() ?? "";
+  if (!filePath) return null;
+  let raw: string;
+  try {
+    raw = readFileSync(filePath, "utf8");
+  } catch {
+    throw new ConfigError(`${fileKey} is not readable`);
+  }
+  const value = raw.trim();
+  if (!value) throw new ConfigError(`${fileKey} is empty`);
+  return value;
 }

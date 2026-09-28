@@ -114,6 +114,7 @@ Copy from [.env.example](../.env.example). Do not commit `.env`.
 | `BRAVE_SEARCH_API_KEY` / `TAVILY_API_KEY` / `SERPER_API_KEY` | no | Built-in web search |
 | `SEARXNG_URL` / `SEARXNG_API_KEY` | no | SearXNG search |
 | `BOTANICAL_MCP_CONFIG` | no | MCP JSON inside the server container (`/config/mcp.json`) |
+| `BOTANICAL_STT_BASE_URL` / `BOTANICAL_STT_API_KEY` / `BOTANICAL_STT_MODEL` | no | Composer dictation. See [Dictation](#dictation) |
 
 Postgres passwords in the URL must be URL-encoded. Keep `POSTGRES_PASSWORD` and the password inside `DATABASE_URL` the same when you use the bundled database.
 
@@ -168,6 +169,24 @@ docker compose exec -it -u botanical server claude setup-token
 These CLIs run inside the agent's workspace (`/data/agents/<agent id>`) with their own tools. Each turn also gets Botanical's tools and your MCP tools through a per-run MCP endpoint on `127.0.0.1` inside the API container (MCP server name `botanical`), with the same role and permission checks as API-model turns. Set `BOTANICAL_INTERNAL_URL` only if the API is not reachable on its own port at `127.0.0.1`. Set `"botanicalTools": false` on a profile to turn this off.
 
 A Linux host can still bind-mount a binary instead of using the installer. That path is a commented example in `docker-compose.cli.yml`. It is not required, and it does not work for a Docker Desktop VM that cannot see your host path. Prefer the named volumes. Treat the server's CLI login as its own login; a refresh of a copied `auth.json` can log the desktop CLI out.
+
+## Dictation
+
+The composer microphone turns speech into text in the message box. It does not send the message.
+
+Speech-to-text uses a Whisper-compatible `POST /audio/transcriptions` endpoint. The API key stays on the server.
+
+- Leave `BOTANICAL_STT_BASE_URL` unset and set `OPENAI_API_KEY`. The server calls `https://api.openai.com/v1` with model `gpt-4o-mini-transcribe`. `whisper-1` and `gpt-4o-transcribe` are other models for that host (`BOTANICAL_STT_MODEL`).
+- Groq: `BOTANICAL_STT_BASE_URL=https://api.groq.com/openai/v1`, `BOTANICAL_STT_API_KEY`, and `BOTANICAL_STT_MODEL=whisper-large-v3-turbo`.
+- A local Whisper-compatible server: `BOTANICAL_STT_BASE_URL=http://whisper:8000/v1` or `http://host.docker.internal:8000/v1`. `BOTANICAL_STT_API_KEY` is optional. The model defaults to `whisper-1`.
+
+`BOTANICAL_STT_DISABLED=true` turns the server endpoint off. `BOTANICAL_STT_API_KEY_FILE` can point at a file when the key is not in the environment. A non-empty `BOTANICAL_STT_API_KEY` wins. An empty file is an error.
+
+Limits default to 10 MB (`BOTANICAL_STT_MAX_BYTES`, 10000000) and 120 seconds (`BOTANICAL_STT_MAX_SECONDS`). The browser stops recording at the duration limit. Larger uploads are rejected. `GET /api/capabilities` tells the browser whether to upload audio or use its own speech recognition. The response includes the limits and a mode of `server` or `browser`. It does not include the base URL or the key.
+
+When no speech backend is configured, dictation uses the browser's speech recognition if that browser has it. In that mode the browser vendor processes the audio, not this server. The composer says so while recording.
+
+Browsers only expose the microphone on HTTPS, or on localhost. A plain HTTP site on another host will not be able to record.
 
 ## TLS
 

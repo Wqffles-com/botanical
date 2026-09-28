@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
   // The /api rewrite proxies text/event-stream. Gzip here buffers the whole SSE body
   // when the browser sends Accept-Encoding: gzip, so tokens arrive in one chunk.
   compress: false,
+  // Proxy buffers request bodies (default 10 MB) before the /api rewrite. Dictation
+  // uploads are allowed up to 25 MB plus multipart framing, so the cap sits above that.
+  experimental: {
+    proxyClientMaxBodySize: "32mb",
+  },
   output: "standalone",
   outputFileTracingRoot: process.cwd().endsWith("/packages/web")
     ? process.cwd().slice(0, -"/packages/web".length)
