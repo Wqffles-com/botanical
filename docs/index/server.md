@@ -29,7 +29,7 @@ HTTP API: account auth, agents, chats, streaming turns, agent-to-agent mail, rou
 | `packages/server/src/a2a` | Agent-message bus service and `send_agent_message` |
 | `packages/server/src/mcp-host.ts` | Boot MCP and snapshot for `GET /api/mcp/servers` |
 | `packages/server/src/cli-mcp.ts` | Per-run MCP endpoint for CLI profiles |
-| `packages/server/src/cli-install` | Install and device-login for coding CLIs |
+| `packages/server/src/cli-install` | Install and device-login for coding CLIs. Logins land in a per-user CLI home; `userCliAvailability` checks that home, then the shared one |
 | `packages/server/src/speech` | Speech-to-text provider calls |
 | `packages/server/src/provider-host.ts` | Holds the provider registry on the config object |
 | `packages/server/test` | `bun test` files |

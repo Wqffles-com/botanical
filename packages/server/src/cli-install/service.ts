@@ -1,7 +1,11 @@
 import { spawn } from "node:child_process";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
+import { currentUserId } from "@botanical/db";
+
 import {
+  checkCliAvailability,
   childEnv,
   claudeHasLogin,
   grokHasLogin,
@@ -12,7 +16,9 @@ import {
   isCliName,
   LoginBusyError,
   LoginManager,
+  type CliAvailability,
   type CliName,
+  type CliProfileSpec,
   type InstallIo,
   type LoginProcess,
   type LoginView,
@@ -77,8 +83,7 @@ export function createCliService(options: CliServiceOptions): CliService {
   const logins = new Map<string, LoginManager>();
 
   function userHome(userId: string): string {
-    const safe = userId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80) || "user";
-    return join(home, "users", safe);
+    return cliUserHome(home, userId);
   }
 
   function loginFor(userId: string): LoginManager {
@@ -184,6 +189,46 @@ export function createCliService(options: CliServiceOptions): CliService {
 }
 
 export { LoginBusyError };
+
+/** Per-user CLI home. Logins from the settings panel write here, and chat turns run here. */
+export function cliUserHome(home: string, userId: string): string {
+  const safe = userId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80) || "user";
+  return join(home, "users", safe);
+}
+
+/**
+ * Env whose HOME is the acting user's CLI home, so availability checks and
+ * chat turns see the credentials that user's settings-panel login stored.
+ */
+export function userCliEnv(env: Record<string, string | undefined> = {}): Record<string, string | undefined> {
+  const base: Record<string, string | undefined> = { ...process.env, ...env };
+  const userId = currentUserId();
+  if (!userId) return base;
+  const home = cliUserHome(cliHomeFrom(base), userId);
+  try {
+    mkdirSync(home, { recursive: true });
+  } catch {
+    return base;
+  }
+  return { ...base, HOME: home, BOTANICAL_CLI_HOME: home };
+}
+
+/**
+ * Availability for the acting user. A login in the user's own CLI home wins.
+ * A login in the shared server home (a terminal `login` inside the container)
+ * still counts. `env` is the one the turn must run with to see that login.
+ */
+export async function userCliAvailability(
+  spec: Pick<CliProfileSpec, "cli" | "bin">,
+  env: Record<string, string | undefined> = {},
+): Promise<{ status: CliAvailability; env: Record<string, string | undefined> }> {
+  const base: Record<string, string | undefined> = { ...process.env, ...env };
+  const user = userCliEnv(env);
+  const status = await checkCliAvailability(spec, { env: user });
+  if (status.available || user.BOTANICAL_CLI_HOME === base.BOTANICAL_CLI_HOME) return { status, env: user };
+  const shared = await checkCliAvailability(spec, { env: base });
+  return shared.available ? { status: shared, env: base } : { status, env: user };
+}
 
 async function loggedIn(
   io: InstallIo,
