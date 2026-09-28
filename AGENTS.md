@@ -44,7 +44,9 @@ Any change that adds, moves, renames or deletes files, routes, tables, env vars,
 
 ## GitHub issues and PRs
 
-Whenever you create an issue or pull request in GitHub, add `Wqffles-com` as both assignee and reviewer (for issues, assignee only, since issues have no reviewers).
+Whenever you create an issue or pull request in GitHub, add `Wqffles-com` as assignee.
+
+Whenever you create a pull request, unless told otherwise, watch it until CI is green: if it goes red, fix it and push; once it is green, merge it.
 
 ## Secrets
 
