@@ -25,6 +25,8 @@ Map of this repo for coding agents. Per-package pages: [server](server.md), [age
 | `scripts/` | e2e runner, release zip, smoke harness |
 | `config/` | `config/mcp.json` (empty servers) and `config/mcp.example.json` |
 | `docs/` | Product and deploy docs, plus this index |
+| `docs/DECISIONS.md` | Dated product decisions (decision, reason, status) |
+| `docs/ROADMAP.md` | Shipped, in progress, and planned work |
 | `.github/workflows/ci.yml` | Typecheck, unit tests, release zip, smoke boot |
 | `.github/pull_request_template.md` | PR checklist |
 
