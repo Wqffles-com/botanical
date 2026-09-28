@@ -17,7 +17,7 @@ Map of this repo for coding agents. Per-package pages: [server](server.md), [age
 | `docker-compose.saas.yml` | Hosted override: no bundled Postgres, mode `SAAS` |
 | `start.sh` | Linux/macOS one-command Compose launcher |
 | `start.ps1` | Windows PowerShell 5.1+ / pwsh launcher (same behaviour as `start.sh`) |
-| `.gitattributes` | Forces `start.sh` and other `*.sh` files to LF |
+| `.gitattributes` | LF for `*.sh`, `*Dockerfile*`, `*.mjs`, `*.ts`, `*.json`, `*.yml`, `*.yaml`, and `.env.example`. `*.ps1` stays auto |
 | `profiles.example.json` | Example `BOTANICAL_PROFILES` document |
 | `.env.example` | Annotated env template |
 | `packages/` | Workspace packages (see graph below) |

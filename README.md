@@ -181,6 +181,16 @@ Botanical gives language models real tools on your server. Please read this befo
 
 To report a vulnerability, see [SECURITY.md](./SECURITY.md). Please do not open a public issue.
 
+## Troubleshooting
+
+Windows clones from before the line-ending fix can check shell scripts out as CRLF (`core.autocrlf=true`). `docker compose up --build` then fails in `web.Dockerfile` with `set: line 5: illegal option -`. Re-checkout with LF:
+
+```sh
+git config core.autocrlf input
+git rm -r --cached -q .
+git reset --hard
+```
+
 ## Documentation
 
 | Doc | Contents |

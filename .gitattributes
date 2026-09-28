@@ -1,4 +1,14 @@
-# Keep the Unix launcher executable as LF after a Windows clone.
-start.sh text eol=lf
+# Unix text stays LF. Git for Windows defaults to core.autocrlf=true, which
+# otherwise checks these out as CRLF and breaks `sh` in image builds
+# (`set: illegal option -`).
 *.sh text eol=lf
+*Dockerfile* text eol=lf
+*.mjs text eol=lf
+*.ts text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
 .env.example text eol=lf
+
+# PowerShell accepts LF or CRLF. Leave the checkout ending to core.autocrlf.
+*.ps1 text
