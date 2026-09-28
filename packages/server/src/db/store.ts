@@ -45,6 +45,15 @@ export async function seedInstance(
     for (const profile of config.profiles) {
       await store.globalProfiles.upsert({ ...profile });
     }
+  } else {
+    // CLI profiles enabled after first boot (BOTANICAL_CLI_PROFILES) show in the
+    // CLI settings panel, so they must also reach the chat profile list.
+    const known = new Set(globals.map((profile) => profile.id));
+    for (const profile of config.profiles) {
+      const kind = profile.kind ?? (profile.provider === "cli" ? "cli" : "api");
+      if (kind !== "cli" || known.has(profile.id)) continue;
+      await store.globalProfiles.upsert({ ...profile });
+    }
   }
   if (config.encryptionKey) {
     const seeded: Array<[string, string | undefined]> = [

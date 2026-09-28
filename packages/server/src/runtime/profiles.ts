@@ -6,7 +6,6 @@ import {
 } from "@botanical/agent-runtime";
 import {
   ProviderError,
-  checkCliAvailability,
   createMockProvider,
   createRegistry,
   runCli,
@@ -16,11 +15,8 @@ import {
   type Env,
   type ProviderType,
 } from "@botanical/providers";
-import { cliHomeFrom } from "@botanical/providers";
-import { currentUserId } from "@botanical/db";
-import { mkdirSync } from "node:fs";
-import { join } from "node:path";
 
+import { userCliAvailability } from "../cli-install/service.ts";
 import type { CliToolHost } from "../cli-mcp.ts";
 import type { ServerConfig } from "../config.ts";
 import type { ProviderFetch } from "../provider-host.ts";
@@ -120,19 +116,6 @@ export function createServerProfileResolver(
   };
 }
 
-function userCliEnv(env: Env): Env {
-  const base: Env = { ...process.env, ...env };
-  const userId = currentUserId();
-  if (!userId) return base;
-  const home = join(cliHomeFrom(base), "users", userId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80));
-  try {
-    mkdirSync(home, { recursive: true });
-  } catch {
-    return base;
-  }
-  return { ...base, HOME: home, BOTANICAL_CLI_HOME: home };
-}
-
 /**
  * Subscription CLIs run in the agent workspace. When `botanicalTools` is on,
  * the same turn exposes Botanical's tool catalog over a per-run MCP server.
@@ -157,10 +140,10 @@ function cliProvider(profile: ModelProfile, cliTools: CliToolHost | undefined, e
         yield { type: "error", error: new Error(`Profile ${profile.id} is missing a CLI name`) };
         return;
       }
-      const status = await checkCliAvailability({
-        cli: profile.cli,
-        ...(profile.bin ? { bin: profile.bin } : {}),
-      });
+      const { status, env: cliEnv } = await userCliAvailability(
+        { cli: profile.cli, ...(profile.bin ? { bin: profile.bin } : {}) },
+        env,
+      );
       if (!status.available || !status.bin) {
         yield {
           type: "error",
@@ -191,7 +174,7 @@ function cliProvider(profile: ModelProfile, cliTools: CliToolHost | undefined, e
           ...(profile.passModel && profile.model ? { model: profile.model } : {}),
           ...(request.signal ? { signal: request.signal } : {}),
           ...(session ? { mcp: { url: session.url, token: session.token }, toolEvents: session.events } : {}),
-          env: userCliEnv(env),
+          env: cliEnv,
         })) {
           if (event.type === "tool-call") {
             yield {
