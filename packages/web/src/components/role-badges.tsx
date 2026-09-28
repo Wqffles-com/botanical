@@ -9,7 +9,7 @@ export function RoleBadges({
   return (
     <span className="flex flex-wrap gap-1">
       {roles.map((role) => (
-        <Badge key={role.id || role.name} variant="outline" className="h-4 px-1.5 text-[10px] font-normal">
+        <Badge key={role.id || role.name} variant="outline" className="h-4 px-1.5 text-2xs font-normal">
           {role.name}
         </Badge>
       ))}

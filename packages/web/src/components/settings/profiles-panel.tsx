@@ -1,6 +1,7 @@
+import { Layers } from "lucide-react";
 import type { ModelProfile } from "@botanical/core";
 import { Badge } from "@botanical/ui/components/badge";
-import { EmptyState } from "@/components/empty-state";
+import { EmptyState } from "@botanical/ui/components/empty-state";
 import { profileIsAvailable, profileKind } from "@/lib/format";
 import { providerLabel } from "@/lib/format-extra";
 
@@ -8,9 +9,10 @@ export function ProfilesPanel({ profiles }: { profiles: ModelProfile[] }) {
   if (profiles.length === 0) {
     return (
       <EmptyState
+        icon={Layers}
         title="No model profiles"
         body="The server lists API profiles whose provider key is set, plus any CLI profiles, including ones that are not available yet."
-        className="min-h-40 rounded-xl border border-dashed"
+        bordered
       />
     );
   }
@@ -33,7 +35,7 @@ export function ProfilesPanel({ profiles }: { profiles: ModelProfile[] }) {
               <tr key={profile.id} className="border-t align-top">
                 <td className="px-3 py-3">
                   <div className="font-medium">{profile.name}</div>
-                  <div className="font-mono text-[11px] text-muted-foreground">{profile.id}</div>
+                  <div className="font-mono text-2xs text-muted-foreground">{profile.id}</div>
                   {profile.description ? (
                     <p className="mt-1 max-w-md text-xs text-muted-foreground">{profile.description}</p>
                   ) : null}

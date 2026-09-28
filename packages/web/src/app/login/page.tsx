@@ -114,7 +114,7 @@ function LoginForm() {
       <div className="relative w-full max-w-[380px]">
         <div className="mb-8 flex flex-col items-center text-center">
           <Mark className="size-12" />
-          <Wordmark className="mt-4 text-[2.4rem]" />
+          <Wordmark className="mt-4 text-4xl" />
           <p className="mt-2 text-sm text-muted-foreground">Always-on agent server. Any model.</p>
         </div>
         <Card className="bg-card">

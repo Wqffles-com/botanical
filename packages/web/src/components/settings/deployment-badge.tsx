@@ -16,12 +16,11 @@ export function DeploymentBadge({
   const selfHost = mode === "SELF_HOST";
   return (
     <Badge
-      variant={selfHost ? "secondary" : "default"}
+      variant={selfHost ? "secondary" : "info"}
       data-testid="mode-badge"
       className={cn(
-        "gap-1.5 font-medium tracking-wide",
-        large ? "h-8 px-3 text-[12.5px]" : "h-6 px-2 text-[11px] uppercase",
-        !selfHost && "bg-amber-500/15 text-amber-800 dark:text-amber-200",
+        "gap-1.5 font-medium",
+        large ? "h-7 px-2.5 text-xs" : "h-5 px-2 text-2xs",
         className,
       )}
     >

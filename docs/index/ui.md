@@ -21,11 +21,35 @@
 
 Components import each other through these package paths (for example `@botanical/ui/components/button`), which is also what the shadcn CLI writes. `packages/ui/tsconfig.json` maps them to `src` for the package's own typecheck.
 
-Primitives: avatar, badge, button, card, command, dialog, dropdown-menu, form, input, input-group, label, popover, scroll-area, select, separator, sheet, sidebar, skeleton, sonner, switch, tabs, textarea, tooltip.
+Primitives: alert-dialog, avatar, badge, breadcrumb, button, card, command, dialog, dropdown-menu, form, input, input-group, label, popover, scroll-area, select, separator, sheet, sidebar, skeleton, sonner, switch, tabs, textarea, tooltip.
+
+Blocks built on them:
+
+| Component | Use |
+|-----------|-----|
+| `packages/ui/src/components/page-container.tsx` | `PageContainer` / `pageContainerVariants`: page width and gutters. `default` (`max-w-5xl`), `narrow` (`max-w-2xl`, forms), `wide` (`max-w-7xl`, grids) |
+| `packages/ui/src/components/page-header.tsx` | Page title, one-line description, actions |
+| `packages/ui/src/components/empty-state.tsx` | Icon tile, title, sentence, optional action; `bordered` for a dashed frame |
+| `packages/ui/src/components/status-badge.tsx` | Badge with a dot. `tone` picks the color: `neutral`, `success`, `warning`, `danger`, `info`, `progress` (pulsing) |
+| `packages/ui/src/components/alert-dialog.tsx` | `AlertDialog` parts plus `ConfirmDialog` for delete-style confirmations |
+
+`Badge` has `success`, `warning`, and `info` variants next to shadcn's. `SidebarMenuButton` draws a `--sidebar-primary` mark when active. `CommandDialog` expects a `Command` child (base-nova style).
 
 ## Styles
 
-`packages/ui/src/styles.css` imports `tw-animate-css` and `shadcn/tailwind.css`, and declares `@source "./"` so Tailwind generates classes used inside the package. It defines the `dark` custom variant, the `@theme inline` mapping, the neutral OKLCH tokens for `:root` and `.dark`, the `[data-accent]` overrides (accent recolors `--primary` and `--ring` only), and the base layer.
+`packages/ui/src/styles.css` imports `tw-animate-css` and `shadcn/tailwind.css`, and declares `@source "./"` so Tailwind generates classes used inside the package. It defines the `dark` custom variant, the `@theme inline` mapping, the OKLCH tokens for `:root` and `.dark`, the `[data-accent]` overrides, and the base layer.
+
+| Tokens | Notes |
+|--------|-------|
+| `--background`, `--foreground`, `--card`, `--muted`, `--border`, … | Neutral base. Never tinted |
+| `--primary`, `--ring`, `--sidebar-primary` | Neutral by default. A non-neutral accent sets them from `--swatch-<accent>` |
+| `--destructive`, `--success`, `--warning`, `--info` (+ `-foreground`) | Status colors. Fixed whatever the accent |
+| `--chart-1` … `--chart-5` | Chart ramp |
+| `--swatch-blue`, `--swatch-red`, `--swatch-green`, `--swatch-orange`, `--swatch-violet` | Accent hues, light and dark. The settings picker paints with them |
+| `--agent-<color>`, `--agent-<color>-ink` | Agent identity marks (`packages/web/src/lib/agent-colors.ts`), light and dark |
+| `--text-2xs` | 11px step below `text-xs` for timestamps and counts |
+
+Text selection is tinted with `--primary`.
 
 The app stylesheet must import Tailwind first:
 
@@ -46,4 +70,6 @@ No unit tests yet. `typecheck` is `tsc --noEmit`, and it runs in the CI typechec
 
 - **Add a shadcn primitive.** From `packages/ui`, run `bunx shadcn@latest add <component>`. The file lands in `packages/ui/src/components`. Import it in the web app as `@botanical/ui/components/<component>`.
 - **Change a color, radius, or font token.** `packages/ui/src/styles.css`. Keep `:root`, `.dark`, and each `[data-accent]` block in step.
-- **Add an accent.** Add `[data-accent]` blocks in `packages/ui/src/styles.css`, then the name in `@botanical/core` and the label and swatch in `packages/web/src/lib/accent.ts`.
+- **Add an accent.** Add `--swatch-<name>` to `:root` and `.dark` and `[data-accent]` blocks in `packages/ui/src/styles.css`, then the name in `@botanical/core` and the label in `packages/web/src/lib/accent.ts`.
+- **Show a status.** Use `StatusBadge` with a `tone`, not a hand-picked `Badge` variant.
+- **Add a page.** Wrap it in `pageContainerVariants()` and start with `PageHeader`.

@@ -18,6 +18,9 @@ const nextConfig: NextConfig = {
     ? process.cwd().slice(0, -"/packages/web".length)
     : process.cwd(),
   transpilePackages: ["@botanical/core", "@botanical/ui", "geist"],
+  // `next dev` blocks its own assets for hosts other than localhost. The API default
+  // above is 127.0.0.1, so allow opening the dev app there too.
+  allowedDevOrigins: ["127.0.0.1"],
   agentRules: false,
   async rewrites() {
     return [

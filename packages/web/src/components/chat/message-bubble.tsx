@@ -21,7 +21,7 @@ export function MessageBubble({
   if (message.role === "user") {
     return (
       <article className="flex justify-end" data-testid="message" data-role="user">
-        <div className="max-w-[min(72%,40rem)] rounded-2xl rounded-br-md bg-secondary px-3.5 py-2.5 text-[14.5px] leading-relaxed">
+        <div className="max-w-[min(72%,40rem)] rounded-2xl rounded-br-md bg-secondary px-3.5 py-2.5 text-sm leading-relaxed">
           <div className="whitespace-pre-wrap">{message.content}</div>
         </div>
       </article>
@@ -35,7 +35,7 @@ export function MessageBubble({
     <article className="flex gap-3" data-testid={streaming ? "streaming-message" : "message"} data-role={message.role}>
       <MessageAgentAvatar agent={identity} />
       <div className="min-w-0 flex-1 pt-0.5">
-        <div className="mb-1 text-[11.5px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="mb-1 text-xs font-medium text-muted-foreground">
           {identity.name}
         </div>
         {/* A step's text comes before the tool calls it makes. */}
@@ -51,7 +51,7 @@ export function MessageBubble({
           </span>
         ) : null}
         {message.usage ? (
-          <p className="mt-1 text-[11px] text-muted-foreground">
+          <p className="mt-1 text-2xs text-muted-foreground">
             {message.usage.inputTokens} in · {message.usage.outputTokens} out
           </p>
         ) : null}

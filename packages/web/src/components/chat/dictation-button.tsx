@@ -8,7 +8,7 @@ import type { DictationController } from "./use-dictation";
 export function DictationNotice({ dictation }: { dictation: DictationController }) {
   if (!dictation.privacyNote && !dictation.interim && !dictation.error) return null;
   return (
-    <div className="px-3.5 pb-1 text-[11px] leading-snug text-muted-foreground">
+    <div className="px-3.5 pb-1 text-2xs leading-snug text-muted-foreground">
       {dictation.privacyNote ? <p>{dictation.privacyNote}</p> : null}
       {dictation.interim ? <p aria-live="polite">{dictation.interim}</p> : null}
       {dictation.error ? <p role="alert">{dictation.error}</p> : null}
@@ -24,7 +24,7 @@ export function DictationActions({ dictation }: { dictation: DictationController
           <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-foreground" aria-hidden />
           <span
             data-testid="dictation-timer"
-            className="font-mono text-[11px] tabular-nums text-muted-foreground"
+            className="font-mono text-2xs tabular-nums text-muted-foreground"
             aria-label={`Recording time ${dictation.elapsedLabel}`}
           >
             {dictation.elapsedLabel}
@@ -42,7 +42,7 @@ export function DictationActions({ dictation }: { dictation: DictationController
         </>
       ) : null}
       {dictation.phase === "transcribing" ? (
-        <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5 text-2xs text-muted-foreground">
           <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
           Transcribing…
         </span>

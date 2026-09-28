@@ -19,7 +19,7 @@ export function Mark({ className }: { className?: string }) {
 
 export function Wordmark({ className }: { className?: string }) {
   return (
-    <span className={cn("font-sans text-[1.15rem] leading-none font-semibold tracking-tight", className)}>
+    <span className={cn("font-sans text-lg leading-none font-semibold tracking-tight", className)}>
       Botanical
     </span>
   );

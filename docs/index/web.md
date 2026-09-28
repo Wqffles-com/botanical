@@ -36,8 +36,12 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 
 | Path | Purpose |
 |------|---------|
-| `packages/web/src/components/app-shell.tsx` | Authenticated shell |
-| `packages/web/src/components/app-sidebar.tsx` | Nav |
+| `packages/web/src/components/app-shell.tsx` | Authenticated shell: sidebar, header with breadcrumb and notification bell |
+| `packages/web/src/components/app-sidebar.tsx` | Sidebar: new chat, search, workspace nav, agents, recent chats, user menu |
+| `packages/web/src/components/app-breadcrumbs.tsx` | Header breadcrumb derived from the route and workspace names |
+| `packages/web/src/components/command-menu.tsx` | ⌘K palette: agents, chats, pages, theme |
+| `packages/web/src/components/nav-user.tsx` | Sidebar footer account menu: settings, theme (light, dark, system), sign out |
+| `packages/web/src/hooks/use-sign-out.ts` | Logout and redirect to `/login` |
 | `packages/web/src/components/workspace-provider.tsx` | Agents, chats, profiles in client state |
 | `packages/web/src/components/agents` | Agent list and editor (name, title, description, icon, shape, color, picture) |
 | `packages/web/src/components/agent-avatar.tsx` | Shape or custom picture for a bot mark |
@@ -58,7 +62,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/lib/chat-stream.ts` | Browser SSE parse |
 | `packages/web/src/lib/server-api.ts` | RSC client (forwards cookies) |
 
-Settings is one page. Tabs in `packages/web/src/components/settings/settings-view.tsx` (`?tab=`): `general` (accent, deployment, background work, provider key flags, tool list, MCP snapshot), `profiles`, `memory`, `roles`, `cli`. The accent picker is `packages/web/src/components/settings/accent-card.tsx`. `packages/web/src/components/accent-provider.tsx` loads `GET /api/settings/appearance` and sets `data-accent` on the document. Tokens live in `packages/ui/src/styles.css`: a non-neutral accent recolors `--primary` and `--ring` in light and dark. Sidebar, page background, and borders stay gray. Panels: `packages/web/src/components/settings/profiles-panel.tsx`, `memory-panel.tsx`, `roles-panel.tsx`, `cli-panel.tsx`, `deployment-badge.tsx`, `background-work-card.tsx`. Sidebar links for routines and listeners are in `packages/web/src/components/app-sidebar.tsx`.
+Settings is one page. Tabs in `packages/web/src/components/settings/settings-view.tsx` (`?tab=`): `general` (accent, deployment, background work, provider key flags, tool list, MCP snapshot), `profiles`, `memory`, `roles`, `cli`. The accent picker is `packages/web/src/components/settings/accent-card.tsx`. `packages/web/src/components/accent-provider.tsx` loads `GET /api/settings/appearance` and sets `data-accent` on the document. Tokens live in `packages/ui/src/styles.css`: a non-neutral accent recolors `--primary`, `--ring`, and the active sidebar mark in light and dark. Page, borders, and status colors (`--destructive`, `--success`, `--warning`, `--info`) stay put. The theme defaults to the OS setting (`packages/web/src/components/theme-provider.tsx`). Panels: `packages/web/src/components/settings/profiles-panel.tsx`, `memory-panel.tsx`, `roles-panel.tsx`, `cli-panel.tsx`, `deployment-badge.tsx`, `background-work-card.tsx`. Sidebar links for inbox, routines, and listeners are in `packages/web/src/components/app-sidebar.tsx`. Sign out lives in the sidebar user menu.
 
 ## Env vars
 

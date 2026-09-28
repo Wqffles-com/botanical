@@ -124,7 +124,7 @@ export function NotificationBell() {
       >
         <Bell className="size-4" />
         {unread > 0 ? (
-          <span className="pointer-events-none absolute -top-1.5 -right-1.5 z-10 flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-[10px] leading-none font-medium text-background ring-2 ring-background">
+          <span className="pointer-events-none absolute -top-1.5 -right-1.5 z-10 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-2xs leading-none font-medium text-primary-foreground ring-2 ring-background">
             {badge}
           </span>
         ) : null}
@@ -166,7 +166,7 @@ export function NotificationBell() {
                       {!item.readAt ? <span className="size-1.5 shrink-0 rounded-full bg-primary" /> : null}
                     </span>
                     {item.body ? <span className="line-clamp-2 text-xs text-muted-foreground">{item.body}</span> : null}
-                    <span className="text-[11px] text-muted-foreground">{formatWhen(item.createdAt)}</span>
+                    <span className="text-2xs text-muted-foreground">{formatWhen(item.createdAt)}</span>
                   </button>
                 </li>
               ))}

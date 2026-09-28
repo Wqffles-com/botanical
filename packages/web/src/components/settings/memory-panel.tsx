@@ -1,11 +1,13 @@
 "use client";
 
+import { ConfirmDialog } from "@botanical/ui/components/alert-dialog";
+import { Bot, Brain } from "lucide-react";
 import type { Agent, MemoryRecord } from "@botanical/core";
 import { isUnauthorized } from "@botanical/core";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { EmptyState } from "@/components/empty-state";
+import { EmptyState } from "@botanical/ui/components/empty-state";
 import { Badge } from "@botanical/ui/components/badge";
 import { Button } from "@botanical/ui/components/button";
 import {
@@ -248,17 +250,19 @@ export function MemoryPanel({ agents }: { agents: Agent[] }) {
 
       {needsAgent ? (
         <EmptyState
+          icon={Bot}
           title="No agents"
           body="Create an agent before storing a private memory."
-          className="min-h-32 rounded-xl border border-dashed"
+          bordered
         />
       ) : loading ? (
         <p className="text-sm text-muted-foreground">Loading memories…</p>
       ) : memories.length === 0 ? (
         <EmptyState
+          icon={Brain}
           title="No memories"
           body={query.q || query.tag ? "Nothing matches that search." : "Save a note and it will show up here."}
-          className="min-h-32 rounded-xl border border-dashed"
+          bordered
         />
       ) : (
         <ul className="space-y-2">
@@ -286,7 +290,7 @@ export function MemoryPanel({ agents }: { agents: Agent[] }) {
                 >
                   Edit
                 </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setPendingDelete(memory)}>
+                <Button type="button" variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setPendingDelete(memory)}>
                   Delete
                 </Button>
               </div>
@@ -314,22 +318,15 @@ export function MemoryPanel({ agents }: { agents: Agent[] }) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete this memory?</DialogTitle>
-            <DialogDescription>Agents will stop seeing it on the next turn.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setPendingDelete(null)}>
-              Cancel
-            </Button>
-            <Button type="button" variant="destructive" disabled={saving} onClick={() => void onDelete()}>
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="Delete this memory?"
+        description="Agents will stop seeing it on the next turn."
+        pending={saving}
+        pendingLabel="Deleting…"
+        onConfirm={() => void onDelete()}
+      />
     </div>
   );
 }

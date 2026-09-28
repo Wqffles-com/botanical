@@ -1,14 +1,17 @@
 "use client";
 
+import { EmptyState } from "@botanical/ui/components/empty-state";
+import { pageContainerVariants } from "@botanical/ui/components/page-container";
 import { isUnauthorized } from "@botanical/core";
 import { ArrowRight, Inbox } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { AgentAvatar } from "@/components/agent-avatar";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@botanical/ui/components/page-header";
 import { useWorkspace } from "@/components/workspace-provider";
 import { Badge } from "@botanical/ui/components/badge";
+import { StatusBadge, type StatusTone } from "@botanical/ui/components/status-badge";
 import { Button } from "@botanical/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
 import { Label } from "@botanical/ui/components/label";
@@ -113,7 +116,7 @@ export function InboxView() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
+    <div className={pageContainerVariants({ className: "flex flex-col gap-6" })}>
       <PageHeader
         title="Inbox"
         description="Async agent-to-agent notes. They never merge into the user thread."
@@ -159,7 +162,12 @@ export function InboxView() {
                 <Skeleton className="h-16 w-full" />
               </div>
             ) : visible.length === 0 ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">Inbox is empty.</p>
+              <EmptyState
+                icon={Inbox}
+                title="Inbox is empty"
+                body="Notes agents send each other land here."
+                className="py-12"
+              />
             ) : (
               <ScrollArea className="h-[min(28rem,60vh)] pr-3">
                 <ul className="space-y-2">
@@ -208,13 +216,13 @@ function MessageRow({
             <p className="text-sm font-medium">
               {from?.name ?? "Agent"} → {to?.name ?? "Agent"}
             </p>
-            <time className="shrink-0 font-mono text-[10.5px] whitespace-nowrap text-muted-foreground">
+            <time className="shrink-0 font-mono text-2xs whitespace-nowrap text-muted-foreground">
               {relativeTime(message.createdAt)}
             </time>
           </div>
-          <p className="mt-1 whitespace-pre-wrap text-[13px] text-muted-foreground">{message.body}</p>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{message.body}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <StatusBadge status={message.status} />
+            <MessageStatus status={message.status} />
             {unread ? (
               <Button variant="ghost" size="sm" onClick={() => void onStatus(message.id, "read")}>
                 Mark read
@@ -233,10 +241,19 @@ function MessageRow({
   );
 }
 
-function StatusBadge({ status }: { status: AgentMessageStatus }) {
-  const variant =
-    status === "failed" ? "destructive" : status === "read" ? "secondary" : "default";
-  return <Badge variant={variant}>{status}</Badge>;
+const MESSAGE_TONE: Record<AgentMessageStatus, StatusTone> = {
+  pending: "progress",
+  delivered: "info",
+  read: "neutral",
+  failed: "danger",
+};
+
+function MessageStatus({ status }: { status: AgentMessageStatus }) {
+  return (
+    <StatusBadge tone={MESSAGE_TONE[status]} className="capitalize">
+      {status}
+    </StatusBadge>
+  );
 }
 
 function ComposeCard({

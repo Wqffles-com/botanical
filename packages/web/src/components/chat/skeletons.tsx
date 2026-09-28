@@ -28,7 +28,7 @@ export function ChatThreadSkeleton() {
         </div>
         <Skeleton className="ml-auto h-8 w-52" />
       </div>
-      <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col justify-end gap-5 px-4 py-6">
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-end gap-5 px-4 py-6">
         <div className="flex justify-end">
           <Skeleton className="h-16 w-64 rounded-2xl" />
         </div>
@@ -41,7 +41,7 @@ export function ChatThreadSkeleton() {
         </div>
       </div>
       <div className="px-4 pb-4">
-        <Skeleton className="mx-auto h-20 max-w-[760px] rounded-xl" />
+        <Skeleton className="mx-auto h-20 max-w-3xl rounded-xl" />
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { ConfirmDialog } from "@botanical/ui/components/alert-dialog";
 import type { Agent, RolePermissions, RoleRecord } from "@botanical/core";
 import { isUnauthorized } from "@botanical/core";
 import { useRouter } from "next/navigation";
@@ -236,7 +237,11 @@ export function RolesPanel({ agents, onAgentsChanged }: { agents: Agent[]; onAge
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className={role.builtin ? "text-muted-foreground" : undefined}
+                  className={
+                    role.builtin
+                      ? "text-muted-foreground"
+                      : "text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  }
                   title={role.builtin ? "Built-in roles can't be deleted" : undefined}
                   onClick={() => (role.builtin ? void tryDeleteBuiltin(role) : setPendingDelete(role))}
                 >
@@ -267,7 +272,7 @@ export function RolesPanel({ agents, onAgentsChanged }: { agents: Agent[]; onAge
                 <tr key={capability.id} className="border-b last:border-b-0">
                   <td className="px-3 py-2">
                     <div>{capability.label}</div>
-                    <div className="font-mono text-[11px] text-muted-foreground">{capability.id}</div>
+                    <div className="font-mono text-2xs text-muted-foreground">{capability.id}</div>
                   </td>
                   {roles.map((role) => {
                     const on = role.permissions.capabilities.includes(capability.id);
@@ -357,7 +362,7 @@ export function RolesPanel({ agents, onAgentsChanged }: { agents: Agent[]; onAge
                     <label key={capability.id} className="flex items-center justify-between gap-3 text-sm">
                       <span>
                         {capability.label}
-                        <span className="ml-2 font-mono text-[11px] text-muted-foreground">{capability.id}</span>
+                        <span className="ml-2 font-mono text-2xs text-muted-foreground">{capability.id}</span>
                       </span>
                       <Switch
                         size="sm"
@@ -443,22 +448,15 @@ export function RolesPanel({ agents, onAgentsChanged }: { agents: Agent[]; onAge
         </DialogContent>
       </Dialog>
 
-      <Dialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete {pendingDelete?.name ?? "this role"}?</DialogTitle>
-            <DialogDescription>Agents using it have to be unassigned first.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setPendingDelete(null)}>
-              Cancel
-            </Button>
-            <Button type="button" variant="destructive" disabled={saving} onClick={() => void removeRole()}>
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title={`Delete ${pendingDelete?.name ?? "this role"}?`}
+        description="Agents using it have to be unassigned first."
+        pending={saving}
+        pendingLabel="Deleting…"
+        onConfirm={() => void removeRole()}
+      />
     </div>
   );
 }

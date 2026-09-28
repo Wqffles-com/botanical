@@ -99,7 +99,7 @@ export function Composer({
     <form onSubmit={handleSubmit} className="px-4 pb-4 pt-2">
       <div
         className={cn(
-          "mx-auto flex max-w-[760px] flex-col rounded-xl border bg-card",
+          "mx-auto flex max-w-3xl flex-col rounded-xl border bg-card",
           disabled ? "border-border opacity-70" : "border-border focus-within:border-primary/45",
         )}
       >
@@ -116,14 +116,14 @@ export function Composer({
           placeholder={placeholder}
           disabled={disabled || streaming}
           rows={1}
-          className="max-h-[200px] min-h-[44px] w-full bg-transparent px-3.5 pt-3 pb-1 text-[14.5px] leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
+          className="max-h-[200px] min-h-[44px] w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
           aria-describedby={unavailableHint ? "composer-unavailable" : undefined}
         />
         {unavailableHint ? (
           <p
             id="composer-unavailable"
             data-testid="profile-unavailable"
-            className="px-3.5 pb-1 text-[11px] leading-snug text-muted-foreground"
+            className="px-3.5 pb-1 text-2xs leading-snug text-muted-foreground"
           >
             {unavailableHint}
           </p>
@@ -141,7 +141,7 @@ export function Composer({
             />
           ) : null}
           {unavailableHint ? null : (
-            <span className="mb-1 hidden text-[11px] text-muted-foreground sm:inline">
+            <span className="mb-1 hidden text-2xs text-muted-foreground sm:inline">
               {dictation.phase === "recording"
                 ? "Enter or Space to stop · Escape to cancel"
                 : "Enter to send · Shift+Enter newline"}

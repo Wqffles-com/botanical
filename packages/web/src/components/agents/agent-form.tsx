@@ -1,5 +1,7 @@
 "use client";
 
+import { ConfirmDialog } from "@botanical/ui/components/alert-dialog";
+import { pageContainerVariants } from "@botanical/ui/components/page-container";
 import type { Agent, RoleRecord } from "@botanical/core";
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
@@ -14,14 +16,6 @@ import { AgentShapePicker } from "@/components/agents/agent-shape-picker";
 import { AgentToolAllowlist } from "@/components/agents/agent-tool-allowlist";
 import { useWorkspace } from "@/components/workspace-provider";
 import { Button } from "@botanical/ui/components/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@botanical/ui/components/dialog";
 import { Input } from "@botanical/ui/components/input";
 import { Label } from "@botanical/ui/components/label";
 import { Textarea } from "@botanical/ui/components/textarea";
@@ -128,7 +122,7 @@ export function AgentForm({
   const effective = rolesMatchSaved ? agent.effectivePermissions : previewEffective(draft.roleIds, roles);
 
   return (
-    <form onSubmit={(event) => void onSubmit(event)} data-testid="agent-editor" className="mx-auto w-full max-w-2xl px-6 py-8">
+    <form onSubmit={(event) => void onSubmit(event)} data-testid="agent-editor" className={pageContainerVariants({ size: "narrow" })}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
           <AgentAvatar
@@ -276,7 +270,7 @@ export function AgentForm({
             value={draft.prompt}
             rows={12}
             placeholder="You are…"
-            className="min-h-48 font-mono text-[13px] leading-relaxed"
+            className="min-h-48 font-mono text-sm leading-relaxed"
             onChange={(event) => patch({ prompt: event.target.value })}
           />
         </div>
@@ -353,24 +347,15 @@ export function AgentForm({
         </div>
       </div>
 
-      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete {agent?.name ?? "this agent"}?</DialogTitle>
-            <DialogDescription>
-              Existing chats keep their history but cannot start new turns with a missing agent.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setConfirmDelete(false)}>
-              Cancel
-            </Button>
-            <Button type="button" variant="destructive" disabled={saving} onClick={() => void onDelete()}>
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={(open) => !open && setConfirmDelete(false)}
+        title={`Delete ${agent?.name ?? "this agent"}?`}
+        description="Existing chats keep their history but cannot start new turns with a missing agent."
+        pending={saving}
+        pendingLabel="Deleting…"
+        onConfirm={() => void onDelete()}
+      />
     </form>
   );
 }
