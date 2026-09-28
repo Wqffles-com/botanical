@@ -106,15 +106,16 @@ Copy from [.env.example](../.env.example). Do not commit `.env`.
 | `BOTANICAL_PUBLIC_ORIGIN` | recommended | Public web origin. Pair `https://` with `BOTANICAL_COOKIE_SECURE=true` |
 | `OPENAI_API_KEY` | no | GPT |
 | `ANTHROPIC_API_KEY` | no | Claude |
-| `XAI_API_KEY` | no | Grok |
+| `XAI_API_KEY` | no | Grok. Also the xAI speech-to-text fallback |
 | `DEEPSEEK_API_KEY` | no | DeepSeek |
-| `OPENROUTER_API_KEY` | no | OpenRouter |
+| `OPENROUTER_API_KEY` | no | OpenRouter. Also the OpenRouter speech-to-text fallback |
+| `DASHSCOPE_API_KEY` | no | Qwen speech-to-text. See [Dictation](#dictation) |
 | `OPENAI_COMPAT_BASE_URL` / `OPENAI_COMPAT_API_KEY` | no | OpenAI-compatible host. Both are required before that profile is listed |
 | `CUSTOM_OPENAI_BASE_URL` / `CUSTOM_OPENAI_API_KEY` | no | Legacy aliases of `OPENAI_COMPAT_*` |
 | `BRAVE_SEARCH_API_KEY` / `TAVILY_API_KEY` / `SERPER_API_KEY` | no | Built-in web search |
 | `SEARXNG_URL` / `SEARXNG_API_KEY` | no | SearXNG search |
 | `BOTANICAL_MCP_CONFIG` | no | MCP JSON inside the server container (`/config/mcp.json`) |
-| `BOTANICAL_STT_BASE_URL` / `BOTANICAL_STT_API_KEY` / `BOTANICAL_STT_MODEL` | no | Composer dictation. See [Dictation](#dictation) |
+| `BOTANICAL_STT_PROVIDER` / `BOTANICAL_STT_BASE_URL` / `BOTANICAL_STT_API_KEY` / `BOTANICAL_STT_MODEL` | no | Composer dictation. See [Dictation](#dictation) |
 
 Postgres passwords in the URL must be URL-encoded. Keep `POSTGRES_PASSWORD` and the password inside `DATABASE_URL` the same when you use the bundled database.
 
@@ -174,15 +175,59 @@ A Linux host can still bind-mount a binary instead of using the installer. That 
 
 The composer microphone turns speech into text in the message box. It does not send the message.
 
-Speech-to-text uses a Whisper-compatible `POST /audio/transcriptions` endpoint. The API key stays on the server.
+`BOTANICAL_STT_PROVIDER` selects the speech backend. The API key stays on the server. When the provider is unset, a `BOTANICAL_STT_BASE_URL` uses the OpenAI-compatible adapter at that URL (model `whisper-1`, key optional). Otherwise `OPENAI_API_KEY` calls `https://api.openai.com/v1` with model `gpt-4o-mini-transcribe`. With neither, dictation uses the browser.
 
-- Leave `BOTANICAL_STT_BASE_URL` unset and set `OPENAI_API_KEY`. The server calls `https://api.openai.com/v1` with model `gpt-4o-mini-transcribe`. `whisper-1` and `gpt-4o-transcribe` are other models for that host (`BOTANICAL_STT_MODEL`).
-- Groq: `BOTANICAL_STT_BASE_URL=https://api.groq.com/openai/v1`, `BOTANICAL_STT_API_KEY`, and `BOTANICAL_STT_MODEL=whisper-large-v3-turbo`.
-- A local Whisper-compatible server: `BOTANICAL_STT_BASE_URL=http://whisper:8000/v1` or `http://host.docker.internal:8000/v1`. `BOTANICAL_STT_API_KEY` is optional. The model defaults to `whisper-1`.
+| Provider | Value | Endpoint | Default model | Key |
+|----------|-------|----------|---------------|-----|
+| OpenAI-compatible (OpenAI, Groq, local Whisper) | `openai-compat` | `<base>/audio/transcriptions` | `gpt-4o-mini-transcribe` on `https://api.openai.com/v1`; `whisper-1` on any other base | `BOTANICAL_STT_API_KEY`, then `OPENAI_API_KEY` only when the base URL is unset |
+| OpenRouter | `openrouter` | `https://openrouter.ai/api/v1/audio/transcriptions` | `openai/whisper-large-v3` | `BOTANICAL_STT_API_KEY`, then `OPENROUTER_API_KEY` |
+| xAI | `xai` | `https://api.x.ai/v1/stt` | `grok-voice-transcribe-2.0` | `BOTANICAL_STT_API_KEY`, then `XAI_API_KEY` |
+| Qwen (DashScope, OpenAI-compatible) | `qwen` | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions` | `qwen3-asr-flash` | `BOTANICAL_STT_API_KEY`, then `DASHSCOPE_API_KEY` |
 
-`BOTANICAL_STT_DISABLED=true` turns the server endpoint off. `BOTANICAL_STT_API_KEY_FILE` can point at a file when the key is not in the environment. A non-empty `BOTANICAL_STT_API_KEY` wins. An empty file is an error.
+`BOTANICAL_STT_BASE_URL` overrides the endpoint origin for every provider. The xAI model is sent on each request; the default above is used when `BOTANICAL_STT_MODEL` is unset. xAI speech-to-text requires an xAI API key (paid API usage), not a Grok consumer subscription login.
 
-Limits default to 10 MB (`BOTANICAL_STT_MAX_BYTES`, 10000000) and 120 seconds (`BOTANICAL_STT_MAX_SECONDS`). The browser stops recording at the duration limit. Larger uploads are rejected. `GET /api/capabilities` tells the browser whether to upload audio or use its own speech recognition. The response includes the limits and a mode of `server` or `browser`. It does not include the base URL or the key.
+Qwen accepts the audio as a data URL. That encoded value must be at most 10 MB; a larger recording is rejected before the upstream call. Region and workspace bases are set with `BOTANICAL_STT_BASE_URL`, for example `https://dashscope.aliyuncs.com/compatible-mode/v1` or `https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`.
+
+Providers differ in accepted formats. Browsers usually record WebM/Opus. The OpenAI-compatible adapter forwards the file as uploaded. OpenRouter accepts webm, ogg, mp3, wav, and m4a. xAI documents wav, mp3, ogg, opus, flac, aac, mp4, m4a, and mkv (WebM is Matroska; the upload keeps a matching filename and content type).
+
+Examples:
+
+```sh
+# OpenAI
+BOTANICAL_STT_PROVIDER=openai-compat
+BOTANICAL_STT_API_KEY=
+BOTANICAL_STT_MODEL=gpt-4o-mini-transcribe
+
+# Groq
+BOTANICAL_STT_PROVIDER=openai-compat
+BOTANICAL_STT_BASE_URL=https://api.groq.com/openai/v1
+BOTANICAL_STT_API_KEY=
+BOTANICAL_STT_MODEL=whisper-large-v3-turbo
+
+# Local Whisper-compatible server (key optional)
+BOTANICAL_STT_PROVIDER=openai-compat
+BOTANICAL_STT_BASE_URL=http://whisper:8000/v1
+BOTANICAL_STT_MODEL=whisper-1
+
+# OpenRouter
+BOTANICAL_STT_PROVIDER=openrouter
+OPENROUTER_API_KEY=
+BOTANICAL_STT_MODEL=openai/whisper-large-v3
+
+# xAI
+BOTANICAL_STT_PROVIDER=xai
+XAI_API_KEY=
+BOTANICAL_STT_MODEL=grok-voice-transcribe-2.0
+
+# Qwen
+BOTANICAL_STT_PROVIDER=qwen
+DASHSCOPE_API_KEY=
+BOTANICAL_STT_MODEL=qwen3-asr-flash
+```
+
+`BOTANICAL_STT_DISABLED=true` turns the server endpoint off. `BOTANICAL_STT_API_KEY_FILE` can point at a file when the key is not in the environment. A non-empty `BOTANICAL_STT_API_KEY` wins. An empty file is an error. An explicit `openrouter`, `xai`, or `qwen` provider with no resolvable key uses the browser instead of refusing to start. The same is true for explicit `openai-compat` when no base URL and no OpenAI key are set.
+
+Limits default to 10 MB (`BOTANICAL_STT_MAX_BYTES`, 10000000) and 120 seconds (`BOTANICAL_STT_MAX_SECONDS`). The browser stops recording at the duration limit. Larger uploads are rejected. `GET /api/capabilities` tells the browser whether to upload audio or use its own speech recognition. In server mode the response includes `dictation.provider` (the provider name only), the limits, and `mode: "server"`. It does not include the base URL, the model, or the key. Browser mode omits the provider.
 
 When no speech backend is configured, dictation uses the browser's speech recognition if that browser has it. In that mode the browser vendor processes the audio, not this server. The composer says so while recording.
 
