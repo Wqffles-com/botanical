@@ -128,6 +128,14 @@ describe("parseDictationCapability", () => {
     ).toEqual({ mode: "server", maxBytes: 1000, maxSeconds: 30 });
   });
 
+  test("keeps a server provider name and still ignores the endpoint", () => {
+    expect(
+      parseDictationCapability({
+        dictation: { mode: "server", maxBytes: 10, maxSeconds: 2, provider: "xai", baseUrl: "http://hidden" },
+      }),
+    ).toEqual({ mode: "server", maxBytes: 10, maxSeconds: 2, provider: "xai" });
+  });
+
   test("rejects a payload that cannot choose a mode", () => {
     expect(parseDictationCapability(null)).toBeNull();
     expect(parseDictationCapability({ dictation: { mode: "local", maxBytes: 1, maxSeconds: 1 } })).toBeNull();

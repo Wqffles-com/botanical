@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 import {
   BROWSER_DICTATION_NOTE,
   CHECKING_REASON,
@@ -123,7 +122,6 @@ export function useDictation(options: { blocked: boolean; onInsert: (text: strin
   const report = useCallback((message: string) => {
     if (!mountedRef.current) return;
     setError(message);
-    toast.error(message);
   }, []);
 
   const finishIdle = useCallback(() => {

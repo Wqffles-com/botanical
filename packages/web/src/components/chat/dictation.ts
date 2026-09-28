@@ -45,6 +45,8 @@ export interface DictationCapability {
   mode: "server" | "browser";
   maxBytes: number;
   maxSeconds: number;
+  /** Server speech provider name. Omitted in browser mode. */
+  provider?: string;
 }
 
 export interface BrowserDictationSupport {
@@ -164,7 +166,13 @@ export function parseDictationCapability(body: unknown): DictationCapability | n
   const record = dictation as Record<string, unknown>;
   if (record.mode !== "server" && record.mode !== "browser") return null;
   if (!isPositiveNumber(record.maxBytes) || !isPositiveNumber(record.maxSeconds)) return null;
-  return { mode: record.mode, maxBytes: record.maxBytes, maxSeconds: record.maxSeconds };
+  const provider = typeof record.provider === "string" ? record.provider.trim() : "";
+  return {
+    mode: record.mode,
+    maxBytes: record.maxBytes,
+    maxSeconds: record.maxSeconds,
+    ...(provider ? { provider } : {}),
+  };
 }
 
 export function formatElapsed(ms: number): string {
