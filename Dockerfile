@@ -28,7 +28,9 @@ RUN alpine_ver="$(cut -d. -f1,2 /etc/alpine-release)" \
 COPY --from=install /app /app
 COPY deploy/scripts/server-entrypoint.sh /entrypoint.sh
 COPY config/mcp.json /config/mcp.json
-RUN chmod +x /entrypoint.sh
+# A checkout from before the LF attributes can still contain CR.
+RUN sed -i 's/\r$//' /entrypoint.sh \
+  && chmod +x /entrypoint.sh
 ENV NODE_ENV=production \
     PORT=8787 \
     HOST=0.0.0.0 \

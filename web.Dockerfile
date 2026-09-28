@@ -16,7 +16,10 @@ COPY package.json bun.lock tsconfig.base.json ./
 COPY packages ./packages
 COPY deploy/scripts/ensure-next-standalone.mjs deploy/scripts/ensure-next-standalone.mjs
 COPY deploy/scripts/stage-next-standalone.sh deploy/scripts/stage-next-standalone.sh
-RUN bun install --frozen-lockfile
+# A checkout from before the LF attributes can still contain CR. Strip it
+# before `sh` parses `set -eu` (`illegal option -`).
+RUN sed -i 's/\r$//' deploy/scripts/stage-next-standalone.sh \
+  && bun install --frozen-lockfile
 ARG BOTANICAL_API_URL
 ENV BOTANICAL_API_URL=${BOTANICAL_API_URL} \
     NEXT_TELEMETRY_DISABLED=1 \
@@ -34,7 +37,8 @@ RUN apk add --no-cache libc6-compat ca-certificates \
   && adduser -S -D -H -h /tmp -u 1001 -G botanical botanical
 COPY deploy/scripts/web-entrypoint.sh /entrypoint.sh
 COPY --from=build --chown=botanical:botanical /out /app
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh \
+  && chmod +x /entrypoint.sh
 USER botanical
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
