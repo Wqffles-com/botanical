@@ -2,7 +2,7 @@
 
 [Index](README.md)
 
-HTTP API: passcode auth, agents, chats, streaming turns, agent-to-agent mail, memory, roles, MCP listing, CLI install/login, dictation.
+HTTP API: passcode auth, agents, chats, streaming turns, agent-to-agent mail, routines, listeners, notifications, memory, roles, MCP listing, CLI install/login, dictation.
 
 - Package: `@botanical/server`
 - Library entry: `packages/server/src/index.ts` (`package.json` `exports`)
@@ -18,10 +18,12 @@ HTTP API: passcode auth, agents, chats, streaming turns, agent-to-agent mail, me
 | `packages/server/src/http.ts` | JSON helpers, body limit, CORS finish |
 | `packages/server/src/config.ts` | `loadConfig` |
 | `packages/server/src/auth` | Passcode verify, session cookie, login rate limit |
-| `packages/server/src/db` | In-memory store and Postgres adapter |
-| `packages/server/src/runtime` | Turn runner, profile resolver, workspace path, store adapter |
+| `packages/server/src/db` | In-memory store and Postgres adapter. Routines, listeners, and notifications: `packages/server/src/db/always-on.ts` |
+| `packages/server/src/runtime` | Turn runner, profile resolver, workspace path, store adapter. Background turns: `packages/server/src/runtime/jobs.ts`, `packages/server/src/runtime/turns.ts` |
+| `packages/server/src/routines` | Cron check (`cron.ts`) and in-process scheduler (`scheduler.ts`) |
+| `packages/server/src/listeners` | Webhook signature, body cap, and prompt framing |
 | `packages/server/src/streaming.ts` | SSE encode and heartbeat |
-| `packages/server/src/tools` | Builtin contributors (files, shell, web, memory, agent admin, MCP) |
+| `packages/server/src/tools` | Builtin contributors (files, shell, web, memory, agent admin, `notify_user` in `packages/server/src/tools/notify.ts`, MCP) |
 | `packages/server/src/a2a` | Agent-message bus service and `send_agent_message` |
 | `packages/server/src/mcp-host.ts` | Boot MCP and snapshot for `GET /api/mcp/servers` |
 | `packages/server/src/cli-mcp.ts` | Per-run MCP endpoint for CLI profiles |
@@ -73,6 +75,29 @@ Registered only through `router.add` in the handler file. `packages/server/src/a
 | DELETE | `/api/chats/:id` | `packages/server/src/routes/chats.ts` |
 | GET | `/api/chats/:id/messages` | `packages/server/src/routes/messages.ts` |
 | POST | `/api/chats/:id/messages` | `packages/server/src/routes/messages.ts` |
+| GET | `/api/routines` | `packages/server/src/routes/routines.ts` |
+| POST | `/api/routines/preview` | `packages/server/src/routes/routines.ts` |
+| POST | `/api/routines` | `packages/server/src/routes/routines.ts` |
+| GET | `/api/routines/:id` | `packages/server/src/routes/routines.ts` |
+| PATCH | `/api/routines/:id` | `packages/server/src/routes/routines.ts` |
+| DELETE | `/api/routines/:id` | `packages/server/src/routes/routines.ts` |
+| POST | `/api/routines/:id/pause` | `packages/server/src/routes/routines.ts` |
+| POST | `/api/routines/:id/resume` | `packages/server/src/routes/routines.ts` |
+| POST | `/api/routines/:id/run` | `packages/server/src/routes/routines.ts` |
+| GET | `/api/routines/:id/runs` | `packages/server/src/routes/routines.ts` |
+| GET | `/api/listeners` | `packages/server/src/routes/listeners.ts` |
+| POST | `/api/listeners` | `packages/server/src/routes/listeners.ts` |
+| GET | `/api/listeners/:id` | `packages/server/src/routes/listeners.ts` |
+| PATCH | `/api/listeners/:id` | `packages/server/src/routes/listeners.ts` |
+| DELETE | `/api/listeners/:id` | `packages/server/src/routes/listeners.ts` |
+| POST | `/api/listeners/:id/rotate-secret` | `packages/server/src/routes/listeners.ts` |
+| GET | `/api/listeners/:id/deliveries` | `packages/server/src/routes/listeners.ts` |
+| POST | `/api/hooks/:listenerId` | `packages/server/src/routes/listeners.ts` |
+| GET | `/api/notifications` | `packages/server/src/routes/notifications.ts` |
+| POST | `/api/notifications/read-all` | `packages/server/src/routes/notifications.ts` |
+| POST | `/api/notifications/:id/read` | `packages/server/src/routes/notifications.ts` |
+| GET | `/api/settings/always-on` | `packages/server/src/routes/always-on-settings.ts` |
+| PATCH | `/api/settings/always-on` | `packages/server/src/routes/always-on-settings.ts` |
 | GET | `/api/agent-messages` | `packages/server/src/routes/agent-messages.ts` |
 | POST | `/api/agent-messages` | `packages/server/src/routes/agent-messages.ts` |
 | PATCH | `/api/agent-messages/:id` | `packages/server/src/routes/agent-messages.ts` |
@@ -93,9 +118,13 @@ Registered only through `router.add` in the handler file. `packages/server/src/a
 
 `GET` and `DELETE` on `/internal/mcp/runs/:runId` are registered and then answered 405 after the run token check. The CLI uses `POST` JSON-RPC (`initialize`, `ping`, `tools/list`, `tools/call`). Session cookies do not authenticate that path.
 
+`POST /api/hooks/:listenerId` is also outside the passcode. It checks the listener secret (`packages/server/src/listeners/verify.ts`). `GET` and `PATCH /api/settings/always-on` are passcode-gated and marked instance-admin in `packages/server/src/routes/always-on-settings.ts`. The scheduler starts from `packages/server/src/serve.ts` unless `createApp({ scheduler: false })`. Each tick reads `always_on.*` from the store (`packages/db/src/always-on-settings.ts`).
+
 ## Env vars
 
-`loadConfig` in `packages/server/src/config.ts` reads: `BOTANICAL_DEPLOYMENT_MODE`, `BOTANICAL_BRAND_NAME`, `BOTANICAL_PASSWORD`, `BOTANICAL_PASSWORD_HASH`, `DATABASE_URL`, `BOTANICAL_HOST`, `BOTANICAL_PORT`, `PORT`, `BOTANICAL_SESSION_TTL_SECONDS`, `BOTANICAL_COOKIE_SECURE`, `BOTANICAL_CORS_ORIGIN`, `BOTANICAL_TRUST_PROXY`, `BOTANICAL_MAX_BODY_BYTES`, `BOTANICAL_A2A_AUTORUN`, `BOTANICAL_CLI_PROFILES`, `BOTANICAL_STT_MAX_BYTES`, `BOTANICAL_STT_MAX_SECONDS`, `BOTANICAL_STT_DISABLED`, `BOTANICAL_STT_PROVIDER`, `BOTANICAL_STT_BASE_URL`, `BOTANICAL_STT_MODEL`, `BOTANICAL_STT_API_KEY`, `OPENAI_API_KEY`. STT presets also read `OPENROUTER_API_KEY`, `XAI_API_KEY`, or `DASHSCOPE_API_KEY` by provider name.
+`loadConfig` in `packages/server/src/config.ts` reads: `BOTANICAL_DEPLOYMENT_MODE`, `BOTANICAL_BRAND_NAME`, `BOTANICAL_PASSWORD`, `BOTANICAL_PASSWORD_HASH`, `DATABASE_URL`, `BOTANICAL_HOST`, `BOTANICAL_PORT`, `PORT`, `BOTANICAL_SESSION_TTL_SECONDS`, `BOTANICAL_COOKIE_SECURE`, `BOTANICAL_CORS_ORIGIN`, `BOTANICAL_TRUST_PROXY`, `BOTANICAL_MAX_BODY_BYTES`, `BOTANICAL_A2A_AUTORUN`, `BOTANICAL_PUBLIC_ORIGIN`, `BOTANICAL_CLI_PROFILES`, `BOTANICAL_STT_MAX_BYTES`, `BOTANICAL_STT_MAX_SECONDS`, `BOTANICAL_STT_DISABLED`, `BOTANICAL_STT_PROVIDER`, `BOTANICAL_STT_BASE_URL`, `BOTANICAL_STT_MODEL`, `BOTANICAL_STT_API_KEY`, `OPENAI_API_KEY`. STT presets also read `OPENROUTER_API_KEY`, `XAI_API_KEY`, or `DASHSCOPE_API_KEY` by provider name.
+
+Scheduler on/off, tick interval, background concurrency, and webhook body size are not env vars. They are `settings` keys `always_on.scheduler_enabled`, `always_on.scheduler_interval_ms`, `always_on.background_concurrency`, and `always_on.listener_max_bytes` (`packages/db/src/always-on-settings.ts`).
 
 Profile documents and provider keys are read via `packages/providers` (see [providers](providers.md)). It does not read `BOTANICAL_PASSCODE`; `deploy/scripts/server-entrypoint.sh` copies that into `BOTANICAL_PASSWORD` before start.
 
@@ -110,12 +139,13 @@ Profile documents and provider keys are read via `packages/providers` (see [prov
 
 `packages/server/test`. From that package: `bun test`. From the root, `bun run --cwd packages/server test`.
 
-`packages/server/test/postgres-store.test.ts` skips unless `BOTANICAL_TEST_DATABASE_URL` is set. A throwaway Postgres file is `packages/db/docker-compose.test.yml` (do not start it unless asked).
+`packages/server/test/postgres-store.test.ts` and `packages/server/test/routines.postgres.test.ts` skip unless `BOTANICAL_TEST_DATABASE_URL` is set. A throwaway Postgres file is `packages/db/docker-compose.test.yml` (do not start it unless asked). Routine, listener, and cron unit tests are `packages/server/test/routines.test.ts`, `packages/server/test/listeners.test.ts`, and `packages/server/test/cron.test.ts`.
 
 ## Where to change X
 
 - **Add an API route.** Add `router.add` in a file under `packages/server/src/routes`, export a `register*` function, and call it from `packages/server/src/app.ts`. Mirror the path on `packages/core/src/paths.ts` and `packages/core/src/client.ts` if the web client should call it.
-- **Add a tool visible to the model.** Builtin file/shell/web contributors are registered in `packages/server/src/tools/catalog.ts`. Memory, agent admin, and `send_agent_message` are registered in `packages/server/src/app.ts`.
+- **Add a tool visible to the model.** Builtin file/shell/web contributors are registered in `packages/server/src/tools/catalog.ts`. Memory, agent admin, `notify_user`, and `send_agent_message` are registered in `packages/server/src/app.ts`.
+- **Change a routine or webhook.** `packages/server/src/routes/routines.ts`, `packages/server/src/routes/listeners.ts`, `packages/server/src/routines`, `packages/server/src/listeners`, and `packages/server/src/runtime/jobs.ts`. The lease is `packages/db/src/run-lease.ts`.
 - **Change auth.** `packages/server/src/routes/auth.ts`, `packages/server/src/auth/session.ts`, `packages/server/src/auth/password.ts`.
 - **Change streaming.** `packages/server/src/routes/messages.ts` and `packages/server/src/streaming.ts`.
 - **Add an env var the API reads.** `packages/server/src/config.ts` (or the specific module above), then `.env.example` and this page.

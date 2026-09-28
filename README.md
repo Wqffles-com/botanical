@@ -22,7 +22,7 @@ What ships today:
 - **Notifications.** The UI shows a badge when background work finishes or an agent calls `notify_user`.
 - **Memory.** Shared memories visible to every agent, plus private per-agent memories. Relevant memories are added to the prompt at the start of each turn.
 - **Agents that create agents.** `agent_create` and `agent_list` tools, limited so an agent can never grant tools or roles beyond its own.
-- **Roles and permissions.** Roles bundle capabilities (file, shell, web, memory, agent admin) and an MCP server/tool allow list. They are enforced when each tool is dispatched. Built-in roles: Coder, Reviewer, Orchestrator.
+- **Roles and permissions.** Roles bundle capabilities (file, shell, web, memory, agent admin, notify) and an MCP server/tool allow list. They are enforced when each tool is dispatched. Built-in roles: Coder, Reviewer, Orchestrator.
 - **Core tools.** `file_read` / `file_write` / `file_list` / `file_delete` (confined to the agent's own directory), `shell` and `code_exec` (inside a Linux namespace jail), and `web_search` / `web_fetch` (Brave, Tavily, Serper, or SearXNG).
 - **Opt-in MCP.** Connect stdio or HTTP MCP servers from a JSON config. The default config has no servers.
 - **Web UI.** Next.js App Router + shadcn/ui: agents, chats with streamed replies and tool-call cards, agent inbox, routines, listeners, notifications, and settings (profiles, tools, MCP, memory, roles, deployment).
@@ -40,7 +40,7 @@ On the roadmap (**not implemented yet**; see [docs/ROADMAP.md](./docs/ROADMAP.md
 
 ```
 Browser (web UI) ──passcode──▶ Next.js web ──/api──▶ Bun API server ──▶ model providers
-                                                     │  agents · tools · MCP · A2A · memory · roles
+                                                     │  agents · tools · MCP · A2A · routines · listeners · memory · roles
                                                      └──▶ Postgres
 ```
 

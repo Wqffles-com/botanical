@@ -26,6 +26,8 @@ There is no `middleware.ts`. `packages/web/src/proxy.ts` is the auth gate: publi
 | `/chats/new` | `packages/web/src/app/(app)/chats/new/page.tsx` |
 | `/chats/[id]` | `packages/web/src/app/(app)/chats/[id]/page.tsx` |
 | `/inbox` | `packages/web/src/app/(app)/inbox/page.tsx` |
+| `/routines` | `packages/web/src/app/(app)/routines/page.tsx` |
+| `/listeners` | `packages/web/src/app/(app)/listeners/page.tsx` |
 | `/settings` | `packages/web/src/app/(app)/settings/page.tsx` |
 
 Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packages/web/src/app/(app)/layout.tsx` (`AppShell`).
@@ -40,7 +42,11 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/components/agents` | Agent list and editor |
 | `packages/web/src/components/chat` | Thread, composer, dictation, tool-call cards |
 | `packages/web/src/components/inbox/inbox-view.tsx` | Agent inbox |
+| `packages/web/src/components/routines` | Routine list and editor (`packages/web/src/lib/schedule.ts` humanizes cron) |
+| `packages/web/src/components/listeners` | Listener list and editor |
+| `packages/web/src/components/notifications/notification-bell.tsx` | Unread badge in `packages/web/src/components/app-shell.tsx` |
 | `packages/web/src/components/settings/settings-view.tsx` | Settings tabs |
+| `packages/web/src/components/settings/background-work-card.tsx` | Always-on scheduler and webhook limits on the general tab |
 | `packages/web/src/hooks/use-chat-thread.ts` | Thread loading and stream |
 | `packages/web/src/lib/mvp-api.ts` | Profiles, tools, MCP, settings fetches outside `API` |
 | `packages/web/src/lib/cli-api.ts` | `/api/cli` install and login |
@@ -48,7 +54,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/lib/chat-stream.ts` | Browser SSE parse |
 | `packages/web/src/lib/server-api.ts` | RSC client (forwards cookies) |
 
-Settings is one page. Tabs in `packages/web/src/components/settings/settings-view.tsx` (`?tab=`): `general` (deployment, provider key flags, tool list, MCP snapshot), `profiles`, `memory`, `roles`, `cli`. Panels: `packages/web/src/components/settings/profiles-panel.tsx`, `memory-panel.tsx`, `roles-panel.tsx`, `cli-panel.tsx`, `deployment-badge.tsx`.
+Settings is one page. Tabs in `packages/web/src/components/settings/settings-view.tsx` (`?tab=`): `general` (deployment, background work, provider key flags, tool list, MCP snapshot), `profiles`, `memory`, `roles`, `cli`. Panels: `packages/web/src/components/settings/profiles-panel.tsx`, `memory-panel.tsx`, `roles-panel.tsx`, `cli-panel.tsx`, `deployment-badge.tsx`, `background-work-card.tsx`. Sidebar links for routines and listeners are in `packages/web/src/components/app-sidebar.tsx`.
 
 ## Env vars
 

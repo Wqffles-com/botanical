@@ -16,6 +16,7 @@ Shared API types, response normalizers, and the HTTP client the web app uses. No
 | `packages/core/src/paths.ts` | `API` path builders |
 | `packages/core/src/types.ts` | Wire types (`Agent`, `Chat`, `Health`, `RoleRecord`, …) |
 | `packages/core/src/normalize.ts` | Server JSON → those types |
+| `packages/core/src/always.ts` | Normalizers for routines, listeners, notifications, and always-on settings |
 | `packages/core/src/sse.ts` | `readChatStream`, `parseSseFrame` |
 | `packages/core/src/errors.ts` | `BotanicalApiError`, `requireProfileId` |
 | `packages/core/src/agents.ts` | Color and icon checks, `EXAMPLE_AGENTS` |
@@ -32,7 +33,7 @@ The browser singleton is `packages/web/src/lib/api.ts`. Server components use `p
 
 `BotanicalClient`, `API`, `readChatStream`, `normalizeAgent`, `normalizeChat`, `normalizeMessage`, `normalizeMemory`, `normalizeRoleRecord`, `EXAMPLE_AGENTS`, `CLIENT_CONTRACT_VERSION`. Deployment entry: `loadDeploymentConfig`, `readDeploymentMode`, `verifySingleTenantPasscode`, `createBillingHooks`.
 
-`API` in `packages/core/src/paths.ts` covers health, auth, profiles, tools, agents, roles, memories, chats, messages, and agent-messages. It does not list CLI, MCP, capabilities, or transcription paths (those are called from `packages/web/src/lib/mvp-api.ts` and `packages/web/src/lib/cli-api.ts`).
+`API` in `packages/core/src/paths.ts` covers health, auth, profiles, tools, agents, roles, memories, chats, messages, agent-messages, routines, listeners, notifications, and `/api/settings/always-on`. It does not list CLI, MCP, capabilities, transcription, or `POST /api/hooks/:listenerId` (the public webhook is not called by `BotanicalClient`). CLI and MCP fetches live in `packages/web/src/lib/mvp-api.ts` and `packages/web/src/lib/cli-api.ts`.
 
 ## Env vars
 

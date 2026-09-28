@@ -39,7 +39,7 @@ The server enters the loop from `packages/server/src/runtime/turn.ts`.
 
 ## Exports
 
-`runAgentTurn`, `prepareTurn`, `dispatchToolCall`, `buildSystemPrompt`, `createToolRegistry`, `contributorFromBuiltins`, `createAgentMessageBus`, `DeliveryWorker`, `effectivePermissions`, `toolAccess`, `CAPABILITIES`, `BUILTIN_ROLES`, `createMemoryStore`, `claimInbox`, `renderInbox`. Capability ids in `packages/agent-runtime/src/permissions.ts`: `file.read`, `file.write`, `shell`, `code_exec`, `web`, `memory.read`, `memory.write`, `agent.create`, `agent.message`.
+`runAgentTurn`, `prepareTurn`, `dispatchToolCall`, `buildSystemPrompt`, `createToolRegistry`, `contributorFromBuiltins`, `createAgentMessageBus`, `DeliveryWorker`, `effectivePermissions`, `toolAccess`, `CAPABILITIES`, `BUILTIN_ROLES`, `createMemoryStore`, `claimInbox`, `renderInbox`. Capability ids in `packages/agent-runtime/src/permissions.ts`: `file.read`, `file.write`, `shell`, `code_exec`, `web`, `memory.read`, `memory.write`, `agent.create`, `agent.message`, `notify`. `notify_user` maps to `notify`. The tool itself is `packages/server/src/tools/notify.ts`.
 
 ## Env vars
 
