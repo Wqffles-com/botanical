@@ -199,7 +199,7 @@ export function RoutinesView() {
       <PageHeader
         title="Routines"
         description="Scheduled runs. Each run opens a new chat so the history stays bounded to that slot."
-        actions={<Button onClick={openCreate}>New routine</Button>}
+        actions={!loading && routines.length > 0 ? <Button onClick={openCreate}>New routine</Button> : undefined}
       />
       {error ? (
         <p role="alert" className="mt-6 text-sm text-destructive">

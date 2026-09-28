@@ -3,7 +3,8 @@
 import { ConfirmDialog } from "@botanical/ui/components/alert-dialog";
 import { pageContainerVariants } from "@botanical/ui/components/page-container";
 import type { Agent, RoleRecord } from "@botanical/core";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
+import { ImageUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -59,6 +60,7 @@ export function AgentForm({
   const [draft, setDraft] = useState<AgentDraft>(agent ? draftFromIdentity(agent) : EMPTY_AGENT_DRAFT);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const pictureInput = useRef<HTMLInputElement>(null);
   if (seenKey !== agentKey) {
     setSeenKey(agentKey);
     setDraft(agent ? draftFromIdentity(agent) : EMPTY_AGENT_DRAFT);
@@ -149,49 +151,40 @@ export function AgentForm({
             ) : null}
           </div>
         </div>
-        <div className="flex gap-2">
-          {agent ? (
-            <Button type="button" variant="destructive" onClick={() => setConfirmDelete(true)} disabled={saving}>
-              Delete
-            </Button>
-          ) : null}
-          <Button type="submit" disabled={saving || !draft.name.trim() || !draft.prompt.trim()}>
-            {saving ? "Saving…" : agent ? "Save" : "Create agent"}
-          </Button>
-        </div>
       </div>
 
       <div className="mt-8 grid gap-6">
         <div className="grid gap-2">
-          <Label htmlFor="agent-name">Name</Label>
+          <div className="flex items-baseline justify-between">
+            <Label htmlFor="agent-name">Name</Label>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {draft.name.trim().length}/{AGENT_NAME_MAX}
+            </span>
+          </div>
           <Input
             id="agent-name"
             value={draft.name}
             maxLength={AGENT_NAME_MAX}
-            placeholder="Gardener"
+            placeholder="Name your agent"
             onChange={(event) => patch({ name: event.target.value })}
             required
           />
-          <p className="text-xs text-muted-foreground">
-            {draft.name.trim().length}/{AGENT_NAME_MAX}
-          </p>
         </div>
 
         <div className="grid gap-2">
           <div className="flex items-baseline justify-between">
             <Label htmlFor="agent-title">Title</Label>
-            <span className="text-xs text-muted-foreground">Short role label</span>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              Short role label · {draft.title.trim().length}/{AGENT_TITLE_MAX}
+            </span>
           </div>
           <Input
             id="agent-title"
             value={draft.title}
             maxLength={AGENT_TITLE_MAX}
-            placeholder="Research assistant"
+            placeholder="What it does, in a few words"
             onChange={(event) => patch({ title: event.target.value })}
           />
-          <p className="text-xs text-muted-foreground">
-            {draft.title.trim().length}/{AGENT_TITLE_MAX}
-          </p>
         </div>
 
         <div className="grid gap-2">
@@ -208,8 +201,8 @@ export function AgentForm({
           />
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2">
-          <div className="grid gap-2">
+        <div className="grid gap-6 sm:grid-cols-2 sm:gap-4">
+          <div className="grid content-start gap-2">
             <Label>Icon</Label>
             <AgentIconPicker
               value={draft.icon}
@@ -217,9 +210,12 @@ export function AgentForm({
               onChange={(icon: AgentIconName) => patch({ icon })}
             />
           </div>
-          <div className="grid gap-2">
+          <div className="grid content-start gap-2">
             <Label>Color</Label>
-            <AgentColorPicker value={draft.color} onChange={(color) => patch({ color })} />
+            {/* Match the icon picker's 40px row so both columns line up. */}
+            <div className="flex min-h-10 items-center">
+              <AgentColorPicker value={draft.color} onChange={(color) => patch({ color })} />
+            </div>
           </div>
         </div>
 
@@ -238,11 +234,26 @@ export function AgentForm({
           <p className="text-xs text-muted-foreground">
             Shown instead of the shape. PNG, JPEG, or WebP. Clear it to go back to the shape.
           </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <Input
+          <div className="flex flex-wrap items-center gap-3">
+            <AgentAvatar
+              name={draft.name || "New agent"}
+              icon={draft.icon}
+              color={draft.color}
+              shape={draft.shape}
+              picture={draft.picture}
+              size="md"
+            />
+            <Button type="button" variant="outline" disabled={saving} onClick={() => pictureInput.current?.click()}>
+              <ImageUp />
+              {draft.picture ? "Replace picture" : "Upload picture"}
+            </Button>
+            <input
+              ref={pictureInput}
               id="agent-picture"
               type="file"
               accept="image/png,image/jpeg,image/webp"
+              className="sr-only"
+              tabIndex={-1}
               disabled={saving}
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -345,6 +356,23 @@ export function AgentForm({
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="sticky bottom-0 z-10 -mx-4 mt-8 flex items-center justify-end gap-2 border-t bg-background px-4 py-3 sm:-mx-6 sm:px-6">
+        {agent ? (
+          <Button
+            type="button"
+            variant="destructive"
+            className="mr-auto"
+            onClick={() => setConfirmDelete(true)}
+            disabled={saving}
+          >
+            Delete
+          </Button>
+        ) : null}
+        <Button type="submit" disabled={saving || !draft.name.trim() || !draft.prompt.trim()}>
+          {saving ? "Saving…" : agent ? "Save" : "Create agent"}
+        </Button>
       </div>
 
       <ConfirmDialog

@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { Bot, LayoutGrid, List, Plus, SearchX } from "lucide-react";
 import { AgentAvatar } from "@/components/agent-avatar";
 import { RoleBadges } from "@/components/role-badges";
+import { SearchInput } from "@/components/search-input";
 import { Button } from "@botanical/ui/components/button";
 import {
   Command,
@@ -142,9 +143,13 @@ export function AgentPicker({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-wrap items-center gap-2">
-        <Command shouldFilter={false} className="min-w-0 flex-1 overflow-visible bg-transparent p-0">
-          <CommandInput value={search} onValueChange={setSearch} placeholder="Search agents…" />
-        </Command>
+        <SearchInput
+          className="min-w-0 flex-1"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search agents…"
+          aria-label="Search agents"
+        />
         <div className="flex items-center gap-1">
           <Button
             type="button"

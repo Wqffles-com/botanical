@@ -40,7 +40,8 @@ export function AppBreadcrumbs() {
           const last = index === crumbs.length - 1;
           return (
             <Fragment key={`${crumb.label}-${index}`}>
-              {index > 0 ? <BreadcrumbSeparator className={last ? undefined : "hidden sm:block"} /> : null}
+              {/* Every item before the last is hidden below sm, so every separator is too. */}
+              {index > 0 ? <BreadcrumbSeparator className="hidden sm:block" /> : null}
               <BreadcrumbItem className={last ? "min-w-0" : "hidden sm:inline-flex"}>
                 {last || !crumb.href ? (
                   <BreadcrumbPage>{crumb.label}</BreadcrumbPage>

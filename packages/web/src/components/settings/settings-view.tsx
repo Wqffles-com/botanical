@@ -12,6 +12,7 @@ import { Badge } from "@botanical/ui/components/badge";
 import { StatusBadge } from "@botanical/ui/components/status-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
 import { Skeleton } from "@botanical/ui/components/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@botanical/ui/components/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@botanical/ui/components/tabs";
 import { api } from "@/lib/api";
 import { providerLabel } from "@/lib/format-extra";
@@ -86,6 +87,8 @@ export function SettingsView() {
     };
   }, [router]);
 
+  const visibleTabs = SETTINGS_TABS.filter((item) => admin || item.value !== "admin");
+
   const providers = useMemo(
     () => deriveProviderKeys(profiles, settings?.providers ?? []),
     [profiles, settings],
@@ -114,11 +117,28 @@ export function SettingsView() {
       ) : null}
 
       <Tabs value={tab} onValueChange={selectTab} className="mt-8">
+        {/* Six tabs do not fit a phone, so pick the section from a select below sm. */}
+        <Select
+          items={visibleTabs}
+          value={tab}
+          onValueChange={(value) => value && selectTab(value)}
+        >
+          <SelectTrigger className="w-full sm:hidden" aria-label="Settings section">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {visibleTabs.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <TabsList
           variant="line"
-          className="scrollbar-thin w-full justify-start gap-4 overflow-x-auto overflow-y-hidden border-b px-0 group-data-horizontal/tabs:h-10"
+          className="scrollbar-thin hidden w-full justify-start gap-4 overflow-x-auto overflow-y-hidden border-b px-0 group-data-horizontal/tabs:h-10 sm:flex"
         >
-          {SETTINGS_TABS.filter((item) => admin || item.value !== "admin").map((item) => (
+          {visibleTabs.map((item) => (
             <TabsTrigger key={item.value} value={item.value} className="flex-none px-0.5">
               {item.label}
             </TabsTrigger>

@@ -16,7 +16,7 @@ export function AppShell({ actions, children }: { actions?: ReactNode; children:
         <SidebarInset className="h-svh min-h-0 overflow-hidden">
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
             <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
+            <Separator orientation="vertical" className="mr-1 data-vertical:h-4 data-vertical:self-center" />
             <div className="min-w-0 flex-1">
               <Suspense fallback={null}>
                 <AppBreadcrumbs />

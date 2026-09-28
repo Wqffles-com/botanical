@@ -2,7 +2,7 @@ import type * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
 
-const pageContainerVariants = cva("mx-auto w-full px-4 py-8 sm:px-6 lg:py-10", {
+const pageContainerVariants = cva("w-full px-4 py-8 sm:px-6 lg:py-10", {
   variants: {
     size: {
       default: "max-w-5xl",
@@ -15,7 +15,7 @@ const pageContainerVariants = cva("mx-auto w-full px-4 py-8 sm:px-6 lg:py-10", {
   },
 })
 
-/** Standard page width and gutters. `narrow` suits forms, `wide` suits grids. */
+/** Standard page width and gutters. `narrow` suits forms, `wide` suits grids. Every size shares the same left edge so content does not jump between pages. */
 function PageContainer({
   className,
   size,
