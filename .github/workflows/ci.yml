@@ -106,7 +106,7 @@ jobs:
           exit 1
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ needs.package.outputs.name }}
+          name: ${{ steps.meta.outputs.name }}
           path: dist/${{ steps.meta.outputs.name }}.zip
           if-no-files-found: error
           retention-days: 30
