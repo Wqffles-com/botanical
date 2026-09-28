@@ -8,6 +8,7 @@ export {
   claudeRegistryUrl,
   clearCliAvailabilityCache,
   CliInstaller,
+  cliCacheFrom,
   cliHomeFrom,
   cliRootFrom,
   CLAUDE_TOKEN_PROMPT,

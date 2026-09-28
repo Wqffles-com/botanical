@@ -32,6 +32,7 @@ export type { CliAvailabilityProbe } from "./availability.ts";
 export {
   childEnv,
   CliInstaller,
+  cliCacheFrom,
   cliHomeFrom,
   cliRootFrom,
   DEFAULT_CLI_HOME,

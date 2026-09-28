@@ -14,6 +14,11 @@
 # BOTANICAL_CLI_AUTO_INSTALL=0 skips install at process start. Install still
 # works from the settings page.
 #
+# Downloaded binaries are also kept in the botanical-cli-cache volume. Its name
+# is fixed, so every Compose project on this Docker host shares it, and a fresh
+# cli_bin volume installs from it without downloading again. `down -v` removes
+# it only when no other project still uses it.
+#
 # Linux-only alternative, not required: bind-mount a host binary and a host
 # config directory instead of the named volumes.
 #
@@ -29,6 +34,7 @@ services:
       HOME: /home/botanical
       BOTANICAL_CLI_HOME: /home/botanical
       BOTANICAL_CLI_BIN: /opt/botanical-cli
+      BOTANICAL_CLI_CACHE: /var/cache/botanical-cli
       BOTANICAL_CLI_PROFILES: ${BOTANICAL_CLI_PROFILES:-grok-build}
       BOTANICAL_CLI_AUTO_INSTALL: ${BOTANICAL_CLI_AUTO_INSTALL:-1}
       BOTANICAL_GROK_VERSION: ${BOTANICAL_GROK_VERSION:-}
@@ -39,7 +45,10 @@ services:
     volumes:
       - cli_bin:/opt/botanical-cli
       - cli_home:/home/botanical
+      - cli_cache:/var/cache/botanical-cli
 
 volumes:
   cli_bin:
   cli_home:
+  cli_cache:
+    name: botanical-cli-cache

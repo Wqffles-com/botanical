@@ -10,6 +10,7 @@ import {
   claudeHasLogin,
   grokHasLogin,
   CliInstaller,
+  cliCacheFrom,
   cliHomeFrom,
   cliRootFrom,
   fileHasCredential,
@@ -79,7 +80,7 @@ export function createCliService(options: CliServiceOptions): CliService {
   const root = options.rootDir ?? cliRootFrom(env);
   const home = options.homeDir ?? cliHomeFrom(env);
   const io = options.io ?? createNodeInstallIo(env);
-  const installer = new CliInstaller(io, { root, home });
+  const installer = new CliInstaller(io, { root, home, cache: cliCacheFrom(env) });
   const logins = new Map<string, LoginManager>();
 
   function userHome(userId: string): string {

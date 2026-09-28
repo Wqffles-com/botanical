@@ -39,7 +39,7 @@ Provider type ids: `openai`, `anthropic`, `xai`, `deepseek`, `openrouter`, `open
 |------|--------|
 | `packages/providers/src/env.ts` | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY` |
 | `packages/providers/src/catalog.ts` | `BOTANICAL_PROFILES`, `BOTANICAL_PROFILES_FILE`, `OPENAI_COMPAT_BASE_URL`, `OPENAI_COMPAT_API_KEY`, `OPENAI_COMPAT_MODEL`, `CUSTOM_OPENAI_BASE_URL`, `CUSTOM_OPENAI_API_KEY` |
-| `packages/providers/src/cli/install.ts` | `BOTANICAL_CLI_BIN`, `BOTANICAL_CLI_HOME`, `HOME`, `BOTANICAL_GROK_VERSION`, `BOTANICAL_CLAUDE_VERSION`, `BOTANICAL_CODEX_VERSION` |
+| `packages/providers/src/cli/install.ts` | `BOTANICAL_CLI_BIN`, `BOTANICAL_CLI_HOME`, `BOTANICAL_CLI_CACHE`, `HOME`, `BOTANICAL_GROK_VERSION`, `BOTANICAL_CLAUDE_VERSION`, `BOTANICAL_CODEX_VERSION` |
 | `packages/providers/src/cli/availability.ts` | `BOTANICAL_CLI_BIN`, `BOTANICAL_CLI_HOME`, `HOME`, `XAI_API_KEY`, `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, `OPENAI_API_KEY` |
 | `packages/providers/src/cli/launch.ts` | `BOTANICAL_MCP_TOKEN` (set on the child, not operator config) |
 | `packages/providers/src/cli/child-env.ts` | Pass-through allowlist includes `CODEX_API_KEY` for `codex`; strips secrets such as `DATABASE_URL` and `BOTANICAL_PASSWORD` |

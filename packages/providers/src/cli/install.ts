@@ -26,6 +26,8 @@ import { CLI_NAMES, type CliName } from "./types.ts";
 
 export const CLI_ROOT_ENV = "BOTANICAL_CLI_BIN";
 export const CLI_HOME_ENV = "BOTANICAL_CLI_HOME";
+/** Optional download cache that outlives the bin volume, keyed by CLI, version, arch and libc. */
+export const CLI_CACHE_ENV = "BOTANICAL_CLI_CACHE";
 export const DEFAULT_CLI_ROOT = "/opt/botanical-cli";
 export const DEFAULT_CLI_HOME = "/home/botanical";
 
@@ -93,6 +95,19 @@ export interface InstallIo {
   now(): Date;
 }
 
+interface CacheKey {
+  cli: CliName;
+  version: string;
+  arch: MachineArch;
+  libc: Libc;
+}
+
+interface PlacedBinary {
+  sourceUrl: string;
+  sha512: string | null;
+  cached: boolean;
+}
+
 interface ResolvedArtifact {
   version: string;
   sourceUrl: string;
@@ -107,6 +122,10 @@ export function cliRootFrom(env: Record<string, string | undefined>): string {
 
 export function cliHomeFrom(env: Record<string, string | undefined>): string {
   return env[CLI_HOME_ENV]?.trim() || env.HOME?.trim() || DEFAULT_CLI_HOME;
+}
+
+export function cliCacheFrom(env: Record<string, string | undefined>): string | null {
+  return env[CLI_CACHE_ENV]?.trim() || null;
 }
 
 export function readVersionPin(cli: CliName, env: Record<string, string | undefined>): string | null {
@@ -127,7 +146,7 @@ export class CliInstaller {
 
   constructor(
     private readonly io: InstallIo,
-    private readonly paths: { root: string; home: string },
+    private readonly paths: { root: string; home: string; cache?: string | null },
   ) {}
 
   install(cli: CliName, options?: { update?: boolean }): Promise<InstallResult> {
@@ -201,10 +220,16 @@ export class CliInstaller {
       }
       await this.io.mkdir(`${this.paths.root}/bin`);
       await this.io.mkdir(scratch);
-      const placed = await this.fetchArtifact(cli, resolved, scratch, arch, pin);
       const staged = `${scratch}/bin`;
-      await this.placeBinary(placed.payload, staged);
-      await this.probe(cli, staged);
+      const cacheKey = { cli, version: resolved.version, arch, libc };
+      let placed = await this.fromCache(cacheKey, staged);
+      if (!placed) {
+        const fetched = await this.fetchArtifact(cli, resolved, scratch, arch, pin);
+        await this.placeBinary(fetched.payload, staged);
+        await this.probe(cli, staged);
+        placed = { sourceUrl: fetched.sourceUrl, sha512: fetched.sha512, cached: false };
+        await this.toCache(cacheKey, staged, placed);
+      }
       await this.io.mkdir(`${this.paths.root}/bin`);
       await this.io.rename(staged, this.binPath(cli));
       const record: CliManifest = {
@@ -220,7 +245,7 @@ export class CliInstaller {
       await this.writeManifest(record);
       if (cli === "claude" && libc === "musl") await this.ensureClaudeRipgrep();
       this.errors.delete(cli);
-      this.logs.set(cli, `installed ${cli} ${resolved.version} (${arch}, ${libc})`);
+      this.logs.set(cli, `installed ${cli} ${resolved.version} (${arch}, ${libc})${placed.cached ? " from cache" : ""}`);
       clearCliAvailabilityCache();
       return { cli, ok: true, skipped: false, version: resolved.version, error: null };
     } catch (error) {
@@ -403,6 +428,49 @@ export class CliInstaller {
     if (result.code !== 0) {
       const tail = redactSecrets(`${result.stderr}\n${result.stdout}`).trim().slice(-300);
       throw new Error(tail ? `${cli} --version failed: ${tail}` : `${cli} --version failed`);
+    }
+  }
+
+  private cacheEntry(key: CacheKey): string | null {
+    if (!this.paths.cache) return null;
+    return `${this.paths.cache}/${key.cli}/${key.version}-${key.arch}-${key.libc}`;
+  }
+
+  /** Stages a cached binary that still passes the version probe. A bad entry is dropped. */
+  private async fromCache(key: CacheKey, staged: string): Promise<PlacedBinary | null> {
+    const entry = this.cacheEntry(key);
+    if (!entry || !this.io.exists(`${entry}/bin`)) return null;
+    try {
+      const meta = await this.io.read(`${entry}/meta.json`);
+      if (!meta) return null;
+      const parsed = JSON.parse(new TextDecoder().decode(meta)) as { sourceUrl?: unknown; sha512?: unknown };
+      if (typeof parsed.sourceUrl !== "string") return null;
+      await this.placeBinary(`${entry}/bin`, staged);
+      await this.probe(key.cli, staged);
+      return {
+        sourceUrl: parsed.sourceUrl,
+        sha512: typeof parsed.sha512 === "string" ? parsed.sha512 : null,
+        cached: true,
+      };
+    } catch {
+      await this.io.remove(entry);
+      await this.io.remove(staged);
+      return null;
+    }
+  }
+
+  /** Best effort: a full or read-only cache never fails the install. */
+  private async toCache(key: CacheKey, staged: string, placed: PlacedBinary): Promise<void> {
+    const entry = this.cacheEntry(key);
+    if (!entry) return;
+    try {
+      await this.io.mkdir(entry);
+      await this.placeBinary(staged, `${entry}/bin.tmp`);
+      await this.io.rename(`${entry}/bin.tmp`, `${entry}/bin`);
+      const meta = { sourceUrl: placed.sourceUrl, sha512: placed.sha512 };
+      await this.io.write(`${entry}/meta.json`, new TextEncoder().encode(`${JSON.stringify(meta)}\n`), 0o644);
+    } catch {
+      await this.io.remove(entry);
     }
   }
 

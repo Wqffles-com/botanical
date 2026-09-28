@@ -5,11 +5,20 @@
 
 ARG BUN_IMAGE=oven/bun:1.4.2-alpine
 
+# Only package.json files, so a source edit leaves the install layer cached.
+FROM ${BUN_IMAGE} AS manifests
+WORKDIR /app
+COPY packages ./packages
+RUN find packages -mindepth 2 -maxdepth 2 ! -name package.json -exec rm -rf {} +
+
 FROM ${BUN_IMAGE} AS install
 WORKDIR /app
 COPY package.json bun.lock tsconfig.base.json ./
+COPY --from=manifests /app/packages ./packages
+# The cache mount keeps downloaded packages across builds and Compose projects.
+RUN --mount=type=cache,id=botanical-bun,target=/var/cache/bun \
+    BUN_INSTALL_CACHE_DIR=/var/cache/bun bun install --frozen-lockfile --production --backend=copyfile
 COPY packages ./packages
-RUN bun install --frozen-lockfile --production
 
 FROM ${BUN_IMAGE} AS runtime
 WORKDIR /app
