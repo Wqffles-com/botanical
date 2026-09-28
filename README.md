@@ -64,18 +64,33 @@ More detail: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 
 Botanical is meant to run always-on on a **server or VPS**. Running it on a laptop works for development, but agents stop when the machine sleeps.
 
-### Option A: Docker Compose on a server (recommended)
+### Option A: One-command Docker Compose (recommended)
 
 Requires Docker with Compose v2.24+.
+
+Linux / macOS:
 
 ```sh
 git clone https://github.com/Wqffles-com/botanical.git
 cd botanical
-cp .env.example .env
-# Edit .env: set BOTANICAL_ENCRYPTION_KEY, POSTGRES_PASSWORD
-# (and the same password inside DATABASE_URL), plus at least one provider key.
-docker compose up --build -d
+./start.sh
 ```
+
+Windows (PowerShell 5.1+ or pwsh):
+
+```powershell
+git clone https://github.com/Wqffles-com/botanical.git
+cd botanical
+.\start.ps1
+```
+
+If execution policy blocks the script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start.ps1
+```
+
+The launcher copies `.env.example` to `.env` when needed, generates `BOTANICAL_ENCRYPTION_KEY`, `BOTANICAL_SESSION_SECRET`, and `POSTGRES_PASSWORD` (and keeps `DATABASE_URL` in sync), then asks for the web port (default 3000), whether to include coding CLIs via `docker-compose.cli.yml` (default yes), and an optional provider API key (skip and add it later in Settings). Re-running keeps every value already set in `.env`. Non-interactive: `./start.sh --yes` or `.\start.ps1 -Yes`.
 
 This starts Postgres, the API, and the web app. The server applies database migrations before it starts listening. Default host ports:
 
