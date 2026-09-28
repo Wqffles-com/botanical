@@ -18,7 +18,7 @@ HTTP API: account auth, agents, chats, streaming turns, agent-to-agent mail, rou
 | `packages/server/src/http.ts` | JSON helpers, body limit, CORS finish |
 | `packages/server/src/config.ts` | `loadConfig` |
 | `packages/server/src/auth` | Session cookie, login rate limit. Actor scope is `packages/db/src/actor.ts` |
-| `packages/server/src/secrets/keys.ts` | Resolves a provider key from the user, then the global row |
+| `packages/server/src/provider-keys.ts` | Resolves a provider key from the user, then the global row |
 | `packages/server/src/db/memory-accounts.ts` | In-memory accounts, secrets, and settings |
 | `packages/server/src/db` | In-memory store and Postgres adapter. Routines, listeners, and notifications: `packages/server/src/db/always-on.ts` |
 | `packages/server/src/runtime` | Turn runner, profile resolver, workspace path, store adapter. Background turns: `packages/server/src/runtime/jobs.ts`, `packages/server/src/runtime/turns.ts` |

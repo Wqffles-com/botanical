@@ -24,7 +24,7 @@ import { join } from "node:path";
 import type { CliToolHost } from "../cli-mcp.ts";
 import type { ServerConfig } from "../config.ts";
 import type { ProviderFetch } from "../provider-host.ts";
-import { providerKeyEnv } from "../secrets/keys.ts";
+import { providerKeyEnv } from "../provider-keys.ts";
 import type { ModelProfile, Store } from "../types.ts";
 
 const MOCK_TOOL = "file_list";
