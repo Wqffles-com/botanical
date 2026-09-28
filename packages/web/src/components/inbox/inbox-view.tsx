@@ -13,7 +13,7 @@ import { useWorkspace } from "@/components/workspace-provider";
 import { Badge } from "@botanical/ui/components/badge";
 import { StatusBadge, type StatusTone } from "@botanical/ui/components/status-badge";
 import { Button } from "@botanical/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
 import { Label } from "@botanical/ui/components/label";
 import { ScrollArea } from "@botanical/ui/components/scroll-area";
 import {
@@ -120,24 +120,6 @@ export function InboxView() {
       <PageHeader
         title="Inbox"
         description="Async agent-to-agent notes. They never merge into the user thread."
-        actions={
-          <div className="w-56">
-            <Label className="text-xs text-muted-foreground">Filter by agent</Label>
-            <Select items={[{ value: "all", label: "All agents" }, ...agents.map((agent) => ({ value: agent.id, label: agent.name }))]} value={filter} onValueChange={(value) => void onFilter(value)}>
-              <SelectTrigger className="mt-1 w-full" aria-label="Filter by agent">
-                <SelectValue placeholder="All agents" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All agents</SelectItem>
-                {agents.map((agent) => (
-                  <SelectItem key={agent.id} value={agent.id}>
-                    {agent.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        }
       />
 
       {error ? (
@@ -154,6 +136,21 @@ export function InboxView() {
               Messages
               <Badge variant="secondary">{visible.length}</Badge>
             </CardTitle>
+            <CardAction>
+              <Select items={[{ value: "all", label: "All agents" }, ...agents.map((agent) => ({ value: agent.id, label: agent.name }))]} value={filter} onValueChange={(value) => void onFilter(value)}>
+                <SelectTrigger size="sm" className="w-40" aria-label="Filter by agent">
+                  <SelectValue placeholder="All agents" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All agents</SelectItem>
+                  {agents.map((agent) => (
+                    <SelectItem key={agent.id} value={agent.id}>
+                      {agent.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardAction>
           </CardHeader>
           <CardContent>
             {loading || !ready ? (

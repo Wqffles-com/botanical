@@ -27,7 +27,7 @@ Blocks built on them:
 
 | Component | Use |
 |-----------|-----|
-| `packages/ui/src/components/page-container.tsx` | `PageContainer` / `pageContainerVariants`: page width and gutters. `default` (`max-w-5xl`), `narrow` (`max-w-2xl`, forms), `wide` (`max-w-7xl`, grids) |
+| `packages/ui/src/components/page-container.tsx` | `PageContainer` / `pageContainerVariants`: page width and gutters. `default` (`max-w-5xl`), `narrow` (`max-w-2xl`, forms), `wide` (`max-w-7xl`, grids). All sizes are left-aligned so the content edge stays put between pages |
 | `packages/ui/src/components/page-header.tsx` | Page title, one-line description, actions |
 | `packages/ui/src/components/empty-state.tsx` | Icon tile, title, sentence, optional action; `bordered` for a dashed frame |
 | `packages/ui/src/components/status-badge.tsx` | Badge with a dot. `tone` picks the color: `neutral`, `success`, `warning`, `danger`, `info`, `progress` (pulsing) |

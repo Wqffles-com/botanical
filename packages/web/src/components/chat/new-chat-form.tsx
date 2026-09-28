@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AgentAvatar } from "@/components/agent-avatar";
 import { ProfileSelect } from "@/components/chat/profile-select";
+import { SearchInput } from "@/components/search-input";
 import { Button } from "@botanical/ui/components/button";
 import { Input } from "@botanical/ui/components/input";
 import { Label } from "@botanical/ui/components/label";
@@ -34,6 +35,14 @@ export function NewChatForm({
   const [profileId, setProfileId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const ready = canStartChat(agentId, profileId);
+  const missing =
+    !agentId && !profileId
+      ? "Choose an agent and a model profile."
+      : !agentId
+        ? "Choose an agent."
+        : !profileId
+          ? "Choose a model profile."
+          : null;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -61,10 +70,11 @@ export function NewChatForm({
           </p>
         ) : (
           <>
-            <Input
+            <SearchInput
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Filter agents"
+              aria-label="Filter agents"
             />
             <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Agent">
               {filtered.map((agent) => {
@@ -111,16 +121,17 @@ export function NewChatForm({
 
       <section className="space-y-2">
         <Label htmlFor="new-chat-profile">Model profile</Label>
-        <ProfileSelect
-          id="new-chat-profile"
-          profiles={profiles}
-          value={profileId}
-          onChange={setProfileId}
-          needed={!profileId}
-        />
         {profiles.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Add a model profile on the server, then refresh.</p>
-        ) : null}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
+            <p className="text-sm text-muted-foreground">No model profiles yet.</p>
+            <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/settings?tab=profiles" />}>
+              Create one
+            </Button>
+          </div>
+        ) : (
+          // No `needed` here: nothing is wrong until the user tries to start, and the button hint says what is missing.
+          <ProfileSelect id="new-chat-profile" profiles={profiles} value={profileId} onChange={setProfileId} />
+        )}
       </section>
 
       <section className="space-y-2">
@@ -150,10 +161,7 @@ export function NewChatForm({
         >
           {pending ? "Starting…" : "Start chat"}
         </Button>
-        <ul className="text-xs text-muted-foreground">
-          <li className={agentId ? "text-foreground" : undefined}>Choose one agent for this chat.</li>
-          <li className={profileId ? "text-foreground" : undefined}>Choose a model profile for this chat.</li>
-        </ul>
+        {missing ? <p className="text-xs text-muted-foreground">{missing}</p> : null}
       </div>
     </div>
   );

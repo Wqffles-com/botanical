@@ -45,6 +45,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/components/workspace-provider.tsx` | Agents, chats, profiles in client state |
 | `packages/web/src/components/agents` | Agent list and editor (name, title, description, icon, shape, color, picture) |
 | `packages/web/src/components/agent-avatar.tsx` | Shape or custom picture for a bot mark |
+| `packages/web/src/components/search-input.tsx` | Outline search field shared by the agents list and new-chat agent filter |
 | `packages/web/src/lib/accent.ts` | Accent names, swatches, and local cache |
 | `packages/web/src/lib/agent-picture.ts` | Browser resize of an uploaded avatar |
 | `packages/web/src/components/chat` | Thread, composer, dictation, tool-call cards |
@@ -52,7 +53,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/components/routines` | Routine list and editor (`packages/web/src/lib/schedule.ts` humanizes cron) |
 | `packages/web/src/components/listeners` | Listener list and editor |
 | `packages/web/src/components/notifications/notification-bell.tsx` | Unread badge in `packages/web/src/components/app-shell.tsx` |
-| `packages/web/src/components/settings/settings-view.tsx` | Settings tabs |
+| `packages/web/src/components/settings/settings-view.tsx` | Settings tabs (a select below `sm`) |
 | `packages/web/src/components/settings/admin-panel.tsx` | Admin signup mode, global keys, and invites |
 | `packages/web/src/components/settings/background-work-card.tsx` | Always-on scheduler and webhook limits on the general tab |
 | `packages/web/src/hooks/use-chat-thread.ts` | Thread loading and stream |
