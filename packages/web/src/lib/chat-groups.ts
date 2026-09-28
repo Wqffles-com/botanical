@@ -44,3 +44,17 @@ function stamp(value: { updatedAt?: string; createdAt?: string }): number {
   const time = Date.parse(raw);
   return Number.isNaN(time) ? 0 : time;
 }
+
+/**
+ * The agent's default model profile, when it is listed and can run. The new-chat form
+ * shows it pre-selected so the pick stays visible and the user can override it.
+ */
+export function agentDefaultProfileId(
+  agent: Pick<Agent, "defaultProfileId"> | null | undefined,
+  profiles: { id: string; available?: boolean | null }[],
+): string | null {
+  const id = agent?.defaultProfileId?.trim();
+  if (!id) return null;
+  const profile = profiles.find((item) => item.id === id);
+  return profile && profile.available !== false ? profile.id : null;
+}

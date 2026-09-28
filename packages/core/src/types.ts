@@ -124,8 +124,9 @@ export interface Agent {
   /** Tool ids. Same list as `toolIds` (shared contract name). */
   tools: string[];
   /**
-   * Suggested profile only. Creating or sending a chat still requires an explicit profileId.
-   * Null when the agent has no suggestion.
+   * Default model profile. The web client pre-selects it when starting a chat, and the user
+   * can override it. Creating or sending a chat still requires an explicit profileId.
+   * Null when the agent has no default.
    */
   defaultProfileId: string | null;
   /** Agent that created this one, or null when the operator did. */

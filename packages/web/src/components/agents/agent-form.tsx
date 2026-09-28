@@ -336,9 +336,9 @@ export function AgentForm({
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="agent-profile">Suggested profile</Label>
+          <Label htmlFor="agent-profile">Default model</Label>
           <p className="text-xs text-muted-foreground">
-            Optional hint only. Every chat still requires an explicit profile pick.
+            Pre-selected when you start a chat with this agent. You can pick a different profile for any chat.
           </p>
           <select
             id="agent-profile"
@@ -346,7 +346,7 @@ export function AgentForm({
             onChange={(event) => patch({ defaultProfileId: event.target.value || null })}
             className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
           >
-            <option value="">No suggestion</option>
+            <option value="">None (pick per chat)</option>
             {profiles.map((profile) => (
               <option key={profile.id} value={profile.id} disabled={!profile.available}>
                 {profile.name}

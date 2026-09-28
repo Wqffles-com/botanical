@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { BotanicalApiError, ProfileRequiredError, type Agent, type Chat, type ChatMessage } from "@botanical/core";
-import { canStartChat, chatsByAgent } from "./chat-groups";
+import { agentDefaultProfileId, canStartChat, chatsByAgent } from "./chat-groups";
 import { applyStreamEvent, emptyDraft, presentThread, toolResultStatus } from "./chat-stream";
 import { isProfileRequired, isProfileUnavailable, profileRequiredMessage, profileUnavailableText } from "./errors";
 
@@ -11,6 +11,18 @@ describe("new chat gates", () => {
     expect(canStartChat(null, "grok")).toBe(false);
     expect(canStartChat("  ", "grok")).toBe(false);
     expect(canStartChat("agent-1", "grok")).toBe(true);
+  });
+
+  test("pre-selects the agent's default profile only when it is listed and available", () => {
+    const profiles = [
+      { id: "grok", available: true },
+      { id: "codex", available: false },
+    ];
+    expect(agentDefaultProfileId({ defaultProfileId: "grok" }, profiles)).toBe("grok");
+    expect(agentDefaultProfileId({ defaultProfileId: "codex" }, profiles)).toBeNull();
+    expect(agentDefaultProfileId({ defaultProfileId: "gone" }, profiles)).toBeNull();
+    expect(agentDefaultProfileId({ defaultProfileId: null }, profiles)).toBeNull();
+    expect(agentDefaultProfileId(null, profiles)).toBeNull();
   });
 });
 
