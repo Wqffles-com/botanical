@@ -230,6 +230,140 @@ Self-host and hosted mode use the same accounts. There is no shared passcode.
 - Model profiles follow the same split: admin-global profiles, with a per-user profile of the same id overriding. `BOTANICAL_PROFILES` and provider key env vars seed those rows once, on first boot, when the database is empty.
 - Coding CLI logins and agent workspaces use a directory per user.
 - `DATABASE_URL` and `BOTANICAL_ENCRYPTION_KEY` are the bootstrap secrets. Other env vars are optional seeds, not the live configuration.
-- Billing is out of scope. Roles (Coder, Reviewer, Orchestrator) stay shared templates. Builtin role names are not per user.
+- Hosted billing is undecided. See the entry below. Roles (Coder, Reviewer, Orchestrator) stay shared templates. Builtin role names are not per user.
 
-API chats send the transcript on every turn. Before the provider call, messages are trimmed to the profile's `maxContext` (about four characters per token). The system prompt and the newest turn stay. Older turns are dropped first, and a tool result stays with the assistant message that requested it. Coding CLI turns do not resume a vendor session id. Each turn renders the transcript into a new prompt. Saving and resuming CLI session ids is left open.
+API chats send the transcript on every turn. Before the provider call, messages are trimmed to the profile's `maxContext` (about four characters per token). The system prompt and the newest turn stay. Older turns are dropped first, and a tool result stays with the assistant message that requested it. That trim is a rough stand-in. Proper context-limit handling is still planned. Coding CLI turns do not resume a vendor session id. Each turn renders the transcript into a new prompt. Saving and resuming CLI session ids is planned; see the entry below.
+
+---
+
+## 2026-09-28: Product decisions for the roadmap
+
+Short entries. Earlier entries still hold unless a status line here changes them. Planned work is tracked in [ROADMAP.md](./ROADMAP.md).
+
+### Positioning and audience
+
+**Decision:** Botanical is an always-on agent platform that runs on a server you operate (self-host) or as a hosted service. It is not a personal-PC app. About half the audience is developers and half is not. A per-user "I'm a developer" setting unlocks coding-agent features, terminals, and similar tools.
+
+**Reason:** Agents have to keep running when the laptop is closed. Non-developers should get a simple assistant. Developers should opt into terminals and coding CLIs without that becoming the default UI.
+
+**Status:** Accepted. Server deploy ships. The developer setting is planned. Today every user sees the same UI. Tool access is the agent's allowlist and roles.
+
+### Open source and hosted billing
+
+**Decision:** The project stays MIT-licensed and self-hostable. A hosted service is planned on the same codebase. How that service bills customers is undecided.
+
+**Reason:** One tree should serve people who run their own server and people who do not. Charging for hosting is a separate choice and is not settled.
+
+**Status:** Accepted. `DEPLOYMENT_MODE` (`SELF_HOST` / `SAAS`) ships and does not change chat, tools, or MCP. Nothing charges a customer. Unused billing stubs in `@botanical/core` are not a billing design.
+
+### Multi-user on every instance
+
+**Decision:** Every instance has accounts. The first signup is the admin. The admin can close signup (or leave it open or invite-only). Each user has their own settings and API keys. Admin global keys and settings are edited in the UI and stored encrypted in the database. Environment variables are only for bootstrap (`DATABASE_URL`, `BOTANICAL_ENCRYPTION_KEY`) and optional seeding.
+
+**Reason:** A shared passcode cannot separate users, and live configuration should not require SSH into the host.
+
+**Status:** Shipped. Detail is in the multi-user entry above.
+
+### Visual style
+
+**Decision:** Main colors stay monochrome shadcn/ui. Each user can pick an accent color (blue, red, green, and similar) in Settings.
+
+**Reason:** The UI should stay quiet, with one color the person chooses.
+
+**Status:** In progress. Monochrome shadcn and a light/dark toggle ship. Settings has no accent picker yet.
+
+### Bot customization
+
+**Decision:** A bot has a name, title, description, color, icon or avatar shape, and an uploaded picture.
+
+**Reason:** People should recognize each bot without reading its prompt.
+
+**Status:** In progress. Name, description, color, and a Lucide icon ship. A separate title, avatar shape, and uploaded picture are not in the schema yet.
+
+### Models and coding CLIs
+
+**Decision:** Models are OpenAI-compatible API providers, with DeepSeek as the first provider the start flow offers, plus subscription coding CLIs (Grok Build, Claude Code, Codex). Those CLIs run headless on the server, are installed and signed in inside the container from the UI, and are enabled with `BOTANICAL_CLI_PROFILES`. All of them share one MCP server named `botanical` for Botanical tools.
+
+**Reason:** API models and subscription CLIs should both be profiles. One MCP server keeps Botanical tools the same no matter which CLI is running.
+
+**Status:** Shipped for API profiles (a generic OpenAI-compatible base URL, plus adapters), container install and login, and the per-turn `botanical` MCP server. The start scripts do not yet choose which CLIs to enable. See below.
+
+### CLI sessions and API context
+
+**Decision:** A coding CLI session starts when a chat needs it, shuts down after 15 to 30 minutes idle, and saves its session id so a later turn can resume. API chats need proper context-limit handling.
+
+**Reason:** A CLI process per idle chat wastes the server. Resuming a session keeps the CLI's own context. An API chat must stay inside the model's context limit.
+
+**Status:** Planned. Each CLI turn currently starts a new process and does not save or resume a session id. API turns are trimmed with the rough `maxContext` estimate before the provider call. That trim is not the final behavior.
+
+### Memory, agents, and permissions
+
+**Decision:** Memory is shared plus per-agent. Agents can create agents. Roles and MCP permissions limit what an agent can do.
+
+**Reason:** Agents need durable notes and a way to delegate, without granting more than they themselves have.
+
+**Status:** Shipped. See the 2026-09-27 entries on memory, `agent_create`, and roles.
+
+### Routines, listeners, notifications, speech
+
+**Decision:** Routines, webhook listeners, and notifications are part of the product. Dictation uses pluggable speech-to-text providers. Voice calls come later.
+
+**Reason:** Background work should run with no browser open. Speech should become text you can edit before send. A live call is a separate feature.
+
+**Status:** Routines, generic webhook listeners, notifications, and dictation are shipped. Speech-to-text providers are OpenAI-compatible, OpenRouter, xAI, and Qwen, with the browser's recognizer when no server provider is set. Voice calls are planned.
+
+### Start scripts
+
+**Decision:** `start.sh` and `start.ps1` ask which coding CLIs to enable and write `BOTANICAL_CLI_PROFILES`.
+
+**Reason:** The first start should record that choice instead of leaving an env line to edit by hand.
+
+**Status:** Planned. The scripts ask only whether to add `docker-compose.cli.yml`. They do not list individual CLIs and they do not set `BOTANICAL_CLI_PROFILES`.
+
+### Bot tools match the app
+
+**Decision:** A bot gets tools for anything a person can do in the app (customize bots, create routines and listeners, change settings), limited by that bot's permissions.
+
+**Reason:** Allowed work should not depend on someone clicking through the UI.
+
+**Status:** Planned. Agents can already create agents inside their permission ceiling. The other app actions are not tools.
+
+### Knowledge bases
+
+**Decision:** There is one shared knowledge base the user can edit, visible across bots, plus one knowledge base per bot. Both use the same layout: organized Markdown files edited with a block editor.
+
+**Reason:** Reference material should outlive a chat, and the shared base and a bot's base should not be two different systems.
+
+**Status:** Planned. There is no knowledge-base schema or editor in the tree.
+
+### Computer use
+
+**Decision:** Computer use gives a bot a desktop container per session, a web viewer the user can take over, and a computer-use tool gated by role.
+
+**Reason:** Some tasks need a desktop. The user must be able to watch and take control. It stays opt-in, not a tool every agent has.
+
+**Status:** Planned.
+
+### GitHub and GitLab
+
+**Decision:** Users can connect GitHub or GitLab, including issue triggers for listeners.
+
+**Reason:** A new issue should start an agent the way a generic webhook already can, through a real connection.
+
+**Status:** Planned. Generic webhook listeners ship. Typed forge connections do not.
+
+### Tool safety
+
+**Decision:** Risky tool calls require approval.
+
+**Reason:** Shell, writes, and similar tools can change the server. A person should be able to stop a dangerous call.
+
+**Status:** Planned. Roles and allowlists already deny a call at dispatch. The UI has no approval prompt. A `tool_audit` table exists and the API does not write it.
+
+### Engineering rules
+
+**Decision:** Every pull request that changes code updates `docs/index/`. Windows checkouts use LF for the text types named in `.gitattributes`.
+
+**Reason:** The index is how changes find the right files. CRLF checkouts break shell scripts inside image builds.
+
+**Status:** Shipped. `bun run check:index` runs in CI. `.gitattributes` forces LF for shell scripts, Dockerfiles, and the other listed types. `*.ps1` follows Git's autocrlf setting.

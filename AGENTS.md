@@ -4,7 +4,7 @@ Always-on agent server: a Bun HTTP API, a web client, and swappable model provid
 
 ## Codebase index
 
-Start at [docs/index/README.md](docs/index/README.md).
+Start at [docs/index/README.md](docs/index/README.md). Product decisions are in [docs/DECISIONS.md](docs/DECISIONS.md). Shipped and planned work is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 - [docs/index/server.md](docs/index/server.md) — HTTP routes, turns, auth
 - [docs/index/agent-runtime.md](docs/index/agent-runtime.md) — agent loop and permissions

@@ -1,6 +1,6 @@
 # Botanical
 
-Botanical is an open-source, self-hostable AI agent platform that runs in the cloud. You deploy it on a server you control (your own VPS or dedicated host), or use the hosted service built from the same code. It is an always-on assistant: the server keeps running when you close the browser, so agents can keep working and messaging each other while you are away.
+Botanical is an open-source, self-hostable AI agent platform that runs in the cloud. You deploy it on a server you control (your own VPS or dedicated host), or use the hosted service built from the same code. It is an always-on assistant: the server keeps running when you close the browser, so agents can keep working and messaging each other while you are away. It is not a personal-PC app. Product decisions are in [docs/DECISIONS.md](./docs/DECISIONS.md). What ships and what is planned is in [docs/ROADMAP.md](./docs/ROADMAP.md).
 
 Botanical is not tied to one model vendor. It talks to any OpenAI-compatible endpoint and has first-class adapters for **GPT (OpenAI)**, **Claude (Anthropic)**, **Grok (xAI)**, **DeepSeek**, and **OpenRouter**. It can also run subscription coding-agent CLIs (**Grok Build**, **Claude Code**, **Codex**) headless on the server as model profiles.
 
@@ -12,10 +12,10 @@ Botanical is not tied to one model vendor. It talks to any OpenAI-compatible end
 
 What ships today:
 
-- **Any model, your keys.** OpenAI, Anthropic, xAI, DeepSeek, OpenRouter, or any OpenAI-compatible base URL (for example a local Ollama). API keys live only in the server environment and are never sent to or accepted from the browser.
-- **No silent default model.** Every chat names a model profile explicitly. Profiles are configured on the server (`BOTANICAL_PROFILES`).
+- **Any model, your keys.** OpenAI-compatible providers, with DeepSeek as the first one the start script offers, plus OpenAI, Anthropic, xAI, and OpenRouter. Keys are set in Settings, encrypted in the database, and can be seeded from the environment. The browser never calls a provider itself.
+- **No silent default model.** Every chat names a model profile explicitly. Profiles live in the database (admin-global, overridable per user). `BOTANICAL_PROFILES` seeds them once.
 - **Coding-agent CLIs as profiles.** Grok Build (`grok`), Claude Code (`claude`), and Codex (`codex`) can run headless on the server, streaming their output into the chat. They use their own tools inside the agent's workspace directory.
-- **Unlimited custom agents.** Each agent has a name, icon, color, prompt, and tool allowlist. Each chat belongs to one agent.
+- **Unlimited custom agents.** Each agent has a name, description, Lucide icon, color, prompt, and tool allowlist. Each chat belongs to one agent. A title, avatar shape, and uploaded picture are in progress.
 - **Async agent-to-agent messaging.** Agents send each other messages that land in the recipient's inbox. With `BOTANICAL_A2A_AUTORUN=true`, a delivered message starts a background turn for the recipient, with no browser needed.
 - **Routines.** Cron schedules run an agent on the server. Each run opens a new chat and records success or failure.
 - **Listeners.** A generic webhook starts an agent turn. The payload is passed as untrusted data. Typed issue listeners are still planned.
@@ -30,11 +30,19 @@ What ships today:
 - **Postgres persistence** with migrations applied automatically on boot.
 - **One codebase, two deployment modes.** `SELF_HOST` (default) or `SAAS`, selected by `DEPLOYMENT_MODE`. Chat, tools, and MCP behave the same in both modes.
 
-On the roadmap (**not implemented yet**; see [docs/ROADMAP.md](./docs/ROADMAP.md)):
+On the roadmap (see [docs/ROADMAP.md](./docs/ROADMAP.md)):
 
-- **Typed forge listeners.** Per-connection rules that turn a new issue into an agent turn. Generic webhooks already ship.
-- **Developer mode.** A per-user setting that unlocks the coding-agent base (coding CLIs, shell/code_exec, terminals). Everyone else gets a simpler assistant experience. Today every user sees the same UI, and the operator controls tools through agent allowlists and roles.
-- Multi-tenant accounts and billing for the hosted mode.
+- **In progress.** A user-selectable accent color, and richer bot customization (title, avatar shape, uploaded picture).
+- **Developer mode.** A per-user "I'm a developer" setting that unlocks the coding-agent base (coding CLIs, shell/code_exec, terminals). Everyone else gets a simpler assistant experience. Today every user sees the same UI, and tool access is the agent's allowlist and roles.
+- **CLI sessions.** Start a coding CLI on demand, stop it after 15 to 30 minutes idle, and save and resume its session id. API chats still need proper context-limit handling.
+- **Start scripts** that ask which coding CLIs to enable and write `BOTANICAL_CLI_PROFILES`.
+- **Bot tools** for anything a person can do in the app, limited by permissions.
+- **Knowledge bases.** One shared base plus one per bot: Markdown files and a block editor.
+- **Computer use.** A desktop container per session, a web viewer with take-over, and a role-gated tool.
+- **GitHub and GitLab** connections, including issue triggers. Generic webhooks already ship.
+- **Approvals** for risky tool calls.
+- **Voice calls.** Dictation already ships.
+- **Hosted billing** is undecided. Accounts already ship on every instance.
 
 ## Architecture
 
@@ -140,15 +148,15 @@ bun run dev                         # API on :8787, Next dev server on :3000
 
 ## Configuration
 
-Everything is configured through environment variables. The full annotated list is in [`.env.example`](./.env.example), and [docs/DEPLOY.md](./docs/DEPLOY.md) has a reference table. The most important keys:
+Bootstrap and optional seeds use environment variables. Accounts, provider keys, profiles, and instance settings are edited in the UI and stored in the database. The annotated env list is in [`.env.example`](./.env.example), and [docs/DEPLOY.md](./docs/DEPLOY.md) has a reference table. The most important keys:
 
 | Variable | Purpose |
 |----------|---------|
-| `DEPLOYMENT_MODE` | `SELF_HOST` (default) or `SAAS`. The container entrypoint normalizes it into `BOTANICAL_DEPLOYMENT_MODE`, which the API reads. Both modes share the same routes, auth, and storage today; SaaS mode changes branding ("Botanical Cloud"). Accounts and billing are not built. |
+| `DEPLOYMENT_MODE` | `SELF_HOST` (default) or `SAAS`. The container entrypoint normalizes it into `BOTANICAL_DEPLOYMENT_MODE`, which the API reads. Both modes share the same routes, accounts, and storage. SaaS mode changes branding ("Botanical Cloud"). Hosted billing is undecided. |
 | `BOTANICAL_ENCRYPTION_KEY` | Encrypts provider keys at rest. Hex, base64, or any other string (hashed to 32 bytes). |
 | `BOTANICAL_SESSION_SECRET` | Reserved. The current API does not read it; sessions are random tokens stored as SHA-256 hashes. |
 | `DATABASE_URL` | Postgres connection. Unset means an in-memory store (development only). |
-| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY` | Provider keys. A set key lists that provider's profiles. It never selects a model. |
+| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY` | Optional seed for provider keys. Live keys are set in Settings and stored encrypted. A key never selects a model. |
 | `OPENAI_COMPAT_BASE_URL` + `OPENAI_COMPAT_API_KEY` | Any other OpenAI-compatible endpoint. |
 | `BOTANICAL_PROFILES` | JSON array of model profiles that users can pick (see [`profiles.example.json`](./profiles.example.json)). Do not put keys in it. |
 | `BOTANICAL_CLI_PROFILES` | Shortcut to add coding-CLI presets: `grok-build,claude-code,codex`. Explicit `BOTANICAL_PROFILES` entries win. With `docker-compose.cli.yml`, the server installs and signs in those CLIs inside the container. |
@@ -176,8 +184,8 @@ Botanical gives language models real tools on your server. Please read this befo
 - **Run it on a host you trust and control, and don't share that host with anything sensitive.** `shell` and `code_exec` run model-generated commands inside a Linux namespace jail (unprivileged `unshare`, network off by default, read-only `/usr`, scrubbed environment, timeouts, output caps). That boundary is real, but **it is not a hardened sandbox**: no seccomp, no separate uid, no cgroup limits. See [packages/tools-shell/SECURITY.md](./packages/tools-shell/SECURITY.md).
 - **Coding-agent CLIs run with their approval prompts disabled** (for example `--dangerously-bypass-approvals-and-sandbox` for Codex and `--permission-mode bypassPermissions` for Claude Code) inside the agent's workspace directory. Only enable them on a server where that is acceptable.
 - **MCP servers are code you choose to run.** Only add servers you trust.
-- **Accounts.** The first signup is the admin. Signup can be open, invite-only, or closed. Serve the UI over HTTPS. Login attempts are rate-limited. Billing is not implemented.
-- Keep provider keys in the server environment or a secret store. Never commit `.env`.
+- **Accounts.** The first signup is the admin. Signup can be open, invite-only, or closed. Serve the UI over HTTPS. Login attempts are rate-limited. Hosted billing is undecided.
+- Provider keys are encrypted in the database. Environment variables only bootstrap the database and the encryption secret, or seed keys. Never commit `.env`.
 
 To report a vulnerability, see [SECURITY.md](./SECURITY.md). Please do not open a public issue.
 
