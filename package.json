@@ -21,7 +21,8 @@
     "test": "bun run --if-present --filter '*' test",
     "db:migrate": "bun run --filter @botanical/db migrate",
     "e2e": "node scripts/e2e/run.mjs",
-    "e2e:self-test": "node scripts/e2e/run.mjs --self-test"
+    "e2e:self-test": "node scripts/e2e/run.mjs --self-test",
+    "check:index": "bun scripts/check-index.ts"
   },
   "devDependencies": {
     "typescript": "^7.0.2"
