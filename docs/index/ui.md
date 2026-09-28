@@ -21,7 +21,7 @@
 
 Components import each other through these package paths (for example `@botanical/ui/components/button`), which is also what the shadcn CLI writes. `packages/ui/tsconfig.json` maps them to `src` for the package's own typecheck.
 
-Primitives: alert-dialog, avatar, badge, breadcrumb, button, card, command, dialog, dropdown-menu, form, input, input-group, label, popover, scroll-area, select, separator, sheet, sidebar, skeleton, sonner, switch, tabs, textarea, tooltip.
+Primitives: alert-dialog, avatar, badge, breadcrumb, button, card, checkbox, command, dialog, dropdown-menu, form, input, input-group, label, popover, scroll-area, select, separator, sheet, sidebar, skeleton, sonner, switch, table, tabs, textarea, tooltip.
 
 Blocks built on them:
 

@@ -18,6 +18,8 @@ import {
   DialogTitle,
 } from "@botanical/ui/components/dialog";
 import { Input } from "@botanical/ui/components/input";
+import { Checkbox } from "@botanical/ui/components/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@botanical/ui/components/table";
 import { Label } from "@botanical/ui/components/label";
 import { Switch } from "@botanical/ui/components/switch";
 import { Textarea } from "@botanical/ui/components/textarea";
@@ -255,42 +257,42 @@ export function RolesPanel({ agents, onAgentsChanged }: { agents: Agent[]; onAge
 
       <section className="space-y-2">
         <h2 className="text-sm font-medium">Capabilities</h2>
-        <div className="overflow-x-auto rounded-xl border">
-          <table className="w-full min-w-[40rem] text-sm">
-            <thead>
-              <tr className="border-b text-left">
-                <th className="px-3 py-2 text-xs font-medium text-muted-foreground">Capability</th>
+        <div className="rounded-xl border">
+          <Table className="min-w-[40rem]">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="px-3 text-xs text-muted-foreground">Capability</TableHead>
                 {roles.map((role) => (
-                  <th key={role.id} className="px-3 py-2 text-xs font-medium whitespace-nowrap">
+                  <TableHead key={role.id} className="px-3 text-xs">
                     {role.name}
-                  </th>
+                  </TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {CAPABILITY_OPTIONS.map((capability) => (
-                <tr key={capability.id} className="border-b last:border-b-0">
-                  <td className="px-3 py-2">
+                <TableRow key={capability.id}>
+                  <TableCell className="px-3 py-2 whitespace-normal">
                     <div>{capability.label}</div>
                     <div className="font-mono text-2xs text-muted-foreground">{capability.id}</div>
-                  </td>
+                  </TableCell>
                   {roles.map((role) => {
                     const on = role.permissions.capabilities.includes(capability.id);
                     return (
-                      <td key={role.id} className="px-3 py-2">
+                      <TableCell key={role.id} className="px-3 py-2">
                         <Switch
                           size="sm"
                           checked={on}
                           aria-label={`${role.name} ${capability.label}`}
                           onCheckedChange={(checked) => void toggleCapability(role, capability.id, checked === true)}
                         />
-                      </td>
+                      </TableCell>
                     );
                   })}
-                </tr>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </section>
 
@@ -308,11 +310,9 @@ export function RolesPanel({ agents, onAgentsChanged }: { agents: Agent[]; onAge
                     const checked = agent.roleIds.includes(role.id);
                     return (
                       <label key={role.id} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          className="size-3.5 accent-foreground"
+                        <Checkbox
                           checked={checked}
-                          onChange={(event) => void assign(agent, role.id, event.target.checked)}
+                          onCheckedChange={(next) => void assign(agent, role.id, next)}
                         />
                         <span>{role.name}</span>
                       </label>
