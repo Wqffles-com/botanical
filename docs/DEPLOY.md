@@ -188,7 +188,7 @@ The composer microphone turns speech into text in the message box. It does not s
 
 Qwen accepts the audio as a data URL. That encoded value must be at most 10 MB; a larger recording is rejected before the upstream call. Region and workspace bases are set with `BOTANICAL_STT_BASE_URL`, for example `https://dashscope.aliyuncs.com/compatible-mode/v1` or `https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`.
 
-Providers differ in accepted formats. Browsers usually record WebM/Opus. The OpenAI-compatible adapter forwards the file as uploaded. OpenRouter accepts webm, ogg, mp3, wav, and m4a. xAI documents wav, mp3, ogg, opus, flac, aac, mp4, m4a, and mkv (WebM is Matroska; the upload keeps a matching filename and content type).
+Providers differ in accepted formats. Browsers usually record WebM/Opus. The OpenAI-compatible adapter forwards the file as uploaded. OpenRouter accepts webm, ogg, mp3, wav, and m4a. xAI documents wav, mp3, ogg, opus, flac, aac, mp4, m4a, and mkv. WebM is not on that list; it is a Matroska subset and is sent with a `.webm` filename and `audio/webm` type, but if xAI rejects browser recordings, use another provider for browsers that only record WebM.
 
 Examples:
 
