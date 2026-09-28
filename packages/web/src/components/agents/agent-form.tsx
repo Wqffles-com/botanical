@@ -19,6 +19,7 @@ import { useWorkspace } from "@/components/workspace-provider";
 import { Button } from "@botanical/ui/components/button";
 import { Input } from "@botanical/ui/components/input";
 import { Label } from "@botanical/ui/components/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@botanical/ui/components/select";
 import { Textarea } from "@botanical/ui/components/textarea";
 import { previewEffective } from "@/lib/permissions";
 import { createAgent, deleteAgent, updateAgent } from "@/lib/agent-api";
@@ -37,6 +38,8 @@ import {
 } from "@/lib/agent-identity";
 import type { AgentShape } from "@botanical/core";
 import type { AgentIconName } from "@/lib/agent-icons";
+
+const NO_PROFILE = "__none__";
 
 export function AgentForm({
   agent,
@@ -340,21 +343,34 @@ export function AgentForm({
           <p className="text-xs text-muted-foreground">
             Pre-selected when you start a chat with this agent. You can pick a different profile for any chat.
           </p>
-          <select
-            id="agent-profile"
-            value={draft.defaultProfileId ?? ""}
-            onChange={(event) => patch({ defaultProfileId: event.target.value || null })}
-            className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+          <Select
+            items={[
+              { value: NO_PROFILE, label: "None (pick per chat)" },
+              ...profiles.map((profile) => ({ value: profile.id, label: profile.name })),
+            ]}
+            value={draft.defaultProfileId ?? NO_PROFILE}
+            onValueChange={(next) =>
+              patch({ defaultProfileId: typeof next === "string" && next !== NO_PROFILE ? next : null })
+            }
           >
-            <option value="">None (pick per chat)</option>
-            {profiles.map((profile) => (
-              <option key={profile.id} value={profile.id} disabled={!profile.available}>
-                {profile.name}
-                {profile.model ? ` · ${profile.model}` : ""}
-                {profile.available ? "" : ` — ${profile.unavailableReason ?? "Unavailable"}`}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="agent-profile" className="w-full sm:w-80">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_PROFILE}>None (pick per chat)</SelectItem>
+              {profiles.map((profile) => (
+                <SelectItem key={profile.id} value={profile.id} disabled={!profile.available}>
+                  <span className="truncate">
+                    {profile.name}
+                    {profile.model ? <span className="text-muted-foreground"> · {profile.model}</span> : null}
+                    {profile.available ? null : (
+                      <span className="text-muted-foreground"> — {profile.unavailableReason ?? "Unavailable"}</span>
+                    )}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

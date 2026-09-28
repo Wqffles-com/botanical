@@ -6,6 +6,7 @@ import { Button } from "@botanical/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
 import { Input } from "@botanical/ui/components/input";
 import { Label } from "@botanical/ui/components/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@botanical/ui/components/select";
 
 const PROVIDERS = [
   { name: "deepseek", label: "DeepSeek", model: "deepseek-chat" },
@@ -29,6 +30,12 @@ async function request(path: string, init?: RequestInit): Promise<Response> {
   }
   return response;
 }
+
+const SIGNUP_MODES = [
+  { value: "open", label: "Open" },
+  { value: "invite", label: "Invite only" },
+  { value: "closed", label: "Closed" },
+];
 
 export function AdminPanel() {
   const [signupMode, setSignupMode] = useState<SignupMode>("open");
@@ -97,17 +104,24 @@ export function AdminPanel() {
         <CardContent className="flex flex-wrap items-end gap-3">
           <div className="grid gap-1.5">
             <Label htmlFor="signup-mode">Mode</Label>
-            <select
-              id="signup-mode"
-              data-testid="signup-mode"
-              className="h-9 rounded-md border bg-background px-2 text-sm"
+            <Select
+              items={SIGNUP_MODES}
               value={signupMode}
-              onChange={(event) => setSignupMode(event.target.value as SignupMode)}
+              onValueChange={(next) => {
+                if (next) setSignupMode(next as SignupMode);
+              }}
             >
-              <option value="open">Open</option>
-              <option value="invite">Invite only</option>
-              <option value="closed">Closed</option>
-            </select>
+              <SelectTrigger id="signup-mode" data-testid="signup-mode" className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SIGNUP_MODES.map((mode) => (
+                  <SelectItem key={mode.value} value={mode.value}>
+                    {mode.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input
