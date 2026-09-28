@@ -60,7 +60,7 @@ export function ProfileSelect({
             }}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent className="min-w-[280px]" alignItemWithTrigger={false}>
+        <SelectContent className="min-w-[280px]">
           <ProfileGroup label="API" profiles={apiProfiles} />
           <ProfileGroup label="CLI (subscription)" profiles={cliProfiles} />
         </SelectContent>
