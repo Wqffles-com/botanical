@@ -9,7 +9,7 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@botanical/ui/components/select";
 import { profileIsAvailable, profileKind, profileLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 

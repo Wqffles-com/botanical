@@ -4,7 +4,7 @@ import { Check, Copy } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Button } from "@/components/ui/button";
+import { Button } from "@botanical/ui/components/button";
 import { cn } from "@/lib/utils";
 
 export function Markdown({ children, className }: { children: string; className?: string }) {

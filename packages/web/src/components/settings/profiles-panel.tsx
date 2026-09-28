@@ -1,5 +1,5 @@
 import type { ModelProfile } from "@botanical/core";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@botanical/ui/components/badge";
 import { EmptyState } from "@/components/empty-state";
 import { profileIsAvailable, profileKind } from "@/lib/format";
 import { providerLabel } from "@/lib/format-extra";

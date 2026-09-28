@@ -2,7 +2,7 @@
 
 [Index](README.md)
 
-Next.js App Router client. Monochrome shadcn UI (`packages/web/components.json`, primitives in `packages/web/src/components/ui`, theme in `packages/web/src/app/globals.css`).
+Next.js App Router client. Monochrome shadcn UI from [`@botanical/ui`](ui.md): primitives are imported as `@botanical/ui/components/<name>`, and `packages/web/src/app/globals.css` imports Tailwind, then `@botanical/ui/styles.css`, then app-only rules (chat stream dots). `packages/web/components.json` points the shadcn CLI's `ui` and `utils` aliases at the package.
 
 - Package: `@botanical/web`
 - App entry: `packages/web/src/app`
@@ -58,7 +58,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/lib/chat-stream.ts` | Browser SSE parse |
 | `packages/web/src/lib/server-api.ts` | RSC client (forwards cookies) |
 
-Settings is one page. Tabs in `packages/web/src/components/settings/settings-view.tsx` (`?tab=`): `general` (accent, deployment, background work, provider key flags, tool list, MCP snapshot), `profiles`, `memory`, `roles`, `cli`. The accent picker is `packages/web/src/components/settings/accent-card.tsx`. `packages/web/src/components/accent-provider.tsx` loads `GET /api/settings/appearance` and sets `data-accent` on the document. Tokens live in `packages/web/src/app/globals.css`: a non-neutral accent recolors `--primary` and `--ring` in light and dark. Sidebar, page background, and borders stay gray. Panels: `packages/web/src/components/settings/profiles-panel.tsx`, `memory-panel.tsx`, `roles-panel.tsx`, `cli-panel.tsx`, `deployment-badge.tsx`, `background-work-card.tsx`. Sidebar links for routines and listeners are in `packages/web/src/components/app-sidebar.tsx`.
+Settings is one page. Tabs in `packages/web/src/components/settings/settings-view.tsx` (`?tab=`): `general` (accent, deployment, background work, provider key flags, tool list, MCP snapshot), `profiles`, `memory`, `roles`, `cli`. The accent picker is `packages/web/src/components/settings/accent-card.tsx`. `packages/web/src/components/accent-provider.tsx` loads `GET /api/settings/appearance` and sets `data-accent` on the document. Tokens live in `packages/ui/src/styles.css`: a non-neutral accent recolors `--primary` and `--ring` in light and dark. Sidebar, page background, and borders stay gray. Panels: `packages/web/src/components/settings/profiles-panel.tsx`, `memory-panel.tsx`, `roles-panel.tsx`, `cli-panel.tsx`, `deployment-badge.tsx`, `background-work-card.tsx`. Sidebar links for routines and listeners are in `packages/web/src/components/app-sidebar.tsx`.
 
 ## Env vars
 
@@ -80,4 +80,4 @@ Colocated `*.test.ts` under `packages/web/src`. Script: `bun test src`. `typeche
 - **Add a settings tab.** Extend `SettingsTab` in `packages/web/src/components/settings/settings-view.tsx` and add a panel under `packages/web/src/components/settings`.
 - **Call a new API.** Prefer `packages/core/src/client.ts`. For routes that client does not wrap, follow `packages/web/src/lib/mvp-api.ts`.
 - **Change chat streaming.** `packages/web/src/hooks/use-chat-thread.ts` and `packages/web/src/lib/chat-stream.ts`.
-- **Change the shell or theme.** `packages/web/src/components/app-shell.tsx`, `packages/web/src/app/globals.css`, `packages/web/src/components/ui`.
+- **Change the shell or theme.** `packages/web/src/components/app-shell.tsx`, `packages/ui/src/styles.css`, `packages/ui/src/components`.

@@ -6,9 +6,9 @@ import { ChevronsUpDown } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@botanical/ui/components/badge";
+import { Button } from "@botanical/ui/components/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@botanical/ui/components/card";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@botanical/ui/components/dialog";
 import {
   Command,
   CommandEmpty,
@@ -24,14 +24,14 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+} from "@botanical/ui/components/command";
+import { Input } from "@botanical/ui/components/input";
+import { Label } from "@botanical/ui/components/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@botanical/ui/components/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@botanical/ui/components/select";
+import { Skeleton } from "@botanical/ui/components/skeleton";
+import { Switch } from "@botanical/ui/components/switch";
+import { Textarea } from "@botanical/ui/components/textarea";
 import { api } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 import { CRON_PRESETS, browserTimeZone, describeCron, formatWhen, presetForCron, timeZones, type CronPresetId } from "@/lib/schedule";

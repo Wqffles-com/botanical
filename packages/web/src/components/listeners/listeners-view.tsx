@@ -5,9 +5,9 @@ import { isUnauthorized } from "@botanical/core";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@botanical/ui/components/badge";
+import { Button } from "@botanical/ui/components/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@botanical/ui/components/card";
 import {
   Dialog,
   DialogContent,
@@ -15,12 +15,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+} from "@botanical/ui/components/dialog";
+import { Input } from "@botanical/ui/components/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@botanical/ui/components/select";
+import { Skeleton } from "@botanical/ui/components/skeleton";
+import { Switch } from "@botanical/ui/components/switch";
+import { Textarea } from "@botanical/ui/components/textarea";
 import { api } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 import { formatWhen } from "@/lib/schedule";

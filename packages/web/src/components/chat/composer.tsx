@@ -7,7 +7,7 @@ import { DictationActions, DictationNotice } from "@/components/chat/dictation-b
 import { spliceTranscript } from "@/components/chat/dictation";
 import { useDictation } from "@/components/chat/use-dictation";
 import { ProfileSelect } from "@/components/chat/profile-select";
-import { Button } from "@/components/ui/button";
+import { Button } from "@botanical/ui/components/button";
 import { unavailableProfileHint } from "@/lib/format";
 import { cn } from "@/lib/utils";
 

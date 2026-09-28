@@ -8,20 +8,20 @@ import { toast } from "sonner";
 import { AgentAvatar } from "@/components/agent-avatar";
 import { PageHeader } from "@/components/page-header";
 import { useWorkspace } from "@/components/workspace-provider";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@botanical/ui/components/badge";
+import { Button } from "@botanical/ui/components/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
+import { Label } from "@botanical/ui/components/label";
+import { ScrollArea } from "@botanical/ui/components/scroll-area";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
+} from "@botanical/ui/components/select";
+import { Skeleton } from "@botanical/ui/components/skeleton";
+import { Textarea } from "@botanical/ui/components/textarea";
 import { agentIdentity } from "@/lib/agent-identity";
 import { relativeTime } from "@/lib/format";
 import { fetchAgentMessages, patchAgentMessageStatus, sendAgentMessage } from "@/lib/mvp-api";

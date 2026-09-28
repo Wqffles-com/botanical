@@ -1,7 +1,7 @@
 "use client";
 
 import { AgentSidebarList } from "@/components/agents/agent-sidebar";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@botanical/ui/components/skeleton";
 import { useAgents } from "@/components/agents/use-agents";
 
 export function SidebarAgentRoster({ activeId }: { activeId?: string | null }) {

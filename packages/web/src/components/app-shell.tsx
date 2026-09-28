@@ -7,13 +7,13 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { WorkspaceProvider } from "@/components/workspace-provider";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@botanical/ui/components/button";
+import { Separator } from "@botanical/ui/components/separator";
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
-} from "@/components/ui/sidebar";
+} from "@botanical/ui/components/sidebar";
 
 export function AppShell({
   title,

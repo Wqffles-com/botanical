@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd().endsWith("/packages/web")
     ? process.cwd().slice(0, -"/packages/web".length)
     : process.cwd(),
-  transpilePackages: ["@botanical/core", "geist"],
+  transpilePackages: ["@botanical/core", "@botanical/ui", "geist"],
   agentRules: false,
   async rewrites() {
     return [

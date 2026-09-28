@@ -5,11 +5,11 @@ import { isUnauthorized } from "@botanical/core";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { Button } from "@botanical/ui/components/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
+import { Input } from "@botanical/ui/components/input";
+import { Label } from "@botanical/ui/components/label";
+import { Switch } from "@botanical/ui/components/switch";
 import { api } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 

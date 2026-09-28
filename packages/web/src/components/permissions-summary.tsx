@@ -1,5 +1,5 @@
 import type { EffectivePermissions } from "@botanical/core";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@botanical/ui/components/badge";
 import { capabilityLabel, formatMcpGrant } from "@/lib/permissions";
 
 export function PermissionsSummary({ permissions }: { permissions: EffectivePermissions }) {

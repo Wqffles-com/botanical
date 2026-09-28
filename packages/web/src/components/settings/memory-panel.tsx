@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@botanical/ui/components/badge";
+import { Button } from "@botanical/ui/components/button";
 import {
   Dialog,
   DialogContent,
@@ -15,12 +15,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
+} from "@botanical/ui/components/dialog";
+import { Label } from "@botanical/ui/components/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@botanical/ui/components/select";
+import { Tabs, TabsList, TabsTrigger } from "@botanical/ui/components/tabs";
+import { Textarea } from "@botanical/ui/components/textarea";
+import { Input } from "@botanical/ui/components/input";
 import { api } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 import { relativeTime } from "@/lib/format";

@@ -1,7 +1,7 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
+import { Badge } from "@botanical/ui/components/badge";
+import { Label } from "@botanical/ui/components/label";
 import type { ToolInfo } from "@/lib/agent-identity";
 import { cn } from "@/lib/utils";
 

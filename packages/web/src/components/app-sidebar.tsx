@@ -9,9 +9,9 @@ import { AgentAvatar } from "@/components/agent-avatar";
 import { Mark } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useWorkspace } from "@/components/workspace-provider";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@botanical/ui/components/button";
+import { Input } from "@botanical/ui/components/input";
+import { ScrollArea } from "@botanical/ui/components/scroll-area";
 import {
   Sidebar,
   SidebarContent,
@@ -20,8 +20,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
-import { Skeleton } from "@/components/ui/skeleton";
+} from "@botanical/ui/components/sidebar";
+import { Skeleton } from "@botanical/ui/components/skeleton";
 import { agentIdentity } from "@/lib/agent-identity";
 import { initials, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
