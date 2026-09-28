@@ -17,7 +17,10 @@ function postJson(app: App, path: string, body: unknown, headers: Record<string,
 interface AgentBody {
   id: string;
   name: string;
+  title: string;
   icon: string;
+  shape: string;
+  picture: string | null;
   color: string;
   description: string;
   prompt: string;
@@ -41,6 +44,9 @@ describe("agent identity", () => {
     const { agent } = await readJson<{ agent: AgentBody }>(response);
     expect(agent.icon).toBe("Bot");
     expect(agent.color).toBe("green");
+    expect(agent.title).toBe("");
+    expect(agent.shape).toBe("squircle");
+    expect(agent.picture).toBeNull();
     expect(agent.prompt).toBe("Be brief.");
     expect(agent.systemPrompt).toBe("Be brief.");
     expect(agent.tools).toEqual([]);

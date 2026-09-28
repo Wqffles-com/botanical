@@ -20,8 +20,8 @@ describe("parse catalogs", () => {
       ],
     });
     expect(agents).toEqual([
-      { id: "a1", name: "Gardener", description: "", icon: "Sprout", color: "green" },
-      { id: "a2", name: "Builder", description: "", icon: "Bot", color: "green" },
+      { id: "a1", name: "Gardener", title: "", description: "", icon: "Sprout", shape: "squircle", picture: null, color: "green" },
+      { id: "a2", name: "Builder", title: "", description: "", icon: "Bot", shape: "squircle", picture: null, color: "green" },
     ]);
   });
 

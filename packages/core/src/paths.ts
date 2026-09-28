@@ -35,6 +35,7 @@ export const API = {
   listenerSecret: (id: string) => `/api/listeners/${encodeURIComponent(id)}/rotate-secret`,
   listenerDeliveries: (id: string) => `/api/listeners/${encodeURIComponent(id)}/deliveries`,
   alwaysOnSettings: "/api/settings/always-on",
+  appearance: "/api/settings/appearance",
   notifications: "/api/notifications",
   notificationRead: (id: string) => `/api/notifications/${encodeURIComponent(id)}/read`,
   notificationsReadAll: "/api/notifications/read-all",

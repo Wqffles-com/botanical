@@ -41,9 +41,12 @@ describe("agent identity mapping", () => {
   test("write payload includes prompt and systemPrompt aliases", () => {
     const payload = agentWritePayload({
       name: "  Scout  ",
+      title: "  Scout lead  ",
       description: "Looks around",
       prompt: "Search first.",
       icon: "Search",
+      shape: "hexagon",
+      picture: null,
       color: "amber",
       tools: ["web_search", "web_search", ""],
       defaultProfileId: "",
@@ -57,6 +60,9 @@ describe("agent identity mapping", () => {
     expect(payload.defaultProfileId).toBeNull();
     expect(payload.roleIds).toEqual(["coder"]);
     expect(payload.icon).toBe("Search");
+    expect(payload.title).toBe("Scout lead");
+    expect(payload.shape).toBe("hexagon");
+    expect(payload.picture).toBeNull();
     expect(payload.color).toBe("amber");
   });
 
@@ -64,9 +70,12 @@ describe("agent identity mapping", () => {
     expect(
       validateAgentDraft({
         name: "",
+        title: "",
         description: "",
         prompt: "",
         icon: "Bot",
+        shape: "squircle",
+        picture: null,
         color: "green",
         tools: [],
         defaultProfileId: null,
@@ -76,9 +85,12 @@ describe("agent identity mapping", () => {
     expect(
       validateAgentDraft({
         name: "x".repeat(41),
+        title: "",
         description: "",
         prompt: "You are helpful.",
         icon: "Bot",
+        shape: "squircle",
+        picture: null,
         color: "green",
         tools: [],
         defaultProfileId: null,
@@ -88,9 +100,12 @@ describe("agent identity mapping", () => {
     expect(
       validateAgentDraft({
         name: "Scout",
+        title: "",
         description: "",
         prompt: "   ",
         icon: "Search",
+        shape: "squircle",
+        picture: null,
         color: "amber",
         tools: [],
         defaultProfileId: null,

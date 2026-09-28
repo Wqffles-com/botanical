@@ -22,6 +22,32 @@ export type AgentColor = (typeof AGENT_COLORS)[number];
 
 export const DEFAULT_AGENT_COLOR: AgentColor = "green";
 
+/** Avatar silhouettes. `squircle` matches the original rounded mark. */
+export const AGENT_SHAPES = ["circle", "squircle", "square", "hexagon", "diamond", "shield"] as const;
+
+export type AgentShape = (typeof AGENT_SHAPES)[number];
+
+export const DEFAULT_AGENT_SHAPE: AgentShape = "squircle";
+
+/** Short role label under the bot name. */
+export const AGENT_TITLE_MAX = 60;
+
+/**
+ * Custom avatar pictures are data URLs, not remote links.
+ * PNG, JPEG, and WebP only. SVG is rejected. Cap keeps a bot row inside the API body limit.
+ */
+export const AGENT_PICTURE_MAX = 200_000;
+
+const AGENT_PICTURE_PATTERN = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+
+export function isAgentShape(value: unknown): value is AgentShape {
+  return typeof value === "string" && (AGENT_SHAPES as readonly string[]).includes(value);
+}
+
+export function isAgentPicture(value: unknown): value is string {
+  return typeof value === "string" && value.length <= AGENT_PICTURE_MAX && AGENT_PICTURE_PATTERN.test(value);
+}
+
 /** Stable timestamp for the example rows so list order is by id. */
 export const EXAMPLE_AGENTS_CREATED_AT = "2026-09-24T00:00:00.000Z";
 

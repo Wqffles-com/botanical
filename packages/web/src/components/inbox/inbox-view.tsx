@@ -43,8 +43,11 @@ export function InboxView() {
         return {
           id: agent.id,
           name: identity.name,
+          title: identity.title,
           description: identity.description,
           icon: identity.icon,
+          shape: identity.shape,
+          picture: identity.picture,
           color: identity.color,
         };
       }),
@@ -196,9 +199,9 @@ function MessageRow({
     <li className="rounded-lg border px-3 py-3">
       <div className="flex items-start gap-3">
         <div className="flex items-center gap-1.5">
-          <AgentAvatar name={from?.name ?? "Agent"} icon={from?.icon} color={from?.color} size="sm" />
+          <AgentAvatar name={from?.name ?? "Agent"} icon={from?.icon} color={from?.color} shape={from?.shape} picture={from?.picture} size="sm" />
           <ArrowRight className="size-3 text-muted-foreground" />
-          <AgentAvatar name={to?.name ?? "Agent"} icon={to?.icon} color={to?.color} size="sm" />
+          <AgentAvatar name={to?.name ?? "Agent"} icon={to?.icon} color={to?.color} shape={to?.shape} picture={to?.picture} size="sm" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline justify-between gap-2">

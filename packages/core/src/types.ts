@@ -1,4 +1,5 @@
-import type { AgentColor } from "./agents";
+import type { AccentColor } from "./appearance";
+import type { AgentColor, AgentShape } from "./agents";
 
 /** Deployment flag from server config. Behavior is the same in v0; the client only badges it. */
 export type DeploymentMode = "SELF_HOST" | "SAAS";
@@ -93,12 +94,25 @@ export interface RoleRecord {
   updatedAt: string;
 }
 
+export interface Appearance {
+  accent: AccentColor;
+}
+
 export interface Agent {
   id: string;
   /** Display name, 1–40 characters. */
   name: string;
+  /** Short role label. Empty when the bot has none. */
+  title: string;
   /** Lucide icon name. Defaults to "Bot" when the server omits it. */
   icon: string;
+  /** Avatar silhouette. Defaults to "squircle" when the server omits it. */
+  shape: AgentShape;
+  /**
+   * Custom avatar image as a PNG, JPEG, or WebP data URL.
+   * Null shows the colored shape and icon instead.
+   */
+  picture: string | null;
   /** Picker swatch. Defaults to "green" when the server omits it. */
   color: AgentColor;
   description: string;
@@ -125,7 +139,11 @@ export interface Agent {
 
 export interface CreateAgentInput {
   name: string;
+  title?: string;
   icon?: string;
+  shape?: AgentShape;
+  /** Data URL, or null to store no picture. */
+  picture?: string | null;
   color?: AgentColor;
   description?: string;
   systemPrompt?: string;
@@ -140,7 +158,11 @@ export interface CreateAgentInput {
 
 export interface UpdateAgentInput {
   name?: string;
+  title?: string;
   icon?: string;
+  shape?: AgentShape;
+  /** Data URL to set, or null to clear. */
+  picture?: string | null;
   color?: AgentColor;
   description?: string;
   systemPrompt?: string;

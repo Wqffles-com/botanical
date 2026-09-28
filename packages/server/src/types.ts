@@ -5,7 +5,7 @@ import type {
   PrefsRepository,
   SecretRepository,
 } from "@botanical/db";
-import type { AgentColor } from "@botanical/core";
+import type { AgentColor, AgentShape } from "@botanical/core";
 
 /**
  * HTTP-layer domain types. This Store is the persistence contract.
@@ -24,7 +24,7 @@ import type { AgentColor } from "@botanical/core";
  */
 
 export { AGENT_COLORS, DEFAULT_AGENT_COLOR, DEFAULT_AGENT_ICON } from "@botanical/core";
-export type { AgentColor };
+export type { AgentColor, AgentShape };
 
 export const DEPLOYMENT_MODES = ["SELF_HOST", "SAAS"] as const;
 export type DeploymentMode = (typeof DEPLOYMENT_MODES)[number];
@@ -85,8 +85,14 @@ export interface Agent {
   id: string;
   /** Display name, 1–40 characters. */
   name: string;
+  /** Short role label. Empty when unset. */
+  title: string;
   /** Lucide icon name, for example "Bot" or "Sprout". */
   icon: string;
+  /** Avatar silhouette. */
+  shape: AgentShape;
+  /** PNG, JPEG, or WebP data URL, or null. */
+  picture: string | null;
   color: AgentColor;
   description: string;
   systemPrompt: string;
@@ -103,7 +109,10 @@ export interface Agent {
 
 export interface NewAgent {
   name: string;
+  title?: string;
   icon?: string;
+  shape?: AgentShape;
+  picture?: string | null;
   color?: AgentColor;
   description: string;
   systemPrompt: string;
@@ -115,7 +124,10 @@ export interface NewAgent {
 
 export interface AgentPatch {
   name?: string;
+  title?: string;
   icon?: string;
+  shape?: AgentShape;
+  picture?: string | null;
   color?: AgentColor;
   description?: string;
   systemPrompt?: string;

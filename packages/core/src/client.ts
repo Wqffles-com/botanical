@@ -1,12 +1,18 @@
 import {
   AGENT_COLORS,
   AGENT_NAME_MAX,
+  AGENT_SHAPES,
+  AGENT_TITLE_MAX,
   DEFAULT_AGENT_COLOR,
   DEFAULT_AGENT_ICON,
   isAgentColor,
   isAgentIcon,
+  isAgentPicture,
+  isAgentShape,
   type AgentColor,
+  type AgentShape,
 } from "./agents";
+import { ACCENT_COLORS, isAccentColor, type AccentColor } from "./appearance";
 import {
   BotanicalApiError,
   errorMessage,
@@ -27,6 +33,7 @@ import {
 import {
   eventsFromFinalMessage,
   normalizeAgent,
+  normalizeAppearance,
   normalizeAgentMessage,
   normalizeChat,
   normalizeMemory,
@@ -43,6 +50,7 @@ import { API } from "./paths";
 import { readChatStream } from "./sse";
 import type {
   Agent,
+  Appearance,
   AgentMessage,
   AgentRoleRef,
   Chat,
@@ -138,6 +146,21 @@ export class BotanicalClient {
     return this.requestJson(API.me).then(normalizeMe);
   }
 
+  getAppearance(): Promise<Appearance> {
+    return this.requestJson(API.appearance).then(normalizeAppearance);
+  }
+
+  async updateAppearance(accent: AccentColor): Promise<Appearance> {
+    if (!isAccentColor(accent)) {
+      throw new BotanicalApiError(`Accent must be one of: ${ACCENT_COLORS.join(", ")}.`, { status: 400 });
+    }
+    const body = await this.requestJson(API.appearance, {
+      method: "PATCH",
+      body: JSON.stringify({ accent }),
+    });
+    return normalizeAppearance(body);
+  }
+
   async listProfiles(): Promise<ModelProfile[]> {
     const body = await this.requestJson(API.profiles);
     return unwrapList(body, ["profiles"]).map(normalizeProfile);
@@ -157,7 +180,10 @@ export class BotanicalClient {
       method: "POST",
       body: JSON.stringify({
         name,
+        ...(input.title !== undefined ? { title: readAgentTitle(input.title) } : {}),
         icon: readAgentIcon(input.icon),
+        ...(input.shape !== undefined ? { shape: readAgentShape(input.shape) } : {}),
+        ...(input.picture !== undefined ? { picture: readAgentPicture(input.picture) } : {}),
         color: readAgentColor(input.color),
         description: input.description?.trim() ?? "",
         prompt: systemPrompt,
@@ -174,8 +200,11 @@ export class BotanicalClient {
   async updateAgent(id: string, input: UpdateAgentInput): Promise<Agent> {
     const patch: Record<string, unknown> = {};
     if (input.name !== undefined) patch.name = readAgentName(input.name);
+    if (input.title !== undefined) patch.title = readAgentTitle(input.title);
     if (input.description !== undefined) patch.description = input.description.trim();
     if (input.icon !== undefined) patch.icon = readAgentIcon(input.icon);
+    if (input.shape !== undefined) patch.shape = readAgentShape(input.shape);
+    if (input.picture !== undefined) patch.picture = readAgentPicture(input.picture);
     if (input.color !== undefined) patch.color = readAgentColor(input.color);
     if (input.systemPrompt !== undefined || input.prompt !== undefined) {
       const systemPrompt = readAgentPrompt(input);
@@ -646,6 +675,29 @@ function readAgentColor(value: AgentColor | undefined): AgentColor {
   if (value === undefined) return DEFAULT_AGENT_COLOR;
   if (!isAgentColor(value)) {
     throw new BotanicalApiError(`Color must be one of: ${AGENT_COLORS.join(", ")}.`, { status: 400 });
+  }
+  return value;
+}
+
+function readAgentTitle(value: string): string {
+  const title = value.trim();
+  if (title.length > AGENT_TITLE_MAX) {
+    throw new BotanicalApiError(`Title must be ${AGENT_TITLE_MAX} characters or fewer.`, { status: 400 });
+  }
+  return title;
+}
+
+function readAgentShape(value: AgentShape): AgentShape {
+  if (!isAgentShape(value)) {
+    throw new BotanicalApiError(`Shape must be one of: ${AGENT_SHAPES.join(", ")}.`, { status: 400 });
+  }
+  return value;
+}
+
+function readAgentPicture(value: string | null): string | null {
+  if (value === null || value.trim() === "") return null;
+  if (!isAgentPicture(value)) {
+    throw new BotanicalApiError("Picture must be a PNG, JPEG, or WebP data URL.", { status: 400 });
   }
   return value;
 }

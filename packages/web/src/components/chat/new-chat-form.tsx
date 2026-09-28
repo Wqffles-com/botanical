@@ -85,7 +85,13 @@ export function NewChatForm({
                         : "border-border hover:border-border hover:bg-muted/60",
                     )}
                   >
-                    <AgentAvatar name={identity.name} icon={identity.icon} color={identity.color} />
+                    <AgentAvatar
+                      name={identity.name}
+                      icon={identity.icon}
+                      color={identity.color}
+                      shape={identity.shape}
+                      picture={identity.picture}
+                    />
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium">{identity.name}</span>
                       <span className="mt-0.5 block text-[12.5px] text-muted-foreground">

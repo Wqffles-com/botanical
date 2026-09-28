@@ -1,4 +1,4 @@
-import type { DeploymentMode, ModelProfile } from "@botanical/core";
+import type { AgentShape, DeploymentMode, ModelProfile } from "@botanical/core";
 
 export const AGENT_COLORS = [
   "red",
@@ -18,8 +18,11 @@ export type AgentColor = (typeof AGENT_COLORS)[number];
 export interface AgentIdentity {
   id: string;
   name: string;
+  title: string;
   description: string;
   icon: string;
+  shape: AgentShape;
+  picture: string | null;
   color: AgentColor;
 }
 

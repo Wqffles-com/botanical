@@ -1,3 +1,10 @@
+import {
+  AGENT_TITLE_MAX,
+  DEFAULT_AGENT_SHAPE,
+  isAgentPicture,
+  isAgentShape,
+  type AgentShape,
+} from "@botanical/core";
 import { DEFAULT_AGENT_COLOR, resolveAgentColor, type AgentColor } from "./agent-colors";
 import {
   DEFAULT_AGENT_ICON,
@@ -9,9 +16,14 @@ export const AGENT_NAME_MAX = 40;
 export const AGENT_DESCRIPTION_MAX = 240;
 export const AGENT_PROMPT_MAX = 20_000;
 
+export { AGENT_TITLE_MAX };
+
 export type AgentIdentityFields = {
   name: string;
+  title: string;
   icon: AgentIconName;
+  shape: AgentShape;
+  picture: string | null;
   color: AgentColor;
   description: string;
 };
@@ -44,9 +56,12 @@ export type AgentIdentity = AgentIdentityFields & {
 
 export type AgentDraft = {
   name: string;
+  title: string;
   description: string;
   prompt: string;
   icon: AgentIconName;
+  shape: AgentShape;
+  picture: string | null;
   color: AgentColor;
   tools: string[];
   defaultProfileId: string | null;
@@ -55,10 +70,13 @@ export type AgentDraft = {
 
 export type AgentWritePayload = {
   name: string;
+  title: string;
   description: string;
   prompt: string;
   systemPrompt: string;
   icon: string;
+  shape: AgentShape;
+  picture: string | null;
   color: AgentColor;
   tools: string[];
   toolIds: string[];
@@ -86,9 +104,12 @@ export type ProfileInfo = {
 
 export const EMPTY_AGENT_DRAFT: AgentDraft = {
   name: "",
+  title: "",
   description: "",
   prompt: "",
   icon: DEFAULT_AGENT_ICON,
+  shape: DEFAULT_AGENT_SHAPE,
+  picture: null,
   color: DEFAULT_AGENT_COLOR,
   tools: [],
   defaultProfileId: null,
@@ -142,9 +163,12 @@ export function identityFromUnknown(value: unknown): AgentIdentity {
   return {
     id: readString(record, ["id", "uuid"]),
     name: readString(record, ["name"], "Agent"),
+    title: readString(record, ["title"]).trim().slice(0, AGENT_TITLE_MAX),
     description: readString(record, ["description"]),
     prompt,
     icon: resolveAgentIconName(record.icon),
+    shape: resolveAgentShape(record.shape),
+    picture: resolveAgentPicture(record.picture),
     color: resolveAgentColor(record.color),
     tools,
     defaultProfileId: defaultProfile,
@@ -171,9 +195,12 @@ export function identitiesFromUnknown(value: unknown): AgentIdentity[] {
 export function draftFromIdentity(agent: AgentIdentity): AgentDraft {
   return {
     name: agent.name,
+    title: agent.title,
     description: agent.description,
     prompt: agent.prompt,
     icon: agent.icon,
+    shape: agent.shape,
+    picture: agent.picture,
     color: agent.color,
     tools: [...agent.tools],
     defaultProfileId: agent.defaultProfileId,
@@ -185,8 +212,14 @@ export function validateAgentDraft(draft: AgentDraft): string | null {
   const name = draft.name.trim();
   if (!name) return "Name the agent before saving it.";
   if (name.length > AGENT_NAME_MAX) return `Name must be ${AGENT_NAME_MAX} characters or fewer.`;
+  if (draft.title.trim().length > AGENT_TITLE_MAX) {
+    return `Title must be ${AGENT_TITLE_MAX} characters or fewer.`;
+  }
   if (draft.description.length > AGENT_DESCRIPTION_MAX) {
     return `Description must be ${AGENT_DESCRIPTION_MAX} characters or fewer.`;
+  }
+  if (draft.picture && !isAgentPicture(draft.picture)) {
+    return "Picture must be a PNG, JPEG, or WebP image.";
   }
   if (!draft.prompt.trim()) return "Write a prompt for the agent.";
   if (draft.prompt.length > AGENT_PROMPT_MAX) return "Prompt is too long.";
@@ -202,10 +235,13 @@ export function agentWritePayload(draft: AgentDraft): AgentWritePayload {
   const roleIds = [...new Set(draft.roleIds.map((id) => id.trim()).filter(Boolean))];
   return {
     name,
+    title: draft.title.trim(),
     description,
     prompt,
     systemPrompt: prompt,
     icon: resolveAgentIconName(draft.icon),
+    shape: resolveAgentShape(draft.shape),
+    picture: resolveAgentPicture(draft.picture),
     color: resolveAgentColor(draft.color),
     tools,
     toolIds: tools,
@@ -312,15 +348,29 @@ function unwrapList(value: unknown, keys: string[]): unknown[] {
 export function agentIdentity(agent: IdentityLoose | null | undefined): AgentIdentityFields {
   return {
     name: agent?.name?.trim() || "Agent",
+    title: agent?.title?.trim().slice(0, AGENT_TITLE_MAX) ?? "",
     icon: resolveAgentIconName(agent?.icon),
+    shape: resolveAgentShape(agent?.shape),
+    picture: resolveAgentPicture(agent?.picture),
     color: resolveAgentColor(agent?.color),
     description: agent?.description?.trim() ?? "",
   };
 }
 
+export function resolveAgentShape(value: unknown): AgentShape {
+  return isAgentShape(value) ? value : DEFAULT_AGENT_SHAPE;
+}
+
+export function resolveAgentPicture(value: unknown): string | null {
+  return isAgentPicture(value) ? value : null;
+}
+
 type IdentityLoose = {
   name?: string | null;
+  title?: string | null;
   icon?: string | null;
+  shape?: string | null;
+  picture?: string | null;
   color?: string | null;
   description?: string | null;
 };
@@ -331,6 +381,7 @@ export function filterAgents(agents: AgentIdentity[], query: string): AgentIdent
   return agents.filter((agent) => {
     return (
       agent.name.toLowerCase().includes(needle) ||
+      agent.title.toLowerCase().includes(needle) ||
       agent.description.toLowerCase().includes(needle) ||
       agent.icon.toLowerCase().includes(needle) ||
       agent.color.toLowerCase().includes(needle)

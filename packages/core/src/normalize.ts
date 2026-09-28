@@ -1,9 +1,14 @@
+import { normalizeAccent } from "./appearance";
 import {
   DEFAULT_AGENT_COLOR,
   DEFAULT_AGENT_ICON,
+  DEFAULT_AGENT_SHAPE,
   isAgentColor,
   isAgentIcon,
+  isAgentPicture,
+  isAgentShape,
   type AgentColor,
+  type AgentShape,
 } from "./agents";
 import { BotanicalApiError } from "./errors";
 import type {
@@ -14,6 +19,7 @@ import type {
   ChatMessage,
   ChatStreamEvent,
   DeploymentMode,
+  Appearance,
   Health,
   LoginResult,
   Me,
@@ -186,7 +192,10 @@ export function normalizeAgent(body: unknown): Agent {
   return {
     id: requireRecordId(record, "Agent"),
     name: stringField(record, ["name"], "Agent"),
+    title: stringField(record, ["title"]).slice(0, 60),
     icon: normalizeIcon(record.icon),
+    shape: normalizeShape(record.shape),
+    picture: normalizePicture(record.picture),
     color: normalizeColor(record.color),
     description: stringField(record, ["description"]),
     systemPrompt,
@@ -266,6 +275,20 @@ function normalizeIcon(value: unknown): string {
 function normalizeColor(value: unknown): AgentColor {
   if (isAgentColor(value)) return value;
   return DEFAULT_AGENT_COLOR;
+}
+
+function normalizeShape(value: unknown): AgentShape {
+  if (isAgentShape(value)) return value;
+  return DEFAULT_AGENT_SHAPE;
+}
+
+function normalizePicture(value: unknown): string | null {
+  return isAgentPicture(value) ? value : null;
+}
+
+export function normalizeAppearance(body: unknown): Appearance {
+  const record = unwrapEntity(body, ["appearance"]);
+  return { accent: normalizeAccent(record.accent) };
 }
 
 function normalizeDefaultProfileId(value: unknown): string | null {

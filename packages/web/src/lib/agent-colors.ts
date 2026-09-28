@@ -1,9 +1,8 @@
 /**
  * Agent color slots. Names stay on the shared contract
- * (red, orange, amber, green, teal, cyan, blue, violet, pink, gray)
- * so stored agents keep their identity. Swatches are a grayscale ramp:
- * icons and names carry the distinction, not hue.
- * Default is green.
+ * (red, orange, amber, green, teal, cyan, blue, violet, pink, gray).
+ * Each slot is a hue used on that bot's avatar and sidebar mark.
+ * The rest of the chrome stays monochrome. Default is green.
  */
 
 export const AGENT_COLORS = [
@@ -34,21 +33,18 @@ export type AgentColorTokens = {
   ring: string;
 };
 
-const wash = "rgba(0, 0, 0, 0.06)";
-const ring = "rgba(0, 0, 0, 0.45)";
-
-/** Equal-channel hex so each slot is a different gray, never a hue. */
+/** Hue fills for the avatar mark. Ink is chosen for contrast on that fill. */
 export const AGENT_COLOR_TOKENS: Record<AgentColor, AgentColorTokens> = {
-  red: { fill: "#171717", ink: "#fafafa", wash, ring },
-  orange: { fill: "#262626", ink: "#fafafa", wash, ring },
-  amber: { fill: "#333333", ink: "#fafafa", wash, ring },
-  green: { fill: "#404040", ink: "#fafafa", wash, ring },
-  teal: { fill: "#525252", ink: "#fafafa", wash, ring },
-  cyan: { fill: "#666666", ink: "#fafafa", wash, ring },
-  blue: { fill: "#737373", ink: "#111111", wash, ring },
-  violet: { fill: "#8a8a8a", ink: "#111111", wash, ring },
-  pink: { fill: "#a3a3a3", ink: "#111111", wash, ring },
-  gray: { fill: "#d4d4d4", ink: "#111111", wash, ring },
+  red: { fill: "#dc2626", ink: "#ffffff", wash: "rgba(220, 38, 38, 0.14)", ring: "#dc2626" },
+  orange: { fill: "#ea580c", ink: "#ffffff", wash: "rgba(234, 88, 12, 0.14)", ring: "#ea580c" },
+  amber: { fill: "#d97706", ink: "#1c1917", wash: "rgba(217, 119, 6, 0.16)", ring: "#d97706" },
+  green: { fill: "#16a34a", ink: "#ffffff", wash: "rgba(22, 163, 74, 0.14)", ring: "#16a34a" },
+  teal: { fill: "#0f766e", ink: "#ffffff", wash: "rgba(15, 118, 110, 0.14)", ring: "#0f766e" },
+  cyan: { fill: "#0891b2", ink: "#ffffff", wash: "rgba(8, 145, 178, 0.14)", ring: "#0891b2" },
+  blue: { fill: "#2563eb", ink: "#ffffff", wash: "rgba(37, 99, 235, 0.14)", ring: "#2563eb" },
+  violet: { fill: "#7c3aed", ink: "#ffffff", wash: "rgba(124, 58, 237, 0.14)", ring: "#7c3aed" },
+  pink: { fill: "#db2777", ink: "#ffffff", wash: "rgba(219, 39, 119, 0.14)", ring: "#db2777" },
+  gray: { fill: "#525252", ink: "#fafafa", wash: "rgba(0, 0, 0, 0.06)", ring: "#525252" },
 };
 
 export function isAgentColor(value: unknown): value is AgentColor {

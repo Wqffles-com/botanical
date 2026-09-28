@@ -18,6 +18,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={cn("font-sans", GeistSans.variable, GeistMono.variable)}
       suppressHydrationWarning
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var a=localStorage.getItem('botanical.accent');if(a&&a!=='neutral')document.documentElement.dataset.accent=a;}catch(e){}",
+          }}
+        />
+      </head>
       <body className="min-h-svh antialiased">
         <Providers>{children}</Providers>
       </body>

@@ -49,6 +49,7 @@ export function AppSidebar() {
       const roles = agent.roles.map((role) => role.name).join(" ");
       return (
         identity.name.toLowerCase().includes(q) ||
+        identity.title.toLowerCase().includes(q) ||
         identity.description.toLowerCase().includes(q) ||
         roles.toLowerCase().includes(q)
       );
@@ -189,7 +190,9 @@ export function AppSidebar() {
 
 function AgentRow({ agent, active }: { agent: Agent; active: boolean }) {
   const identity = agentIdentity(agent);
-  const line = agent.roles.length > 0 ? agent.roles.map((role) => role.name).join(", ") : identity.description;
+  const line =
+    identity.title ||
+    (agent.roles.length > 0 ? agent.roles.map((role) => role.name).join(", ") : identity.description);
   return (
     <li>
       <Link
@@ -201,7 +204,14 @@ function AgentRow({ agent, active }: { agent: Agent; active: boolean }) {
           active && "bg-sidebar-accent",
         )}
       >
-        <AgentAvatar icon={identity.icon} color={identity.color} name={identity.name} size="sm" />
+        <AgentAvatar
+          icon={identity.icon}
+          color={identity.color}
+          shape={identity.shape}
+          picture={identity.picture}
+          name={identity.name}
+          size="sm"
+        />
         <span className="min-w-0">
           <span className="block truncate text-sm leading-tight font-medium">{identity.name}</span>
           {line ? <span className="mt-0.5 block truncate text-xs leading-tight text-muted-foreground">{line}</span> : null}

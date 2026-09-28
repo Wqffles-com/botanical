@@ -84,9 +84,12 @@ export async function createAgent(draft: AgentDraft): Promise<AgentIdentity> {
   const payload = agentWritePayload(draft);
   const created = await api.createAgent({
     name: payload.name,
+    title: payload.title,
     description: payload.description,
     prompt: payload.prompt,
     icon: payload.icon,
+    shape: payload.shape,
+    picture: payload.picture,
     color: payload.color,
     tools: payload.tools,
     defaultProfileId: payload.defaultProfileId,
@@ -99,9 +102,12 @@ export async function updateAgent(id: string, draft: AgentDraft): Promise<AgentI
   const payload = agentWritePayload(draft);
   const saved = await api.updateAgent(id, {
     name: payload.name,
+    title: payload.title,
     description: payload.description,
     prompt: payload.prompt,
     icon: payload.icon,
+    shape: payload.shape,
+    picture: payload.picture,
     color: payload.color,
     tools: payload.tools,
     defaultProfileId: payload.defaultProfileId,

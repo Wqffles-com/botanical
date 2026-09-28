@@ -118,6 +118,8 @@ Registered only through `router.add` in the handler file. `packages/server/src/a
 | PUT | `/api/settings/speech` | `packages/server/src/routes/account-settings.ts` |
 | GET | `/api/settings/always-on` | `packages/server/src/routes/always-on-settings.ts` |
 | PATCH | `/api/settings/always-on` | `packages/server/src/routes/always-on-settings.ts` |
+| GET | `/api/settings/appearance` | `packages/server/src/routes/appearance.ts` |
+| PATCH | `/api/settings/appearance` | `packages/server/src/routes/appearance.ts` |
 | GET | `/api/agent-messages` | `packages/server/src/routes/agent-messages.ts` |
 | POST | `/api/agent-messages` | `packages/server/src/routes/agent-messages.ts` |
 | PATCH | `/api/agent-messages/:id` | `packages/server/src/routes/agent-messages.ts` |
@@ -138,7 +140,7 @@ Registered only through `router.add` in the handler file. `packages/server/src/a
 
 `GET` and `DELETE` on `/internal/mcp/runs/:runId` are registered and then answered 405 after the run token check. The CLI uses `POST` JSON-RPC (`initialize`, `ping`, `tools/list`, `tools/call`). Session cookies do not authenticate that path.
 
-`POST /api/hooks/:listenerId` is outside the session. It checks the listener secret (`packages/server/src/listeners/verify.ts`). `GET` and `PATCH /api/settings/always-on` require an admin session (`packages/server/src/routes/always-on-settings.ts`). The scheduler starts from `packages/server/src/serve.ts` unless `createApp({ scheduler: false })`. Each tick reads `always_on.*` from the store (`packages/db/src/always-on-settings.ts`).
+`POST /api/hooks/:listenerId` is outside the session. It checks the listener secret (`packages/server/src/listeners/verify.ts`). `GET` and `PATCH /api/settings/always-on` require an admin session (`packages/server/src/routes/always-on-settings.ts`). `GET` and `PATCH /api/settings/appearance` are per-user (`packages/server/src/routes/appearance.ts`). The accent is `neutral`, `blue`, `red`, `green`, `orange`, or `violet`, stored at `appearance.accent` in `user_settings`. `neutral` is the default and deletes the row. Agent create and update accept `title` (role label), `shape` (avatar silhouette), and `picture` (data URL or null). The scheduler starts from `packages/server/src/serve.ts` unless `createApp({ scheduler: false })`. Each tick reads `always_on.*` from the store (`packages/db/src/always-on-settings.ts`).
 
 ## Env vars
 
