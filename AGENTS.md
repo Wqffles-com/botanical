@@ -42,6 +42,10 @@ Do not run e2e against a live stack unless explicitly asked. `bun run e2e:self-t
 
 Any change that adds, moves, renames or deletes files, routes, tables, env vars, or packages must update the relevant file in `docs/index/` in the same PR. Run `bun run check:index` before opening a PR. Reviewers should reject PRs that leave the index stale.
 
+## GitHub issues and PRs
+
+Whenever you create an issue or pull request in GitHub, add `Wqffles-com` as both assignee and reviewer (for issues, assignee only, since issues have no reviewers).
+
 ## Secrets
 
 Do not commit secrets, `.env` files, or real API keys. Use `.env.example` for placeholders. See `SECURITY.md`.
