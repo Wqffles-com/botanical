@@ -22,6 +22,10 @@ There is no default model. A profile is chosen in the product for each chat. `BO
 
 Requires Docker and Compose v2.24 or newer (the SaaS file uses `depends_on: !reset`).
 
+Linux / macOS: `./start.sh`. Windows: `.\start.ps1` (or `powershell -ExecutionPolicy Bypass -File .\start.ps1` if execution policy blocks it). The script creates `.env` from `.env.example` when needed, generates encryption and database secrets, asks for the web port and coding CLIs, then runs Compose. Use `./start.sh --yes` / `.\start.ps1 -Yes` to accept defaults. Re-running does not overwrite secrets already in `.env`.
+
+To configure by hand instead:
+
 ```sh
 git clone https://github.com/Wqffles-com/botanical.git
 cd botanical

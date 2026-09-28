@@ -1,0 +1,4 @@
+# Keep the Unix launcher executable as LF after a Windows clone.
+start.sh text eol=lf
+*.sh text eol=lf
+.env.example text eol=lf

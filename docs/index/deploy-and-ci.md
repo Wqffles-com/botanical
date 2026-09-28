@@ -14,6 +14,9 @@ Images, compose, release zip, and the one workflow. The API process inside the s
 | `docker-compose.yml` | `postgres`, `server` (root `Dockerfile`), `web` (`web.Dockerfile`). Host ports default to web 3000, API `127.0.0.1:8788`, Postgres `127.0.0.1:5433` |
 | `docker-compose.cli.yml` | Extra env and volumes for coding CLIs on `server` |
 | `docker-compose.saas.yml` | Sets deployment mode to `SAAS` and does not start bundled Postgres |
+| `start.sh` | Repo-root launcher: Docker/Compose checks, `.env` from `.env.example`, generated secrets, prompts, `docker compose up --build -d` |
+| `start.ps1` | Same launcher for Windows PowerShell 5.1+ and pwsh. Writes `.env` UTF-8 without BOM, LF endings |
+| `.gitattributes` | `start.sh` and `*.sh` stay LF |
 | `.dockerignore` | Docker build context filter |
 | `packages/db/docker-compose.test.yml` | Test-only Postgres. Do not start it unless asked |
 
@@ -81,6 +84,7 @@ Issue forms: `.github/ISSUE_TEMPLATE/bug_report.yml`, `.github/ISSUE_TEMPLATE/fe
 
 ## Where to change X
 
+- **Change the one-command start.** `start.sh` and `start.ps1` together. They read `.env.example` and call `docker-compose.yml` / `docker-compose.cli.yml`.
 - **Change the compose API boot.** `deploy/scripts/server-entrypoint.sh` and `Dockerfile`. Pass new env through `docker-compose.yml` only if the process reads it (see [server](server.md)).
 - **Change the web image.** `web.Dockerfile` and `packages/web/next.config.ts` (`BOTANICAL_API_URL` is a build arg).
 - **Change the release zip.** `scripts/release/package.sh` and `scripts/release/start.sh`.

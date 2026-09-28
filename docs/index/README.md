@@ -15,6 +15,9 @@ Map of this repo for coding agents. Per-package pages: [server](server.md), [age
 | `docker-compose.yml` | Postgres + API + web |
 | `docker-compose.cli.yml` | Opt-in coding-CLI volumes and env on the API service |
 | `docker-compose.saas.yml` | Hosted override: no bundled Postgres, mode `SAAS` |
+| `start.sh` | Linux/macOS one-command Compose launcher |
+| `start.ps1` | Windows PowerShell 5.1+ / pwsh launcher (same behaviour as `start.sh`) |
+| `.gitattributes` | Forces `start.sh` and other `*.sh` files to LF |
 | `profiles.example.json` | Example `BOTANICAL_PROFILES` document |
 | `.env.example` | Annotated env template |
 | `packages/` | Workspace packages (see graph below) |
