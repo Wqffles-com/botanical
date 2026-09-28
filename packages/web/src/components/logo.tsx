@@ -1,20 +1,9 @@
 import { cn } from "@/lib/utils";
 
 export function Mark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 32" className={cn("shrink-0", className)} aria-hidden>
-      <rect width="32" height="32" rx="8" className="fill-foreground" />
-      <path d="M16 24.5V12" className="stroke-background" strokeWidth="1.6" strokeLinecap="round" fill="none" />
-      <path
-        d="M16 15.2c-3.1-1.2-5-.6-6 1.1-.9 1.6.2 3.1 1.9 3.1 2.1 0 3.3-1.9 4.1-4.2Z"
-        className="fill-background"
-      />
-      <path
-        d="M16 14.4c2.9-1.3 5-.9 6 .8.9 1.7-.1 3.3-1.9 3.3-2.1 0-3.3-1.9-4.1-4.1Z"
-        className="fill-background"
-      />
-    </svg>
-  );
+  // Brand colors live in the asset, so the mark looks the same in light and dark themes.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/favicon.svg" alt="" aria-hidden className={cn("shrink-0", className)} />;
 }
 
 export function Wordmark({ className }: { className?: string }) {
