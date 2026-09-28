@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 export function Mark({ className }: { className?: string }) {
   // Brand colors live in the asset, so the mark looks the same in light and dark themes.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src="/favicon.svg" alt="" aria-hidden className={cn("shrink-0", className)} />;
+  return <img src="/logo.svg" alt="" aria-hidden className={cn("shrink-0", className)} />;
 }
 
 export function Wordmark({ className }: { className?: string }) {
