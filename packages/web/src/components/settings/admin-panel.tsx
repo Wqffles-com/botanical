@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@botanical/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
 import { Input } from "@botanical/ui/components/input";
+import { Checkbox } from "@botanical/ui/components/checkbox";
 import { Label } from "@botanical/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@botanical/ui/components/select";
 
@@ -124,11 +125,10 @@ export function AdminPanel() {
             </Select>
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+            <Checkbox
               data-testid="allow-global-keys"
               checked={allowGlobalKeys}
-              onChange={(event) => setAllowGlobalKeys(event.target.checked)}
+              onCheckedChange={(next) => setAllowGlobalKeys(next)}
             />
             Members may use global provider keys
           </label>

@@ -18,6 +18,7 @@ import { AgentToolAllowlist } from "@/components/agents/agent-tool-allowlist";
 import { useWorkspace } from "@/components/workspace-provider";
 import { Button } from "@botanical/ui/components/button";
 import { Input } from "@botanical/ui/components/input";
+import { Checkbox } from "@botanical/ui/components/checkbox";
 import { Label } from "@botanical/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@botanical/ui/components/select";
 import { Textarea } from "@botanical/ui/components/textarea";
@@ -302,13 +303,11 @@ export function AgentForm({
                 const checked = draft.roleIds.includes(role.id);
                 return (
                   <label key={role.id} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      className="size-3.5 accent-foreground"
+                    <Checkbox
                       checked={checked}
                       disabled={saving}
-                      onChange={(event) => {
-                        const roleIds = event.target.checked
+                      onCheckedChange={(next) => {
+                        const roleIds = next
                           ? [...draft.roleIds, role.id]
                           : draft.roleIds.filter((id) => id !== role.id);
                         patch({ roleIds });

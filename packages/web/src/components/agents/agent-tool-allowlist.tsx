@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@botanical/ui/components/badge";
+import { Checkbox } from "@botanical/ui/components/checkbox";
 import { Label } from "@botanical/ui/components/label";
 import type { ToolInfo } from "@/lib/agent-identity";
 import { cn } from "@/lib/utils";
@@ -53,13 +54,12 @@ export function AgentToolAllowlist({
               disabled && "pointer-events-none opacity-50",
             )}
           >
-            <input
+            <Checkbox
               id={inputId}
-              type="checkbox"
-              className="mt-1 size-4 accent-emerald-600"
+              className="mt-0.5"
               checked={checked}
               disabled={disabled}
-              onChange={() => toggle(tool.id)}
+              onCheckedChange={() => toggle(tool.id)}
             />
             <span className="min-w-0 flex-1">
               <span className="flex flex-wrap items-center gap-2">
