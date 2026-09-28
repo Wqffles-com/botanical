@@ -15,7 +15,7 @@ export function ChatListRow({
   title: string;
   preview?: string;
   active?: boolean;
-  agent?: Pick<AgentIdentity, "name" | "icon" | "color"> | null;
+  agent?: Pick<AgentIdentity, "name" | "icon" | "color" | "shape" | "picture"> | null;
   timestamp?: string;
 }) {
   return (
@@ -30,6 +30,8 @@ export function ChatListRow({
         name={agent?.name ?? title}
         icon={agent?.icon}
         color={agent?.color}
+        shape={agent?.shape}
+        picture={agent?.picture}
         size="sm"
       />
       <span className="min-w-0 flex-1">

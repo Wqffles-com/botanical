@@ -1,15 +1,29 @@
 export {
+  ACCENT_COLORS,
+  ACCENT_SETTING_KEY,
+  DEFAULT_ACCENT,
+  isAccentColor,
+  normalizeAccent,
+} from "./appearance";
+export type { AccentColor } from "./appearance";
+export {
   AGENT_COLORS,
   AGENT_ICON_PATTERN,
   AGENT_NAME_MAX,
+  AGENT_PICTURE_MAX,
+  AGENT_SHAPES,
+  AGENT_TITLE_MAX,
   DEFAULT_AGENT_COLOR,
   DEFAULT_AGENT_ICON,
+  DEFAULT_AGENT_SHAPE,
   EXAMPLE_AGENTS,
   EXAMPLE_AGENTS_CREATED_AT,
   isAgentColor,
   isAgentIcon,
+  isAgentPicture,
+  isAgentShape,
 } from "./agents";
-export type { AgentColor, ExampleAgent } from "./agents";
+export type { AgentColor, AgentShape, ExampleAgent } from "./agents";
 export { BotanicalClient } from "./client";
 export type { BotanicalClientOptions } from "./client";
 export {
@@ -24,6 +38,7 @@ export {
 export {
   normalizeAgent,
   normalizeAgentMessage,
+  normalizeAppearance,
   normalizeChat,
   normalizeMemory,
   normalizeRoleRecord,
@@ -35,6 +50,7 @@ export { parseNdjsonLine, parseSseFrame, readChatStream } from "./sse";
 export { AGENT_MESSAGE_STATUSES, CLIENT_CONTRACT_VERSION, INBOX_CHAT_TITLE } from "./types";
 export type {
   Agent,
+  Appearance,
   AgentMessage,
   AgentMessageStatus,
   Chat,

@@ -50,11 +50,21 @@ export function AgentSidebarList({
                     active && "bg-accent",
                   )}
                 >
-                  <AgentAvatar name={agent.name} icon={agent.icon} color={agent.color} size="sm" />
+                  <AgentAvatar
+                    name={agent.name}
+                    icon={agent.icon}
+                    color={agent.color}
+                    shape={agent.shape}
+                    picture={agent.picture}
+                    size="sm"
+                  />
                   <span className="min-w-0">
                     <span className="block truncate text-[13px] font-medium">{agent.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {agent.roles.length > 0 ? agent.roles.map((role) => role.name).join(", ") : agent.description || "No description"}
+                      {agent.title ||
+                        (agent.roles.length > 0
+                          ? agent.roles.map((role) => role.name).join(", ")
+                          : agent.description || "No description")}
                     </span>
                   </span>
                 </Link>
@@ -70,7 +80,14 @@ export function AgentSidebarList({
 export function AgentSidebarChip({ agent }: { agent: AgentIdentity }) {
   return (
     <span className="inline-flex min-w-0 items-center gap-2">
-      <AgentAvatar name={agent.name} icon={agent.icon} color={agent.color} size="sm" />
+      <AgentAvatar
+        name={agent.name}
+        icon={agent.icon}
+        color={agent.color}
+        shape={agent.shape}
+        picture={agent.picture}
+        size="sm"
+      />
       <span className="truncate text-sm font-medium">{agent.name}</span>
     </span>
   );

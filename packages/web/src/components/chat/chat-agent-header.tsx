@@ -35,7 +35,13 @@ export function ChatAgentHeader({
     <header className={cn("flex min-h-12 shrink-0 items-center gap-3 border-b px-4 py-2", className)}>
       <div className="flex min-w-0 flex-1 items-center gap-2.5 py-1">
         <Link href={`/agents/${encodeURIComponent(agent.id)}`} className="shrink-0 rounded-md hover:opacity-90">
-          <AgentAvatar name={agent.name} icon={agent.icon} color={agent.color} />
+          <AgentAvatar
+            name={agent.name}
+            icon={agent.icon}
+            color={agent.color}
+            shape={agent.shape}
+            picture={agent.picture}
+          />
         </Link>
         <span className="min-w-0">
           <span className="flex min-w-0 flex-wrap items-center gap-2">
@@ -43,13 +49,13 @@ export function ChatAgentHeader({
               href={`/agents/${encodeURIComponent(agent.id)}`}
               className="truncate text-sm font-medium hover:underline"
             >
-              {title ?? agent.name}
+              {agent.name}
             </Link>
             <RoleBadges roles={agent.roles} />
           </span>
           <span className="block truncate text-xs text-muted-foreground">
-            {agent.name}
-            {agent.description ? ` · ${agent.description}` : ""}
+            {agent.title || agent.description || "Agent"}
+            {title && title !== agent.name ? ` · ${title}` : ""}
             {agent.createdByAgentId ? (
               <>
                 {" · Created by "}

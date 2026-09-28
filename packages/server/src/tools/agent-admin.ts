@@ -32,7 +32,12 @@ export function createAgentAdminContributor(store: Store): ToolContributor {
             description: { type: "string" },
             prompt: { type: "string" },
             systemPrompt: { type: "string" },
+            title: { type: "string", description: "Short role label, up to 60 characters." },
             icon: { type: "string" },
+            shape: {
+              type: "string",
+              description: "Avatar shape: circle, squircle, square, hexagon, diamond, or shield.",
+            },
             color: { type: "string" },
             tools: { type: "array", items: { type: "string" } },
             roles: {
@@ -72,6 +77,9 @@ export function createAgentAdminContributor(store: Store): ToolContributor {
           return {
             id: created.id,
             name: created.name,
+            title: created.title,
+            shape: created.shape,
+            color: created.color,
             roleIds: created.roleIds,
             createdByAgentId: created.createdByAgentId,
           };
@@ -91,7 +99,10 @@ export function createAgentAdminContributor(store: Store): ToolContributor {
             agents: agents.map((agent) => ({
               id: agent.id,
               name: agent.name,
+              title: agent.title,
               description: agent.description,
+              shape: agent.shape,
+              color: agent.color,
             })),
           };
         },
@@ -121,7 +132,9 @@ function normalizeCreateArgs(args: unknown): Record<string, unknown> {
   if (typeof record.description === "string") body.description = record.description;
   const prompt = typeof record.prompt === "string" ? record.prompt : record.systemPrompt;
   if (typeof prompt === "string") body.prompt = prompt;
+  if (typeof record.title === "string") body.title = record.title;
   if (typeof record.icon === "string") body.icon = record.icon;
+  if (typeof record.shape === "string") body.shape = record.shape;
   if (typeof record.color === "string") body.color = record.color;
   if (Array.isArray(record.tools)) body.tools = record.tools;
   return body;

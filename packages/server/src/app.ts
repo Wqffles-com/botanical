@@ -22,6 +22,7 @@ import { adaptServerStore } from "./runtime/store.ts";
 import { agentWorkspace, userWorkspaceRoot } from "./runtime/workspace.ts";
 import { registerAgentMessages } from "./routes/agent-messages.ts";
 import { registerAlwaysOnSettings } from "./routes/always-on-settings.ts";
+import { registerAppearance } from "./routes/appearance.ts";
 import { registerAccountSettings } from "./routes/account-settings.ts";
 import { registerAgents } from "./routes/agents.ts";
 import { registerAuth } from "./routes/auth.ts";
@@ -157,6 +158,7 @@ export function createApp(deps: AppDeps): App {
   registerHooks(router, { jobs, limiter: hookLimiter });
   registerNotifications(router);
   registerAlwaysOnSettings(router);
+  registerAppearance(router);
   registerAgentMessages(router, a2a);
   registerProfiles(router);
   registerTranscription(router);

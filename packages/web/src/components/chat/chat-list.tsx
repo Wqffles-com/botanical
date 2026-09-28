@@ -75,6 +75,8 @@ export function ChatList({
                     name={identity.name}
                     icon={identity.icon}
                     color={identity.color}
+                    shape={identity.shape}
+                    picture={identity.picture}
                     size="sm"
                   />
                 ) : null}

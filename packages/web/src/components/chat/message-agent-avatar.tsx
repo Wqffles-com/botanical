@@ -5,7 +5,7 @@ export function MessageAgentAvatar({
   agent,
   size = "sm",
 }: {
-  agent?: Pick<AgentIdentity, "name" | "icon" | "color"> | null;
+  agent?: Partial<Pick<AgentIdentity, "name" | "icon" | "color" | "shape" | "picture">> | null;
   size?: AgentAvatarSize;
 }) {
   return (
@@ -13,6 +13,8 @@ export function MessageAgentAvatar({
       name={agent?.name ?? "Agent"}
       icon={agent?.icon}
       color={agent?.color}
+      shape={agent?.shape}
+      picture={agent?.picture}
       size={size}
       className="mt-0.5"
     />

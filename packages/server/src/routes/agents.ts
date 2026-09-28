@@ -79,7 +79,10 @@ function presentAgent(agent: Agent) {
   return {
     id: agent.id,
     name: agent.name,
+    title: agent.title,
     icon: agent.icon,
+    shape: agent.shape,
+    picture: agent.picture,
     color: agent.color,
     description: agent.description,
     prompt: agent.systemPrompt,

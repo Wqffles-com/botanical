@@ -10,6 +10,7 @@ import { PermissionsSummary } from "@/components/permissions-summary";
 import { RoleBadges } from "@/components/role-badges";
 import { AgentColorPicker } from "@/components/agents/agent-color-picker";
 import { AgentIconPicker } from "@/components/agents/agent-icon-picker";
+import { AgentShapePicker } from "@/components/agents/agent-shape-picker";
 import { AgentToolAllowlist } from "@/components/agents/agent-tool-allowlist";
 import { useWorkspace } from "@/components/workspace-provider";
 import { Button } from "@/components/ui/button";
@@ -26,9 +27,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { previewEffective } from "@/lib/permissions";
 import { createAgent, deleteAgent, updateAgent } from "@/lib/agent-api";
+import { fileToAgentPicture } from "@/lib/agent-picture";
 import {
   AGENT_DESCRIPTION_MAX,
   AGENT_NAME_MAX,
+  AGENT_TITLE_MAX,
   EMPTY_AGENT_DRAFT,
   draftFromIdentity,
   validateAgentDraft,
@@ -37,6 +40,7 @@ import {
   type ProfileInfo,
   type ToolInfo,
 } from "@/lib/agent-identity";
+import type { AgentShape } from "@botanical/core";
 import type { AgentIconName } from "@/lib/agent-icons";
 
 export function AgentForm({
@@ -124,15 +128,22 @@ export function AgentForm({
   const effective = rolesMatchSaved ? agent.effectivePermissions : previewEffective(draft.roleIds, roles);
 
   return (
-    <form onSubmit={(event) => void onSubmit(event)} className="mx-auto w-full max-w-2xl px-6 py-8">
+    <form onSubmit={(event) => void onSubmit(event)} data-testid="agent-editor" className="mx-auto w-full max-w-2xl px-6 py-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
-          <AgentAvatar name={draft.name || "New agent"} icon={draft.icon} color={draft.color} size="xl" />
+          <AgentAvatar
+            name={draft.name || "New agent"}
+            icon={draft.icon}
+            color={draft.color}
+            shape={draft.shape}
+            picture={draft.picture}
+            size="xl"
+          />
           <div className="min-w-0">
             <h1 className="truncate text-3xl font-semibold tracking-tight">{title}</h1>
             {agent ? <RoleBadges roles={agent.roles} /> : null}
             <p className="mt-1 text-sm text-muted-foreground">
-              Icon and name show up in the picker, sidebar, chat header, and messages.
+              Name, title, shape, and picture show up in the sidebar, chat header, and messages.
             </p>
             {agent?.createdByAgentId ? (
               <p className="mt-1 text-sm text-muted-foreground">
@@ -174,6 +185,23 @@ export function AgentForm({
 
         <div className="grid gap-2">
           <div className="flex items-baseline justify-between">
+            <Label htmlFor="agent-title">Title</Label>
+            <span className="text-xs text-muted-foreground">Short role label</span>
+          </div>
+          <Input
+            id="agent-title"
+            value={draft.title}
+            maxLength={AGENT_TITLE_MAX}
+            placeholder="Research assistant"
+            onChange={(event) => patch({ title: event.target.value })}
+          />
+          <p className="text-xs text-muted-foreground">
+            {draft.title.trim().length}/{AGENT_TITLE_MAX}
+          </p>
+        </div>
+
+        <div className="grid gap-2">
+          <div className="flex items-baseline justify-between">
             <Label htmlFor="agent-description">Description</Label>
             <span className="text-xs text-muted-foreground">Shown in pickers</span>
           </div>
@@ -198,6 +226,46 @@ export function AgentForm({
           <div className="grid gap-2">
             <Label>Color</Label>
             <AgentColorPicker value={draft.color} onChange={(color) => patch({ color })} />
+          </div>
+        </div>
+
+        <div className="grid gap-2">
+          <Label>Shape</Label>
+          <AgentShapePicker
+            value={draft.shape}
+            color={draft.color}
+            icon={draft.icon}
+            onChange={(shape: AgentShape) => patch({ shape })}
+          />
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="agent-picture">Picture</Label>
+          <p className="text-xs text-muted-foreground">
+            Shown instead of the shape. PNG, JPEG, or WebP. Clear it to go back to the shape.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              id="agent-picture"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              disabled={saving}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) return;
+                void fileToAgentPicture(file)
+                  .then((picture) => patch({ picture }))
+                  .catch((error: unknown) => {
+                    toast.error(error instanceof Error ? error.message : "Could not read that image.");
+                  });
+              }}
+            />
+            {draft.picture ? (
+              <Button type="button" variant="outline" disabled={saving} onClick={() => patch({ picture: null })}>
+                Clear picture
+              </Button>
+            ) : null}
           </div>
         </div>
 

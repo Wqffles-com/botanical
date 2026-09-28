@@ -40,6 +40,8 @@ export function AgentCard({
         name={agent.name}
         icon={agent.icon}
         color={agent.color}
+        shape={agent.shape}
+        picture={agent.picture}
         size={layout === "grid" ? "lg" : "sm"}
       />
       <span className="min-w-0 flex-1">
@@ -51,7 +53,7 @@ export function AgentCard({
             layout === "grid" ? "line-clamp-2" : "truncate",
           )}
         >
-          {agent.description || "No description yet."}
+          {agent.title || agent.description || "No description yet."}
         </span>
       </span>
     </>
@@ -265,11 +267,18 @@ export function AgentPickerDialog({
                   }}
                   className="items-start gap-3 py-2"
                 >
-                  <AgentAvatar name={agent.name} icon={agent.icon} color={agent.color} size="md" />
+                  <AgentAvatar
+                    name={agent.name}
+                    icon={agent.icon}
+                    color={agent.color}
+                    shape={agent.shape}
+                    picture={agent.picture}
+                    size="md"
+                  />
                   <span className="min-w-0">
                     <span className="block truncate font-medium">{agent.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {agent.description || "No description yet."}
+                      {agent.title || agent.description || "No description yet."}
                     </span>
                   </span>
                 </CommandItem>

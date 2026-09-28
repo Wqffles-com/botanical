@@ -1,6 +1,5 @@
-import { BotanicalApiError } from "@botanical/core";
+import { BotanicalApiError, isAgentPicture, isAgentShape, type AgentShape, type DeploymentMode } from "@botanical/core";
 import { providerLabel } from "./format-extra";
-import type { DeploymentMode } from "@botanical/core";
 import {
   AGENT_COLORS,
   AGENT_MESSAGE_STATUSES,
@@ -75,11 +74,17 @@ export function parseAgentIdentity(body: unknown): AgentIdentity {
   const record = asRecord(body);
   const colorRaw = stringField(record, ["color", "accent"]).toLowerCase();
   const color = (AGENT_COLORS as readonly string[]).includes(colorRaw) ? (colorRaw as AgentColor) : "green";
+  const shapeRaw = stringField(record, ["shape"]);
+  const shape: AgentShape = isAgentShape(shapeRaw) ? shapeRaw : "squircle";
+  const pictureRaw = stringField(record, ["picture"]);
   return {
     id: stringField(record, ["id", "uuid"]),
     name: stringField(record, ["name"], "Agent"),
+    title: stringField(record, ["title"]),
     description: stringField(record, ["description"]),
     icon: stringField(record, ["icon"], "Bot") || "Bot",
+    shape,
+    picture: isAgentPicture(pictureRaw) ? pictureRaw : null,
     color,
   };
 }

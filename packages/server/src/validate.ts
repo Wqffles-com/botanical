@@ -1,11 +1,21 @@
 import {
+  ACCENT_COLORS,
   AGENT_COLORS,
   AGENT_NAME_MAX,
+  AGENT_PICTURE_MAX,
+  AGENT_SHAPES,
+  AGENT_TITLE_MAX,
   DEFAULT_AGENT_COLOR,
   DEFAULT_AGENT_ICON,
+  DEFAULT_AGENT_SHAPE,
+  isAccentColor,
   isAgentColor,
   isAgentIcon,
+  isAgentPicture,
+  isAgentShape,
+  type AccentColor,
   type AgentColor,
+  type AgentShape,
 } from "@botanical/core";
 import { HttpError, isRecord } from "./http.ts";
 import type { AgentPatch, NewAgent } from "./types.ts";
@@ -112,6 +122,38 @@ export function readAgentColor(value: unknown): AgentColor {
   return value;
 }
 
+export function readAgentTitle(value: unknown): string {
+  const title = readBoundedString(value, "title", { required: false, max: AGENT_TITLE_MAX }) ?? "";
+  return title;
+}
+
+export function readAgentShape(value: unknown): AgentShape {
+  if (!isAgentShape(value)) {
+    throw new HttpError(400, "invalid_body", `shape must be one of: ${AGENT_SHAPES.join(", ")}`);
+  }
+  return value;
+}
+
+export function readAgentPicture(value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value !== "string") {
+    throw new HttpError(400, "invalid_body", "picture must be a PNG, JPEG, or WebP data URL, or null");
+  }
+  const picture = value.trim();
+  if (!picture) return null;
+  if (picture.length > AGENT_PICTURE_MAX || !isAgentPicture(picture)) {
+    throw new HttpError(400, "invalid_body", "picture must be a PNG, JPEG, or WebP data URL, or null");
+  }
+  return picture;
+}
+
+export function readAccent(value: unknown): AccentColor {
+  if (!isAccentColor(value)) {
+    throw new HttpError(400, "invalid_body", `accent must be one of: ${ACCENT_COLORS.join(", ")}`);
+  }
+  return value;
+}
+
 export function readDefaultProfileId(value: unknown): string | null {
   if (value === null) return null;
   if (typeof value !== "string") {
@@ -172,6 +214,9 @@ export function parseCreateAgent(body: unknown): NewAgent {
   const systemPrompt = readAgentPrompt(body, true);
   if (!systemPrompt) throw new HttpError(400, "invalid_body", "prompt is required");
   const icon = Object.prototype.hasOwnProperty.call(body, "icon") ? readAgentIcon(body.icon) : DEFAULT_AGENT_ICON;
+  const title = Object.prototype.hasOwnProperty.call(body, "title") ? readAgentTitle(body.title) : "";
+  const shape = Object.prototype.hasOwnProperty.call(body, "shape") ? readAgentShape(body.shape) : DEFAULT_AGENT_SHAPE;
+  const picture = Object.prototype.hasOwnProperty.call(body, "picture") ? readAgentPicture(body.picture) : null;
   const color = Object.prototype.hasOwnProperty.call(body, "color")
     ? readAgentColor(body.color)
     : DEFAULT_AGENT_COLOR;
@@ -180,7 +225,10 @@ export function parseCreateAgent(body: unknown): NewAgent {
     : null;
   return {
     name,
+    title,
     icon,
+    shape,
+    picture,
     color,
     description,
     systemPrompt,
@@ -206,7 +254,10 @@ export function parseUpdateAgent(body: unknown): AgentPatch {
   if (systemPrompt !== undefined) patch.systemPrompt = systemPrompt;
   const toolIds = readAgentTools(body);
   if (toolIds !== undefined) patch.toolIds = toolIds;
+  if (Object.prototype.hasOwnProperty.call(body, "title")) patch.title = readAgentTitle(body.title);
   if (Object.prototype.hasOwnProperty.call(body, "icon")) patch.icon = readAgentIcon(body.icon);
+  if (Object.prototype.hasOwnProperty.call(body, "shape")) patch.shape = readAgentShape(body.shape);
+  if (Object.prototype.hasOwnProperty.call(body, "picture")) patch.picture = readAgentPicture(body.picture);
   if (Object.prototype.hasOwnProperty.call(body, "color")) patch.color = readAgentColor(body.color);
   if (Object.prototype.hasOwnProperty.call(body, "defaultProfileId")) {
     patch.defaultProfileId = readDefaultProfileId(body.defaultProfileId);
@@ -219,7 +270,10 @@ export function parseUpdateAgent(body: unknown): AgentPatch {
     patch.description === undefined &&
     patch.systemPrompt === undefined &&
     patch.toolIds === undefined &&
+    patch.title === undefined &&
     patch.icon === undefined &&
+    patch.shape === undefined &&
+    patch.picture === undefined &&
     patch.color === undefined &&
     patch.defaultProfileId === undefined &&
     patch.roleIds === undefined

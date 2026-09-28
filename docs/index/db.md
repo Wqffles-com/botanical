@@ -41,7 +41,7 @@ Defined with `pgTable` under `packages/db/src/schema`. Re-exported from `package
 
 Enums in `packages/db/src/schema/enums.ts`: `message_role`, `a2a_status`, `agent_color`. Relations: `packages/db/src/schema/relations.ts`.
 
-`secret_refs` stores env var names, not secret values. `settings` stores instance metadata. Always-on tuning uses keys `always_on.scheduler_enabled`, `always_on.scheduler_interval_ms`, `always_on.background_concurrency`, and `always_on.listener_max_bytes` (`packages/db/src/always-on-settings.ts`). Absent keys use the defaults. `tenants` is a placeholder; self-host bootstraps one `users` row in `packages/db/src/store.ts` (`ensureOperator`). `routines`, `listeners`, and `notifications` store that operator in `user_id` until accounts exist. `routine_runs` and `listener_deliveries` do not copy `user_id`. They store `lease_owner` and `lease_expires_at` (`packages/db/src/run-lease.ts`). Repositories: `packages/db/src/always-on.ts`. The in-memory copy is `packages/server/src/db/always-on.ts`.
+`agents.title` is a short role label (empty when unset, at most 60 characters). `agents.shape` is the avatar silhouette (`circle`, `squircle`, `square`, `hexagon`, `diamond`, `shield`; default `squircle`). `agents.picture` is an optional PNG, JPEG, or WebP data URL; null shows the shape and icon. `secret_refs` stores env var names, not secret values. `settings` stores instance metadata. Always-on tuning uses keys `always_on.scheduler_enabled`, `always_on.scheduler_interval_ms`, `always_on.background_concurrency`, and `always_on.listener_max_bytes` (`packages/db/src/always-on-settings.ts`). Absent keys use the defaults. `tenants` is a placeholder; self-host bootstraps one `users` row in `packages/db/src/store.ts` (`ensureOperator`). `routines`, `listeners`, and `notifications` store that operator in `user_id` until accounts exist. `routine_runs` and `listener_deliveries` do not copy `user_id`. They store `lease_owner` and `lease_expires_at` (`packages/db/src/run-lease.ts`). Repositories: `packages/db/src/always-on.ts`. The in-memory copy is `packages/server/src/db/always-on.ts`.
 
 ## Migrations
 
@@ -53,6 +53,7 @@ Enums in `packages/db/src/schema/enums.ts`: `message_role`, `a2a_status`, `agent
 | `packages/db/migrations/0003_mvp2.sql` | `roles`, `agent_roles`, `memories`, agent creator |
 | `packages/db/migrations/0004_routines.sql` | `routines`, `routine_runs`, `listeners`, `listener_deliveries`, `notifications` |
 | `packages/db/migrations/0005_accounts.sql` | user role, session owner, invites, encrypted secrets, user settings, global profiles |
+| `packages/db/migrations/0006_agent_customization.sql` | agent `title`, `shape`, and optional `picture` |
 | `packages/db/migrations/meta/_journal.json` | Apply order (tags match the SQL filenames) |
 | `packages/db/migrations/meta/0000_snapshot.json` | Drizzle snapshot for `0000` |
 | `packages/db/migrations/meta/0001_snapshot.json` | Drizzle snapshot for `0001` |

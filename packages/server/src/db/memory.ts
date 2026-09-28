@@ -1,12 +1,19 @@
 import { randomUUID } from "node:crypto";
 import {
+  AGENT_PICTURE_MAX,
+  AGENT_SHAPES,
+  AGENT_TITLE_MAX,
   DEFAULT_AGENT_COLOR,
   DEFAULT_AGENT_ICON,
+  DEFAULT_AGENT_SHAPE,
   EXAMPLE_AGENTS,
   EXAMPLE_AGENTS_CREATED_AT,
   isAgentColor,
   isAgentIcon,
+  isAgentPicture,
+  isAgentShape,
   type AgentColor,
+  type AgentShape,
 } from "@botanical/core";
 import { currentUserId, pinStore } from "@botanical/db";
 import { createAlwaysOn, MEMORY_OPERATOR_ID } from "./always-on.ts";
@@ -94,7 +101,10 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date; 
       agents.set(example.id, {
         id: example.id,
         name: example.name,
+        title: "",
         icon: example.icon,
+        shape: "squircle",
+        picture: null,
         color: example.color,
         description: example.description,
         systemPrompt: example.prompt,
@@ -173,7 +183,10 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date; 
         const agent: Agent = {
           id: randomUUID(),
           name: requireName(input.name),
+          title: normalizeTitle(input.title),
           icon: normalizeIcon(input.icon),
+          shape: normalizeShape(input.shape),
+          picture: normalizePicture(input.picture),
           color: normalizeColor(input.color),
           description: input.description,
           systemPrompt: input.systemPrompt,
@@ -202,7 +215,10 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date; 
           updatedAt: timestamp(),
         };
         if (patch.name !== undefined) next.name = requireName(patch.name);
+        if (patch.title !== undefined) next.title = normalizeTitle(patch.title);
         if (patch.icon !== undefined) next.icon = normalizeIcon(patch.icon);
+        if (patch.shape !== undefined) next.shape = normalizeShape(patch.shape);
+        if (patch.picture !== undefined) next.picture = normalizePicture(patch.picture);
         if (patch.color !== undefined) next.color = normalizeColor(patch.color);
         if (patch.description !== undefined) next.description = patch.description;
         if (patch.systemPrompt !== undefined) next.systemPrompt = patch.systemPrompt;
@@ -633,6 +649,32 @@ function normalizeColor(color: AgentColor | undefined): AgentColor {
     throw new Error("color must be one of red, orange, amber, green, teal, cyan, blue, violet, pink, gray");
   }
   return color;
+}
+
+function normalizeTitle(title: string | undefined): string {
+  const trimmed = (title ?? "").trim();
+  if (trimmed.length > AGENT_TITLE_MAX) {
+    throw new Error(`title must be at most ${AGENT_TITLE_MAX} characters`);
+  }
+  return trimmed;
+}
+
+function normalizeShape(shape: AgentShape | undefined): AgentShape {
+  if (shape === undefined) return DEFAULT_AGENT_SHAPE;
+  if (!isAgentShape(shape)) {
+    throw new Error(`shape must be one of ${AGENT_SHAPES.join(", ")}`);
+  }
+  return shape;
+}
+
+function normalizePicture(picture: string | null | undefined): string | null {
+  if (picture === undefined || picture === null) return null;
+  const trimmed = picture.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > AGENT_PICTURE_MAX || !isAgentPicture(trimmed)) {
+    throw new Error("picture must be a PNG, JPEG, or WebP data URL");
+  }
+  return trimmed;
 }
 
 function normalizeProfileId(value: string | null | undefined): string | null {

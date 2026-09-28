@@ -39,7 +39,10 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/components/app-shell.tsx` | Authenticated shell |
 | `packages/web/src/components/app-sidebar.tsx` | Nav |
 | `packages/web/src/components/workspace-provider.tsx` | Agents, chats, profiles in client state |
-| `packages/web/src/components/agents` | Agent list and editor |
+| `packages/web/src/components/agents` | Agent list and editor (name, title, description, icon, shape, color, picture) |
+| `packages/web/src/components/agent-avatar.tsx` | Shape or custom picture for a bot mark |
+| `packages/web/src/lib/accent.ts` | Accent names, swatches, and local cache |
+| `packages/web/src/lib/agent-picture.ts` | Browser resize of an uploaded avatar |
 | `packages/web/src/components/chat` | Thread, composer, dictation, tool-call cards |
 | `packages/web/src/components/inbox/inbox-view.tsx` | Agent inbox |
 | `packages/web/src/components/routines` | Routine list and editor (`packages/web/src/lib/schedule.ts` humanizes cron) |
@@ -55,7 +58,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/lib/chat-stream.ts` | Browser SSE parse |
 | `packages/web/src/lib/server-api.ts` | RSC client (forwards cookies) |
 
-Settings is one page. Tabs in `packages/web/src/components/settings/settings-view.tsx` (`?tab=`): `general` (deployment, background work, provider key flags, tool list, MCP snapshot), `profiles`, `memory`, `roles`, `cli`. Panels: `packages/web/src/components/settings/profiles-panel.tsx`, `memory-panel.tsx`, `roles-panel.tsx`, `cli-panel.tsx`, `deployment-badge.tsx`, `background-work-card.tsx`. Sidebar links for routines and listeners are in `packages/web/src/components/app-sidebar.tsx`.
+Settings is one page. Tabs in `packages/web/src/components/settings/settings-view.tsx` (`?tab=`): `general` (accent, deployment, background work, provider key flags, tool list, MCP snapshot), `profiles`, `memory`, `roles`, `cli`. The accent picker is `packages/web/src/components/settings/accent-card.tsx`. `packages/web/src/components/accent-provider.tsx` loads `GET /api/settings/appearance` and sets `data-accent` on the document. Tokens live in `packages/web/src/app/globals.css`: a non-neutral accent recolors `--primary` and `--ring` in light and dark. Sidebar, page background, and borders stay gray. Panels: `packages/web/src/components/settings/profiles-panel.tsx`, `memory-panel.tsx`, `roles-panel.tsx`, `cli-panel.tsx`, `deployment-badge.tsx`, `background-work-card.tsx`. Sidebar links for routines and listeners are in `packages/web/src/components/app-sidebar.tsx`.
 
 ## Env vars
 

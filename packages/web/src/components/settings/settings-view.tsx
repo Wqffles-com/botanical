@@ -23,6 +23,7 @@ import { RolesPanel } from "@/components/settings/roles-panel";
 import { fetchMcpServers, fetchProfiles, fetchSettings, fetchTools } from "@/lib/mvp-api";
 import type { AppSettings, CatalogTool, McpSnapshot, ProviderKeyStatus } from "@/lib/mvp-types";
 import { deriveProviderKeys } from "@/lib/parse";
+import { AccentCard } from "./accent-card";
 import { AdminPanel } from "./admin-panel";
 import { BackgroundWorkCard } from "./background-work-card";
 import { DeploymentBadge } from "./deployment-badge";
@@ -132,6 +133,7 @@ export function SettingsView() {
         </TabsList>
 
         <TabsContent value="general" className="mt-4 space-y-4">
+          <AccentCard />
           {loading ? (
             <SettingsSkeleton />
           ) : (

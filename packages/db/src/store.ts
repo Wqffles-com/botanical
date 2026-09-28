@@ -45,6 +45,13 @@ const AGENT_COLORS = [
 ] as const;
 type AgentColor = (typeof AGENT_COLORS)[number];
 
+const AGENT_SHAPES = ['circle', 'squircle', 'square', 'hexagon', 'diamond', 'shield'] as const;
+type AgentShape = (typeof AGENT_SHAPES)[number];
+
+const PICTURE_PATTERN = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+const PICTURE_MAX = 200_000;
+const TITLE_MAX = 60;
+
 const AGENT_MESSAGE_STATUSES = ['pending', 'delivered', 'read', 'failed'] as const;
 type AgentMessageStatus = (typeof AGENT_MESSAGE_STATUSES)[number];
 
@@ -81,7 +88,10 @@ export interface ModelProfile {
 export interface Agent {
   id: string;
   name: string;
+  title: string;
   icon: string;
+  shape: AgentShape;
+  picture: string | null;
   color: AgentColor;
   description: string;
   systemPrompt: string;
@@ -96,7 +106,10 @@ export interface Agent {
 
 export interface NewAgent {
   name: string;
+  title?: string;
   icon?: string;
+  shape?: AgentShape;
+  picture?: string | null;
   color?: AgentColor;
   description: string;
   systemPrompt: string;
@@ -108,7 +121,10 @@ export interface NewAgent {
 
 export interface AgentPatch {
   name?: string;
+  title?: string;
   icon?: string;
+  shape?: AgentShape;
+  picture?: string | null;
   color?: AgentColor;
   description?: string;
   systemPrompt?: string;
@@ -430,7 +446,10 @@ function buildStore(
           .values({
             userId: bound(),
             name: requireName(input.name),
+            title: normalizeTitle(input.title),
             icon: normalizeIcon(input.icon),
+            shape: normalizeShape(input.shape),
+            picture: normalizePicture(input.picture),
             color: normalizeColor(input.color),
             description: input.description,
             prompt: input.systemPrompt,
@@ -453,7 +472,10 @@ function buildStore(
         if (!isUuid(id)) return null;
         const values: {
           name?: string;
+          title?: string;
           icon?: string;
+          shape?: AgentShape;
+          picture?: string | null;
           color?: AgentColor;
           description?: string;
           prompt?: string;
@@ -462,7 +484,10 @@ function buildStore(
           updatedAt?: Date;
         } = { updatedAt: new Date() };
         if (patch.name !== undefined) values.name = requireName(patch.name);
+        if (patch.title !== undefined) values.title = normalizeTitle(patch.title);
         if (patch.icon !== undefined) values.icon = normalizeIcon(patch.icon);
+        if (patch.shape !== undefined) values.shape = normalizeShape(patch.shape);
+        if (patch.picture !== undefined) values.picture = normalizePicture(patch.picture);
         if (patch.color !== undefined) values.color = normalizeColor(patch.color);
         if (patch.description !== undefined) values.description = patch.description;
         if (patch.systemPrompt !== undefined) values.prompt = patch.systemPrompt;
@@ -903,7 +928,10 @@ function toAgent(row: AgentRow, assigned: AgentRoleSummary[]): Agent {
   return {
     id: row.id,
     name: row.name,
+    title: row.title,
     icon: row.icon,
+    shape: asShape(row.shape),
+    picture: row.picture,
     color: asColor(row.color),
     description: row.description,
     systemPrompt: row.prompt,
@@ -1088,6 +1116,34 @@ function normalizeIcon(icon: string | undefined): string {
 function normalizeColor(color: AgentColor | undefined): AgentColor {
   if (color === undefined) return 'green';
   return asColor(color);
+}
+
+function normalizeTitle(title: string | undefined): string {
+  const trimmed = (title ?? '').trim();
+  if (trimmed.length > TITLE_MAX) throw new Error(`title must be at most ${TITLE_MAX} characters`);
+  return trimmed;
+}
+
+function normalizeShape(shape: AgentShape | string | undefined): AgentShape {
+  if (shape === undefined) return 'squircle';
+  return asShape(shape);
+}
+
+function normalizePicture(picture: string | null | undefined): string | null {
+  if (picture === undefined || picture === null) return null;
+  const trimmed = picture.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > PICTURE_MAX || !PICTURE_PATTERN.test(trimmed)) {
+    throw new Error('picture must be a PNG, JPEG, or WebP data URL');
+  }
+  return trimmed;
+}
+
+function asShape(value: string): AgentShape {
+  if (!(AGENT_SHAPES as readonly string[]).includes(value)) {
+    throw new Error(`shape must be one of ${AGENT_SHAPES.join(', ')}`);
+  }
+  return value as AgentShape;
 }
 
 function asColor(value: string): AgentColor {
