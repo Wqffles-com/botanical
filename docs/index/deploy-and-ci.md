@@ -8,11 +8,11 @@ Images, compose, release zip, and the one workflow. The API process inside the s
 
 | Path | Purpose |
 |------|---------|
-| `Dockerfile` | API image. Installs the workspace, copies `deploy/scripts/server-entrypoint.sh` and `config/mcp.json`. Strips CR from the entrypoint before it runs |
-| `web.Dockerfile` | Next standalone image. Build calls `deploy/scripts/ensure-next-standalone.mjs` and `deploy/scripts/stage-next-standalone.sh`. Strips CR from those shell scripts before `sh` runs them |
+| `Dockerfile` | API image. Installs the workspace from `package.json` files only (a `manifests` stage), so a source edit keeps the install layer. Bun's download cache is a BuildKit cache mount (`id=botanical-bun`). Copies `deploy/scripts/server-entrypoint.sh` and `config/mcp.json`. Strips CR from the entrypoint before it runs |
+| `web.Dockerfile` | Next standalone image. Same `manifests` stage and Bun cache mount as `Dockerfile`, plus a cache mount on the web package's .next/cache (`id=botanical-next`) for Turbopack's build cache. Build calls `deploy/scripts/ensure-next-standalone.mjs` and `deploy/scripts/stage-next-standalone.sh`. Strips CR from those shell scripts before `sh` runs them |
 | `packages/server/Dockerfile` | Package-only image. Comment in the file says the supported build is the root `Dockerfile` |
 | `docker-compose.yml` | `postgres`, `server` (root `Dockerfile`), `web` (`web.Dockerfile`). Host ports default to web 3000, API `127.0.0.1:8788`, Postgres `127.0.0.1:5433` |
-| `docker-compose.cli.yml` | Extra env and volumes for coding CLIs on `server` |
+| `docker-compose.cli.yml` | Extra env and volumes for coding CLIs on `server`. `cli_cache` is named `botanical-cli-cache`, shared by every Compose project on the host, and holds downloaded CLI binaries (`BOTANICAL_CLI_CACHE`) |
 | `docker-compose.saas.yml` | Sets deployment mode to `SAAS` and does not start bundled Postgres |
 | `start.sh` | Repo-root launcher: Docker/Compose checks, `.env` from `.env.example`, generated secrets, prompts, `docker compose up --build -d` |
 | `start.ps1` | Same launcher for Windows PowerShell 5.1+ and pwsh. Writes `.env` UTF-8 without BOM, LF endings |

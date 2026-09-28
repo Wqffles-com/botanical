@@ -9,22 +9,34 @@ ARG BUN_IMAGE=oven/bun:1.4.2-alpine
 ARG NODE_IMAGE=node:22-alpine
 ARG BOTANICAL_API_URL=http://server:8787
 
+# Only package.json files, so a source edit leaves the install layer cached.
+FROM ${BUN_IMAGE} AS manifests
+WORKDIR /app
+COPY packages ./packages
+RUN find packages -mindepth 2 -maxdepth 2 ! -name package.json -exec rm -rf {} +
+
 FROM ${BUN_IMAGE} AS build
 WORKDIR /app
 RUN apk add --no-cache libc6-compat ca-certificates
 COPY package.json bun.lock tsconfig.base.json ./
+COPY --from=manifests /app/packages ./packages
+# The cache mount keeps downloaded packages across builds and Compose projects.
+RUN --mount=type=cache,id=botanical-bun,target=/var/cache/bun \
+    BUN_INSTALL_CACHE_DIR=/var/cache/bun bun install --frozen-lockfile --backend=copyfile
 COPY packages ./packages
 COPY deploy/scripts/ensure-next-standalone.mjs deploy/scripts/ensure-next-standalone.mjs
 COPY deploy/scripts/stage-next-standalone.sh deploy/scripts/stage-next-standalone.sh
 # A checkout from before the LF attributes can still contain CR. Strip it
 # before `sh` parses `set -eu` (`illegal option -`).
-RUN sed -i 's/\r$//' deploy/scripts/stage-next-standalone.sh \
-  && bun install --frozen-lockfile
+RUN sed -i 's/\r$//' deploy/scripts/stage-next-standalone.sh
 ARG BOTANICAL_API_URL
 ENV BOTANICAL_API_URL=${BOTANICAL_API_URL} \
     NEXT_TELEMETRY_DISABLED=1 \
     CI=1
-RUN bun deploy/scripts/ensure-next-standalone.mjs \
+# .next/cache holds the Turbopack build cache, so a rebuild only recompiles
+# what changed.
+RUN --mount=type=cache,id=botanical-next,target=/app/packages/web/.next/cache,sharing=locked \
+  bun deploy/scripts/ensure-next-standalone.mjs \
   && cd packages/web \
   && bun run build \
   && cd /app \

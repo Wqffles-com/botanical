@@ -238,6 +238,43 @@ describe("CLI installer", () => {
     expect(settings).not.toContain(SECRET);
   });
 
+  test("a fresh bin volume installs from the download cache without downloading", async () => {
+    const CACHE = "/var/cache/botanical-cli";
+    const io = memoryIo();
+    const first = await new CliInstaller(io, { root: ROOT, home: HOME, cache: CACHE }).install("claude");
+    expect(first.ok).toBe(true);
+    expect(io.files.has(`${CACHE}/claude/2.1.3-x86_64-musl/bin`)).toBe(true);
+    const sha512 = JSON.parse(new TextDecoder().decode(io.files.get(`${ROOT}/manifests/claude.json`) ?? new Uint8Array())).sha512;
+
+    await io.remove(ROOT);
+    const downloads = io.downloads.length;
+    const second = await new CliInstaller(io, { root: ROOT, home: HOME, cache: CACHE }).install("claude");
+    expect(second).toMatchObject({ ok: true, skipped: false, version: "2.1.3" });
+    expect(io.downloads.length).toBe(downloads);
+    expect(io.files.has(`${ROOT}/bin/claude`)).toBe(true);
+    const manifest = JSON.parse(new TextDecoder().decode(io.files.get(`${ROOT}/manifests/claude.json`) ?? new Uint8Array()));
+    expect(manifest).toMatchObject({ verified: "sha512", sha512 });
+  });
+
+  test("a cached binary that fails its probe is dropped and downloaded again", async () => {
+    const CACHE = "/var/cache/botanical-cli";
+    const io = memoryIo();
+    await new CliInstaller(io, { root: ROOT, home: HOME, cache: CACHE }).install("grok");
+    await io.remove(ROOT);
+    const probe = io.spawn.bind(io);
+    let probes = 0;
+    io.spawn = async (bin, args, env, timeoutMs) => {
+      probes += 1;
+      if (probes === 1) return { code: 1, stdout: "", stderr: "broken" };
+      return probe(bin, args, env, timeoutMs);
+    };
+    const downloads = io.downloads.length;
+    const result = await new CliInstaller(io, { root: ROOT, home: HOME, cache: CACHE }).install("grok");
+    expect(result.ok).toBe(true);
+    expect(io.downloads.length).toBe(downloads + 1);
+    expect(io.files.has(`${CACHE}/grok/1.2.3-x86_64-musl/bin`)).toBe(true);
+  });
+
   test("arm64 codex selects the aarch64 musl vendor path", async () => {
     const io = memoryIo({ arch: "arm64", libc: "glibc" });
     const installer = new CliInstaller(io, { root: ROOT, home: HOME });
