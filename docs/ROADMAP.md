@@ -17,6 +17,7 @@ Botanical is in early alpha. This page separates what already ships from what is
 - Postgres persistence with automatic migrations
 - Docker Compose deploy, and a prebuilt release zip from CI
 - `DEPLOYMENT_MODE` switch (`SELF_HOST` / `SAAS`) on one codebase
+- Dictation in the composer: speech becomes editable text before send, via a Whisper-compatible server endpoint, or the browser's speech recognition when no backend is configured
 
 ## Planned
 
@@ -38,7 +39,6 @@ Botanical is in early alpha. This page separates what already ships from what is
 - Webhooks require the server to be reachable from GitHub or GitLab; local testing needs a tunnel.
 
 ### Voice
-- **Dictation**: a mic button in the composer that turns speech into editable text before sending. Speech-to-text runs on the server through any Whisper-compatible endpoint (OpenAI, Groq, or a local Whisper), so keys stay server-side. When no speech backend is configured, it falls back to the browser's built-in speech recognition.
 - **Voice calls with an agent**: a voice mode for a chat. It transcribes what you say, sends it as a normal message to the chat's agent, and reads the reply aloud with text-to-speech. Because it goes through the normal chat pipeline, it works with any agent and profile (including coding-agent CLIs), keeps tools, memory, and roles, and saves the call as an ordinary chat.
 - Later: low-latency realtime voice for providers that support it.
 

@@ -3,6 +3,9 @@
 import type { ModelProfile } from "@botanical/core";
 import { Send, Square } from "lucide-react";
 import { useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
+import { DictationActions, DictationNotice } from "@/components/chat/dictation-button";
+import { spliceTranscript } from "@/components/chat/dictation";
+import { useDictation } from "@/components/chat/use-dictation";
 import { ProfileSelect } from "@/components/chat/profile-select";
 import { Button } from "@/components/ui/button";
 import { unavailableProfileHint } from "@/lib/format";
@@ -34,17 +37,52 @@ export function Composer({
   profileNeeded?: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const valueRef = useRef(value);
+  const caretRef = useRef<number | null>(null);
   const unavailableHint = unavailableProfileHint(profiles?.find((profile) => profile.id === profileId) ?? null);
   const canSubmit = !disabled && !streaming && !unavailableHint && value.trim().length > 0;
+
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
+  function insertTranscript(transcript: string) {
+    const current = valueRef.current;
+    const el = ref.current;
+    const next = spliceTranscript(
+      current,
+      transcript,
+      el?.selectionStart ?? current.length,
+      el?.selectionEnd ?? current.length,
+    );
+    valueRef.current = next.value;
+    caretRef.current = next.caret;
+    onChange(next.value);
+  }
+
+  const dictation = useDictation({
+    blocked: Boolean(disabled) || streaming,
+    onInsert: insertTranscript,
+  });
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = "0px";
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    const caret = caretRef.current;
+    if (caret === null) return;
+    caretRef.current = null;
+    el.focus();
+    const pos = Math.min(caret, el.value.length);
+    el.setSelectionRange(pos, pos);
   }, [value]);
 
   function handleKey(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (dictation.phase === "recording") {
+      event.preventDefault();
+      return;
+    }
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
     if (canSubmit) onSubmit();
@@ -69,7 +107,10 @@ export function Composer({
           id="composer"
           data-testid="composer"
           value={value}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => {
+            valueRef.current = event.target.value;
+            onChange(event.target.value);
+          }}
           onKeyDown={handleKey}
           placeholder={placeholder}
           disabled={disabled || streaming}
@@ -86,6 +127,7 @@ export function Composer({
             {unavailableHint}
           </p>
         ) : null}
+        <DictationNotice dictation={dictation} />
         <div className="flex items-end gap-2 px-2 pb-2">
           {profiles && onProfile ? (
             <ProfileSelect
@@ -99,10 +141,13 @@ export function Composer({
           ) : null}
           {unavailableHint ? null : (
             <span className="mb-1 hidden text-[11px] text-muted-foreground sm:inline">
-              Enter to send · Shift+Enter newline
+              {dictation.phase === "recording"
+                ? "Enter or Space to stop · Escape to cancel"
+                : "Enter to send · Shift+Enter newline"}
             </span>
           )}
           <span className="ml-auto flex items-center gap-2">
+            <DictationActions dictation={dictation} />
             {streaming ? (
               <Button type="button" variant="outline" size="icon" data-testid="stop" onClick={onStop} aria-label="Stop">
                 <Square className="size-3.5 fill-current" />

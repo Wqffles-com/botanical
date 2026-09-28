@@ -113,6 +113,25 @@ describe("loadConfig", () => {
     expect(JSON.stringify(config.auth)).not.toContain("plain-secret");
   });
 
+  test("derives OpenAI speech-to-text when only OPENAI_API_KEY is set", () => {
+    const config = loadConfig(baseEnv({ OPENAI_API_KEY: "sk-openai-test" }));
+    expect(config.dictation).toEqual({
+      mode: "server",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "sk-openai-test",
+      model: "gpt-4o-mini-transcribe",
+      maxBytes: 10_000_000,
+      maxSeconds: 120,
+    });
+    expect(loadConfig(baseEnv()).dictation.mode).toBe("browser");
+    const custom = loadConfig(baseEnv({ BOTANICAL_STT_BASE_URL: "https://api.groq.com/openai/v1" }));
+    expect(custom.dictation.mode).toBe("server");
+    if (custom.dictation.mode !== "server") return;
+    expect(custom.dictation.model).toBe("whisper-1");
+    expect(custom.dictation.apiKey).toBeNull();
+    expect(custom.dictation.baseUrl).toBe("https://api.groq.com/openai/v1");
+  });
+
   test("rejects a non-argon2 hash and a bad database URL", () => {
     expect(() => loadConfig(baseEnv({ BOTANICAL_PASSWORD_HASH: "sha256:nope" }))).toThrow(
       /argon2/,

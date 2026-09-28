@@ -30,6 +30,7 @@ import { registerMessages } from "./routes/messages.ts";
 import { registerProfiles } from "./routes/profiles.ts";
 import { registerRoles } from "./routes/roles.ts";
 import { registerTools } from "./routes/tools.ts";
+import { registerTranscription } from "./routes/transcription.ts";
 import { createAgentAdminContributor } from "./tools/agent-admin.ts";
 import { createMemoryContributor } from "./tools/memory.ts";
 import { contributorFromServerMcp, createDefaultToolRegistry } from "./tools/catalog.ts";
@@ -103,6 +104,7 @@ export function createApp(deps: AppDeps): App {
   registerMessages(router, runtime.deps);
   registerAgentMessages(router, a2a);
   registerProfiles(router);
+  registerTranscription(router);
   registerCli(router, cli);
   registerMcp(router);
   registerCliMcp(router, cliTools);
