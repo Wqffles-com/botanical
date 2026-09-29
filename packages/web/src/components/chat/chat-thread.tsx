@@ -2,7 +2,7 @@
 
 import { MessageSquareOff } from "lucide-react";
 import type { Agent, Chat, ChatMessage, ModelProfile } from "@botanical/core";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { ChatAgentHeader } from "@/components/chat/chat-agent-header";
 import { ChatMembersMenu } from "@/components/chat/chat-members-menu";
 import { Composer } from "@/components/chat/composer";
@@ -43,6 +43,7 @@ export function ChatThread({
   onResendMessage,
   onRetryMessage,
   creator,
+  headerActions,
 }: {
   chat: Chat | null;
   agent: Agent | null;
@@ -70,6 +71,8 @@ export function ChatThread({
   onResendMessage?: (messageId: string, content: string) => Promise<boolean>;
   onRetryMessage?: (messageId: string) => Promise<boolean>;
   creator?: Agent | null;
+  /** Extra header controls after the members menu (the side panel toggle). */
+  headerActions?: ReactNode;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
@@ -125,15 +128,18 @@ export function ChatThread({
         creator={creator}
         members={members.map((member) => member.name)}
         trailing={
-          agent && onMembers ? (
-            <ChatMembersMenu
-              owner={agent}
-              agents={agents}
-              memberIds={chat.memberIds}
-              disabled={locked}
-              onChange={onMembers}
-            />
-          ) : null
+          <>
+            {agent && onMembers ? (
+              <ChatMembersMenu
+                owner={agent}
+                agents={agents}
+                memberIds={chat.memberIds}
+                disabled={locked}
+                onChange={onMembers}
+              />
+            ) : null}
+            {headerActions}
+          </>
         }
       />
 

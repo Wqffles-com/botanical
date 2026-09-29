@@ -62,6 +62,8 @@ Group chats: `POST /api/chats` and `PATCH /api/chats/:id` take `memberIds`, the 
 | GET | `/api/agents/:id` | `packages/server/src/routes/agents.ts` |
 | PATCH | `/api/agents/:id` | `packages/server/src/routes/agents.ts` |
 | DELETE | `/api/agents/:id` | `packages/server/src/routes/agents.ts` |
+| GET | `/api/agents/:id/files` | `packages/server/src/routes/workspace.ts` |
+| GET | `/api/agents/:id/files/content` | `packages/server/src/routes/workspace.ts` |
 | GET | `/api/agents/:id/roles` | `packages/server/src/routes/roles.ts` |
 | PUT | `/api/agents/:id/roles` | `packages/server/src/routes/roles.ts` |
 | GET | `/api/roles` | `packages/server/src/routes/roles.ts` |
@@ -145,6 +147,8 @@ Group chats: `POST /api/chats` and `PATCH /api/chats/:id` take `memberIds`, the 
 | DELETE | `/internal/mcp/runs/:runId` | `packages/server/src/cli-mcp.ts` |
 
 `GET` and `DELETE` on `/internal/mcp/runs/:runId` are registered and then answered 405 after the run token check. The CLI uses `POST` JSON-RPC (`initialize`, `ping`, `tools/list`, `tools/call`). Session cookies do not authenticate that path.
+
+`GET /api/agents/:id/files?path=` lists one directory of the agent's workspace (`<user root>/agents/<agentId>`, not recursive) and `GET /api/agents/:id/files/content?path=` returns a UTF-8 text file from it. Both run the `file_list` and `file_read` tools with the agent's id, so the path jail and size caps are the agent's own; there is no write route (`packages/server/src/routes/workspace.ts`, tests in `packages/server/test/workspace-files.test.ts`).
 
 `PATCH /api/chats/:id/messages/:messageId` replaces the text of a user or assistant message. `DELETE` on the same path removes the message and, for an assistant message, the tool results of its calls; `?following=true` also removes every later message (`messagesToDelete` in `packages/server/src/routes/messages.ts`). Both return `409 chat_busy` while the chat's queue is running or has messages waiting. `POST /api/hooks/:listenerId` is outside the session. It checks the listener secret (`packages/server/src/listeners/verify.ts`). `GET` and `PATCH /api/settings/always-on` require an admin session (`packages/server/src/routes/always-on-settings.ts`). `GET` and `PATCH /api/settings/appearance` are per-user (`packages/server/src/routes/appearance.ts`). The accent is `neutral`, `blue`, `red`, `green`, `orange`, or `violet`, stored at `appearance.accent` in `user_settings`. `neutral` is the default and deletes the row. Agent create and update accept `title` (role label), `shape` (avatar silhouette), and `picture` (data URL or null). The scheduler starts from `packages/server/src/serve.ts` unless `createApp({ scheduler: false })`. Each tick reads `always_on.*` from the store (`packages/db/src/always-on-settings.ts`).
 
