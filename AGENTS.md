@@ -48,6 +48,10 @@ Whenever you create an issue or pull request in GitHub, add `Wqffles-com` as ass
 
 Whenever you create a pull request, unless told otherwise, watch it until CI is green: if it goes red, fix it and push; once it is green, merge it.
 
+Every pull request body must reference the issue it fixes and declare it fixed with a closing keyword, e.g. `Fixes #123`.
+
+Do not create routines (scheduled triggers, e.g. `create_trigger` or `send_later`) for pull requests. Watch PRs through PR activity subscriptions only.
+
 Whenever you pick up a GitHub issue in a session, add the `working on` label to it.
 
 ## Secrets
