@@ -312,6 +312,26 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date; 
         messages.push(message);
         return clone(message);
       },
+      async updateContent(chatId, id, content) {
+        if (chatOwners.get(chatId) !== acting()) return null;
+        const message = messages.find((row) => row.chatId === chatId && row.id === id);
+        if (!message) return null;
+        message.content = content;
+        return clone(message);
+      },
+      async deleteMany(chatId, ids) {
+        if (chatOwners.get(chatId) !== acting()) return 0;
+        const doomed = new Set(ids);
+        let removed = 0;
+        for (let index = messages.length - 1; index >= 0; index--) {
+          const row = messages[index];
+          if (row?.chatId === chatId && doomed.has(row.id)) {
+            messages.splice(index, 1);
+            removed += 1;
+          }
+        }
+        return removed;
+      },
       async deleteByChat(chatId) {
         let removed = 0;
         for (let index = messages.length - 1; index >= 0; index--) {

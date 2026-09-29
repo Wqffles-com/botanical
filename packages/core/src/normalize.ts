@@ -616,6 +616,13 @@ export function normalizeChatEvent(event: string, data: unknown): ChatEvent | nu
     const queuedId = stringField(record, ["queuedId"]);
     return { type: "message", message: normalizeMessage(record.message), ...(queuedId ? { queuedId } : {}) };
   }
+  if (event === "message-updated" && record.message) {
+    return { type: "message-updated", message: normalizeMessage(record.message) };
+  }
+  if (event === "messages-deleted") {
+    const ids = Array.isArray(record.ids) ? record.ids.filter((id): id is string => typeof id === "string") : [];
+    return { type: "messages-deleted", ids };
+  }
   if (event === "error") {
     return {
       type: "error",

@@ -49,3 +49,25 @@ export function applyQueueStatus(
 export function pendingToMessage(chatId: string, row: PendingMessage): ChatMessage {
   return { id: `pending-${row.id}`, chatId, role: "user", content: row.content, createdAt: row.createdAt };
 }
+
+/** Swap in an edited message. Unknown ids leave the list as is. */
+export function replaceMessage(messages: ChatMessage[], message: ChatMessage): ChatMessage[] {
+  if (!messages.some((row) => row.id === message.id)) return messages;
+  return messages.map((row) => (row.id === message.id ? message : row));
+}
+
+export function removeMessages(messages: ChatMessage[], ids: readonly string[]): ChatMessage[] {
+  const doomed = new Set(ids);
+  const next = messages.filter((row) => !doomed.has(row.id));
+  return next.length === messages.length ? messages : next;
+}
+
+/** The user message a reply answers: the closest one before it. */
+export function promptFor(messages: ChatMessage[], messageId: string): ChatMessage | null {
+  const index = messages.findIndex((row) => row.id === messageId);
+  for (let at = index - 1; at >= 0; at--) {
+    const row = messages[at];
+    if (row?.role === "user") return row;
+  }
+  return null;
+}
