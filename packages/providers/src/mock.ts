@@ -65,7 +65,12 @@ function echo(request: ChatRequest): string {
   return `mock:${text}`;
 }
 
+/**
+ * A copy of the request for `calls`. The abort signal and the runtime's live input
+ * (`input`, extra to `ChatRequest`) hold functions and cannot be cloned.
+ */
 function snapshotRequest(request: ChatRequest): ChatRequest {
   const { signal: _signal, ...rest } = request;
-  return structuredClone(rest);
+  const { input: _input, ...plain } = rest as ChatRequest & { input?: unknown };
+  return structuredClone(plain);
 }
