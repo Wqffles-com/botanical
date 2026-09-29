@@ -290,4 +290,68 @@ describe("per-run CLI MCP", () => {
       clearCliAvailabilityCache();
     }
   });
+
+  test("an agent with no tools gets no MCP endpoint", async () => {
+    clearCliAvailabilityCache();
+    const previousMode = process.env.FAKE_CLI_MODE;
+    const previousHome = process.env.BOTANICAL_CLI_HOME;
+    const cliHome = mkdtempSync(join(tmpdir(), "botanical-cli-home-"));
+    mkdirSync(join(cliHome, ".grok"), { recursive: true });
+    writeFileSync(join(cliHome, ".grok", "auth.json"), '{"test":true}\n');
+    process.env.BOTANICAL_CLI_HOME = cliHome;
+    process.env.FAKE_CLI_MODE = "capture";
+    const profiles = [
+      { id: "mock", name: "Mock", provider: "mock", model: "echo" },
+      { id: "grok-build", kind: "cli", cli: "grok", label: "Grok Build", bin: fixture, timeoutMs: 20_000 },
+    ];
+    const { app } = setup({ BOTANICAL_PROFILES: JSON.stringify(profiles) });
+    try {
+      const { token } = await login(app);
+      const headers = { "content-type": "application/json", ...bearer(token) };
+      const agentId = (
+        await readJson<{ agent: { id: string } }>(
+          await app.fetch(
+            new Request("http://localhost/api/agents", {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ name: "Bare", prompt: "Be brief.", tools: [] }),
+            }),
+          ),
+        )
+      ).agent.id;
+      const chatId = (
+        await readJson<{ chat: { id: string } }>(
+          await app.fetch(
+            new Request("http://localhost/api/chats", {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ agentId, profileId: "grok-build" }),
+            }),
+          ),
+        )
+      ).chat.id;
+      const posted = await app.fetch(
+        new Request(`http://localhost/api/chats/${chatId}/messages`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ content: "Message Jan.", profileId: "grok-build", stream: false }),
+        }),
+      );
+      if (posted.status !== 201) throw new Error(`${posted.status} ${await posted.text()}`);
+      const messages = await readJson<{ messages: { role: string; content: string }[] }>(
+        await app.fetch(new Request(`http://localhost/api/chats/${chatId}/messages`, { headers: bearer(token) })),
+      );
+      const assistant = messages.messages.find((message) => message.role === "assistant");
+      expect(assistant?.content).toContain("CONFIG:no");
+      expect(assistant?.content).toContain("TOKEN_ENV:missing");
+      expect(app.cliTools.size()).toBe(0);
+    } finally {
+      if (previousMode === undefined) delete process.env.FAKE_CLI_MODE;
+      else process.env.FAKE_CLI_MODE = previousMode;
+      if (previousHome === undefined) delete process.env.BOTANICAL_CLI_HOME;
+      else process.env.BOTANICAL_CLI_HOME = previousHome;
+      rmSync(cliHome, { recursive: true, force: true });
+      clearCliAvailabilityCache();
+    }
+  });
 });

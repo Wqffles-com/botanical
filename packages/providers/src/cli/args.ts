@@ -28,6 +28,14 @@ import type { CliName } from "./types.ts";
  * Grok uses `streaming-messages-json` plus `--include-partial-messages`
  * because that stream is Anthropic-style text deltas. ACP `streaming-json`
  * is still parsed if a binary emits it.
+ *
+ * Grok also gets `--no-wait-for-background` (headless only; in 1.0.40 and
+ * 1.0.41, not listed by `--help`). Without it, Grok keeps running after the
+ * model's last message while background work is pending: commands still
+ * running after about 15s, background subagents, and `monitor` watches. It
+ * waits up to 600s, and forever for a persistent monitor. The chat showed
+ * nothing until Stop (issue #87). With the flag, Grok exits once the turn
+ * ends and kills whatever is still pending.
  */
 export interface CliArgInput {
   cli: CliName;
@@ -54,6 +62,7 @@ export function buildCliArgs(input: CliArgInput): string[] {
         "streaming-messages-json",
         "--include-partial-messages",
         "--always-approve",
+        "--no-wait-for-background",
         "--cwd",
         input.cwd,
         "--prompt-file",

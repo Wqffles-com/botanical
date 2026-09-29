@@ -30,14 +30,33 @@ export function parseCliLine(line: string): ParsedCliLine {
 
 /** Claude Code's end-of-turn event. With stream-json input, stdin can close after it. */
 export function isCliTurnResult(line: string): boolean {
+  return cliLineMarker(line) === "result";
+}
+
+/**
+ * Stream markers that are not text.
+ * - `result`: end of the CLI turn (Claude Code, Grok).
+ * - `message-start`: a new assistant message in the Anthropic-style stream
+ *   (Grok `streaming-messages-json`, Claude Code `stream-json`). Each model
+ *   step after a tool call starts a new message.
+ */
+export function cliLineMarker(line: string): "result" | "message-start" | null {
   const trimmed = line.trim();
-  if (!trimmed.startsWith("{")) return false;
+  if (!trimmed.startsWith("{")) return null;
+  let value: unknown;
   try {
-    const value = JSON.parse(trimmed) as unknown;
-    return typeof value === "object" && value !== null && (value as { type?: unknown }).type === "result";
+    value = JSON.parse(trimmed);
   } catch {
-    return false;
+    return null;
   }
+  const record = asRecord(value);
+  if (!record) return null;
+  const type = stringField(record, "type");
+  if (type === "result") return "result";
+  if (type === "stream_event" && stringField(asRecord(record.event) ?? {}, "type") === "message_start") {
+    return "message-start";
+  }
+  return null;
 }
 
 function extractEvent(value: Record<string, unknown>): ParsedCliLine | null {

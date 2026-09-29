@@ -45,6 +45,8 @@ A profile may run a subscription coding-agent CLI on the server instead of an HT
 - `model` is passed to the CLI only when the profile sets it (`-m` or `--model`). Omitting it leaves the CLI's own default. That is not a Botanical default model, and CLI profiles are never auto-selected.
 - The CLI runs in the agent's folder inside the existing workspace jail. Botanical tools reach it through a per-run MCP server (refined below). Set `botanicalTools: false` on a profile to opt out.
 - Grok is invoked with `--prompt-file` (not `-p <prompt>`) plus `--output-format streaming-messages-json --include-partial-messages --always-approve --cwd <dir>` because that format emits incremental text deltas. ACP `streaming-json` lines are still parsed if a binary emits them.
+- Grok also gets `--no-wait-for-background` (headless only, not listed by `--help` in 1.0.40/1.0.41). Without it, Grok keeps running after the model's last message while background work is pending (commands still running after about 15s, background subagents, `monitor` watches), up to 600s and forever for a persistent monitor. The chat then showed nothing until Stop (issue #87). With the flag, Grok exits when the turn ends and kills what is still pending.
+- Text from separate model steps in one CLI run is joined with a blank line. A step starts at each `message_start` in Grok's and Claude Code's stream.
 - Claude Code reads the prompt on stdin (`-p` with no prompt argument) and uses `--output-format stream-json --verbose --include-partial-messages --permission-mode bypassPermissions`. Codex uses `codex exec … -` so the prompt is stdin. The extra flags keep the process from blocking on prompts or a git repo check. The workspace jail is the external sandbox.
 - `GET /api/profiles` includes every CLI profile with `kind`, `available`, and `unavailableReason` when the binary is missing or login cannot be confirmed. A chat turn on an unavailable CLI profile fails with `profile_unavailable`. It does not crash the process.
 - Docker: `docker-compose.cli.yml` is opt-in and does not change `docker compose up`.
@@ -144,6 +146,7 @@ A CLI turn opens `POST /internal/mcp/runs/<runId>` on the same server process fo
 - Claude Code gets `--mcp-config <temp file> --strict-mcp-config` and `--allowedTools mcp__botanical__*`. Codex gets `-c mcp_servers.botanical.url=…` and `bearer_token_env_var`. Neither is installed in the default image; these flags follow their published CLI references.
 - Calls made through the endpoint stream as `tool-call` / `tool-result` events and are stored as tool messages, so they render as tool cards. The CLI's own native tools are not Botanical tool cards.
 - `botanicalTools: false` on a CLI profile skips the endpoint. Presets from `BOTANICAL_CLI_PROFILES` leave it on.
+- An agent that can use no tools also gets no endpoint. Its prompt says Botanical tools such as memory and agent messages are not enabled, and asks the CLI to say so rather than look for a workaround. Before this, Grok found an empty `botanical` server and went searching the workspace instead (issue #87).
 - Chat SSE streams send a `: ping` comment after 5 seconds without an event. Bun closes idle connections after 10 seconds, and CLI turns are often silent while the CLI looks up or runs tools; without the ping that aborted the turn.
 
 ---
