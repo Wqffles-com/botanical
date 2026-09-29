@@ -52,6 +52,9 @@ Bootstrap env read in `deploy/server/src/config.ts` includes `DEPLOYMENT_MODE`, 
 | Path | Purpose |
 |------|---------|
 | `scripts/check-index.ts` | `bun run check:index` |
+| `scripts/dashboard/render_dashboard.py` | Progress dashboard PNG from git history and GitHub |
+| `scripts/dashboard/README.md` | How to run the renderer |
+| `scripts/dashboard/requirements.txt` | Standard-library note; system tools are `git`, `gh`, and Chrome or Chromium |
 | `scripts/e2e/run.mjs` | Playwright runner (see [e2e](e2e.md)) |
 | `scripts/release/package.sh` | Builds the API and web into a zip |
 | `scripts/release/start.sh` | Unzipped release: API and web. Also maps `BOTANICAL_PASSCODE` → `BOTANICAL_PASSWORD` |
