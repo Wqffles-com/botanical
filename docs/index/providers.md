@@ -25,7 +25,7 @@ Streaming model adapters and headless coding-CLI profiles. This is the only pack
 | `packages/providers/src/cli` | Install, login, args, and `runCli` for CLI profiles. `runCli` `input` writes mid-turn messages to Claude Code's stream-json stdin |
 | `packages/providers/test` | `bun test` |
 
-Provider type ids: `openai`, `anthropic`, `xai`, `deepseek`, `openrouter`, `openai-compat`, `mock`. CLI names in `packages/providers/src/cli/types.ts`: `grok`, `claude`, `codex`. Preset profile ids: `grok-build`, `claude-code`, `codex`.
+Provider type ids: `openai`, `anthropic`, `xai`, `deepseek`, `openrouter`, `openai-compat`, `mock`. CLI names in `packages/providers/src/cli/types.ts`: `grok`, `claude`, `codex`. Preset profile ids: `grok-build`, `claude-code`, `codex`. `expandCliModels` (`packages/providers/src/cli/config.ts`) lists each CLI profile's `models` (default `CLI_KNOWN_MODELS` in `types.ts`) as sibling profiles `<id>--<model>` for the model picker.
 
 `xai`, `deepseek`, `openrouter`, and `openai-compat` use `packages/providers/src/openai-client.ts`. `anthropic` uses `packages/providers/src/anthropic.ts`.
 

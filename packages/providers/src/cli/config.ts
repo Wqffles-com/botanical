@@ -1,5 +1,6 @@
 import { ProviderError } from "../errors.ts";
 import {
+  CLI_KNOWN_MODELS,
   CLI_NAMES,
   CLI_PROFILE_PRESET_IDS,
   DEFAULT_CLI_TIMEOUT_MS,
@@ -121,6 +122,7 @@ function parseCliEntry(value: Record<string, unknown>, index: number): CliProfil
       ? nameSource.trim().slice(0, 120)
       : PRESET_LABELS[id as CliProfilePresetId]?.label ?? cli;
   const model = optionalText(value.model, `${label}.model`);
+  const models = readModels(value.models, label);
   const bin = optionalText(value.bin, `${label}.bin`);
   if (bin && !bin.startsWith("/")) {
     throw new ProviderError(`${label}.bin must be an absolute path.`, { code: "config" });
@@ -137,6 +139,7 @@ function parseCliEntry(value: Record<string, unknown>, index: number): CliProfil
         ? `Subscription CLI (${cli}). Botanical tools are exposed on a per-run MCP server named botanical.`
         : `Subscription CLI (${cli}). Botanical tools are off for this profile; the CLI runs its own tools.`),
     ...(model ? { model } : {}),
+    ...(models ? { models } : {}),
     ...(bin ? { bin } : {}),
     timeoutMs: readTimeout(value.timeoutMs, label),
     botanicalTools,
@@ -178,6 +181,35 @@ function optionalText(value: unknown, label: string): string | undefined {
   if (typeof value !== "string") throw new ProviderError(`${label} must be a string.`, { code: "config" });
   const text = value.trim();
   return text.length > 0 ? text : undefined;
+}
+
+function readModels(value: unknown, label: string): string[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || item.trim() === "")) {
+    throw new ProviderError(`${label}.models must be an array of model ids.`, { code: "config" });
+  }
+  return [...new Set(value.map((item: string) => item.trim()))];
+}
+
+/**
+ * One spec per model the picker lists: the spec itself, then a sibling
+ * `<id>--<model>` for each entry of `models` (or `CLI_KNOWN_MODELS`).
+ */
+export function expandCliModels(specs: readonly CliProfileSpec[]): CliProfileSpec[] {
+  const ids = new Set(specs.map((spec) => spec.id));
+  const out: CliProfileSpec[] = [];
+  for (const spec of specs) {
+    const { models, ...base } = spec;
+    out.push(base);
+    for (const model of models ?? CLI_KNOWN_MODELS[spec.cli]) {
+      if (model === spec.model) continue;
+      const id = `${spec.id}--${model.replace(/[^A-Za-z0-9_-]/g, "-")}`.slice(0, 64);
+      if (ids.has(id)) continue;
+      ids.add(id);
+      out.push({ ...base, id, model });
+    }
+  }
+  return out;
 }
 
 function readBotanicalTools(value: unknown, label: string): boolean {
