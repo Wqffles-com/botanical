@@ -1,9 +1,9 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import Link from "next/link";
 import { useMemo } from "react";
 import { AgentPicker } from "@/components/agents/agent-picker";
+import { useAppDialogs } from "@/components/app-dialogs";
 import { useWorkspace } from "@/components/workspace-provider";
 import { Button } from "@botanical/ui/components/button";
 import { pageContainerVariants } from "@botanical/ui/components/page-container";
@@ -13,6 +13,7 @@ import { identityFromUnknown } from "@/lib/agent-identity";
 
 export function AgentsIndex() {
   const { ready, agents, error } = useWorkspace();
+  const { openAgent } = useAppDialogs();
   const identities = useMemo(() => agents.map((agent) => identityFromUnknown(agent)), [agents]);
 
   return (
@@ -21,7 +22,7 @@ export function AgentsIndex() {
         title="Agents"
         description="Each agent has a color, an icon, and a name. One agent owns each chat."
         actions={
-          <Button nativeButton={false} render={<Link href="/agents/new" />}>
+          <Button onClick={() => openAgent(null)} className="rounded-full px-3.5">
             <Plus />
             New agent
           </Button>
@@ -38,7 +39,7 @@ export function AgentsIndex() {
           <Skeleton className="h-32 rounded-xl" />
         </div>
       ) : (
-        <AgentPicker agents={identities} showCreate={false} />
+        <AgentPicker agents={identities} showCreate={false} onSelect={(id) => openAgent(id)} />
       )}
     </div>
   );

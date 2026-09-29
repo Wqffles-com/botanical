@@ -3,7 +3,18 @@
 import { pageContainerVariants } from "@botanical/ui/components/page-container";
 import type { ModelProfile } from "@botanical/core";
 import { isUnauthorized } from "@botanical/core";
-import { Layers, Plug, Server, Wrench } from "lucide-react";
+import {
+  Brain,
+  Layers,
+  Plug,
+  Server,
+  Settings2,
+  ShieldCheck,
+  SquareTerminal,
+  UserCog,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState } from "@botanical/ui/components/empty-state";
@@ -17,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@botanical/ui/componen
 import { api } from "@/lib/api";
 import { providerLabel } from "@/lib/format-extra";
 import { useWorkspace } from "@/components/workspace-provider";
+import { cn } from "@/lib/utils";
 import { CliPanel } from "@/components/settings/cli-panel";
 import { MemoryPanel } from "@/components/settings/memory-panel";
 import { ProfilesPanel } from "@/components/settings/profiles-panel";
@@ -29,26 +41,61 @@ import { AdminPanel } from "./admin-panel";
 import { BackgroundWorkCard } from "./background-work-card";
 import { DeploymentBadge } from "./deployment-badge";
 
-type SettingsTab = "general" | "profiles" | "memory" | "roles" | "cli" | "admin";
+export type SettingsTab = "general" | "profiles" | "memory" | "roles" | "cli" | "admin";
 
-const SETTINGS_TABS: Array<{ value: SettingsTab; label: string }> = [
-  { value: "general", label: "General" },
-  { value: "profiles", label: "Profiles" },
-  { value: "memory", label: "Memory" },
-  { value: "roles", label: "Roles & permissions" },
-  { value: "cli", label: "Coding CLIs" },
-  { value: "admin", label: "Admin" },
+const SETTINGS_TABS: Array<{ value: SettingsTab; label: string; icon: LucideIcon }> = [
+  { value: "general", label: "General", icon: Settings2 },
+  { value: "profiles", label: "Profiles", icon: Layers },
+  { value: "memory", label: "Memory", icon: Brain },
+  { value: "roles", label: "Roles & permissions", icon: ShieldCheck },
+  { value: "cli", label: "Coding CLIs", icon: SquareTerminal },
+  { value: "admin", label: "Admin", icon: UserCog },
 ];
 
-function normalizeTab(value: string | null): SettingsTab {
+export function normalizeSettingsTab(value: string | null | undefined): SettingsTab {
   if (value === "profiles" || value === "memory" || value === "roles" || value === "cli" || value === "admin") return value;
   return "general";
 }
 
+/** `/settings` fallback page. In the app, settings open as a dialog (`useAppDialogs().openSettings`). */
 export function SettingsView() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tab = normalizeTab(searchParams.get("tab"));
+  const tab = normalizeSettingsTab(searchParams.get("tab"));
+
+  function selectTab(value: SettingsTab) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "general") params.delete("tab");
+    else params.set("tab", value);
+    const query = params.toString();
+    router.replace(query ? `/settings?${query}` : "/settings", { scroll: false });
+  }
+
+  return (
+    <div className={pageContainerVariants()}>
+      <PageHeader
+        title="Settings"
+        description="Profiles, memory, and roles live on the server. Keys never enter this browser."
+      />
+      <SettingsPanels tab={tab} onTab={selectTab} layout="page" />
+    </div>
+  );
+}
+
+/**
+ * Every settings section. `page` lays the tabs out on top; `dialog` puts them in a rail on the
+ * left with the section scrolling beside it.
+ */
+export function SettingsPanels({
+  tab,
+  onTab,
+  layout,
+}: {
+  tab: SettingsTab;
+  onTab: (tab: SettingsTab) => void;
+  layout: "page" | "dialog";
+}) {
+  const router = useRouter();
   const { agents, refresh } = useWorkspace();
   const [profiles, setProfiles] = useState<ModelProfile[]>([]);
   const [tools, setTools] = useState<CatalogTool[]>([]);
@@ -94,46 +141,103 @@ export function SettingsView() {
     [profiles, settings],
   );
 
-  function selectTab(next: string) {
-    const value = normalizeTab(next);
-    const params = new URLSearchParams(searchParams.toString());
-    if (value === "general") params.delete("tab");
-    else params.set("tab", value);
-    const query = params.toString();
-    router.replace(query ? `/settings?${query}` : "/settings", { scroll: false });
+  const dialog = layout === "dialog";
+  const selectTab = (next: unknown) => onTab(normalizeSettingsTab(typeof next === "string" ? next : null));
+
+  // Six tabs do not fit a phone, so pick the section from a select below sm.
+  const mobilePicker = (
+    <Select items={visibleTabs} value={tab} onValueChange={(value) => value && selectTab(value)}>
+      <SelectTrigger className="w-full sm:hidden" aria-label="Settings section">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {visibleTabs.map((item) => (
+          <SelectItem key={item.value} value={item.value}>
+            {item.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  const errorLine = error ? (
+    <p role="alert" className={cn("text-sm text-destructive", dialog ? "mb-4" : "mt-6")}>
+      {error}
+    </p>
+  ) : null;
+
+  const panels = (
+    <>
+      <TabsContent value="general" className={cn("space-y-4", !dialog && "mt-4")}>
+        <AccentCard />
+        {loading ? (
+          <SettingsSkeleton />
+        ) : (
+          <>
+            <DeploymentTab settings={settings} />
+            <BackgroundWorkCard />
+            <ProfilesTab profiles={[]} providers={providers} keysOnly />
+            <ToolsTab tools={tools} />
+            <McpTab snapshot={mcp} />
+          </>
+        )}
+      </TabsContent>
+      <TabsContent value="profiles" className={cn(!dialog && "mt-4")}>
+        {loading ? <SettingsSkeleton /> : <ProfilesPanel profiles={profiles} />}
+      </TabsContent>
+      <TabsContent value="memory" className={cn(!dialog && "mt-4")}>
+        <MemoryPanel agents={agents} />
+      </TabsContent>
+      <TabsContent value="roles" className={cn(!dialog && "mt-4")}>
+        <RolesPanel agents={agents} onAgentsChanged={refresh} />
+      </TabsContent>
+      <TabsContent value="cli" className={cn(!dialog && "mt-4")}>
+        <CliPanel />
+      </TabsContent>
+      {admin ? (
+        <TabsContent value="admin" className={cn(!dialog && "mt-4")}>
+          <AdminPanel />
+        </TabsContent>
+      ) : null}
+    </>
+  );
+
+  if (dialog) {
+    return (
+      <Tabs
+        value={tab}
+        onValueChange={selectTab}
+        orientation="vertical"
+        className="h-full min-h-0 flex-col gap-0 sm:flex-row"
+      >
+        <nav className="flex shrink-0 flex-col gap-3 border-b p-3 sm:w-56 sm:border-r sm:border-b-0 sm:p-4">
+          {mobilePicker}
+          <TabsList variant="line" className="hidden w-full items-stretch gap-0.5 sm:flex">
+            {visibleTabs.map(({ value, label, icon: Icon }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="h-9 flex-none justify-start gap-2.5 rounded-lg px-2.5 after:hidden data-active:bg-accent! data-active:text-foreground"
+              >
+                <Icon />
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </nav>
+        <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+          {errorLine}
+          {panels}
+        </div>
+      </Tabs>
+    );
   }
 
   return (
-    <div className={pageContainerVariants()}>
-      <PageHeader
-        title="Settings"
-        description="Profiles, memory, and roles live on the server. Keys never enter this browser."
-      />
-
-      {error ? (
-        <p role="alert" className="mt-6 text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
-
+    <>
+      {errorLine}
       <Tabs value={tab} onValueChange={selectTab} className="mt-8">
-        {/* Six tabs do not fit a phone, so pick the section from a select below sm. */}
-        <Select
-          items={visibleTabs}
-          value={tab}
-          onValueChange={(value) => value && selectTab(value)}
-        >
-          <SelectTrigger className="w-full sm:hidden" aria-label="Settings section">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {visibleTabs.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {mobilePicker}
         <TabsList
           variant="line"
           className="scrollbar-thin hidden w-full justify-start gap-4 overflow-x-auto overflow-y-hidden border-b px-0 group-data-horizontal/tabs:h-10 sm:flex"
@@ -144,40 +248,9 @@ export function SettingsView() {
             </TabsTrigger>
           ))}
         </TabsList>
-
-        <TabsContent value="general" className="mt-4 space-y-4">
-          <AccentCard />
-          {loading ? (
-            <SettingsSkeleton />
-          ) : (
-            <>
-              <DeploymentTab settings={settings} />
-              <BackgroundWorkCard />
-              <ProfilesTab profiles={[]} providers={providers} keysOnly />
-              <ToolsTab tools={tools} />
-              <McpTab snapshot={mcp} />
-            </>
-          )}
-        </TabsContent>
-        <TabsContent value="profiles" className="mt-4">
-          {loading ? <SettingsSkeleton /> : <ProfilesPanel profiles={profiles} />}
-        </TabsContent>
-        <TabsContent value="memory" className="mt-4">
-          <MemoryPanel agents={agents} />
-        </TabsContent>
-        <TabsContent value="roles" className="mt-4">
-          <RolesPanel agents={agents} onAgentsChanged={refresh} />
-        </TabsContent>
-        <TabsContent value="cli" className="mt-4">
-          <CliPanel />
-        </TabsContent>
-        {admin ? (
-          <TabsContent value="admin" className="mt-4">
-            <AdminPanel />
-          </TabsContent>
-        ) : null}
+        {panels}
       </Tabs>
-    </div>
+    </>
   );
 }
 

@@ -59,6 +59,7 @@ export function ChatMembersMenu({
           <Button
             variant="ghost"
             size="sm"
+            className="h-8 rounded-full px-3 text-muted-foreground hover:text-foreground"
             data-testid="chat-members"
             aria-label={members.length > 0 ? `Group members, ${members.length + 1} agents` : "Add agents to this chat"}
           />

@@ -8,7 +8,6 @@ import {
   Monitor,
   Moon,
   Plus,
-  Search,
   Settings,
   Sun,
   Webhook,
@@ -17,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AgentAvatar } from "@/components/agent-avatar";
+import { useAppDialogs } from "@/components/app-dialogs";
 import { useWorkspace } from "@/components/workspace-provider";
 import {
   Command,
@@ -29,7 +29,6 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@botanical/ui/components/command";
-import { SidebarMenuButton } from "@botanical/ui/components/sidebar";
 import { agentChatHref, groupChats } from "@/lib/chat-groups";
 import { agentIdentity } from "@/lib/agent-identity";
 import { relativeTime } from "@/lib/format";
@@ -39,7 +38,6 @@ const PAGES = [
   { href: "/routines", label: "Routines", icon: CalendarClock },
   { href: "/listeners", label: "Listeners", icon: Webhook },
   { href: "/agents", label: "Agents", icon: Bot },
-  { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 /** ⌘K palette: jump to an agent, a chat, or a page, or run a quick action. */
@@ -47,6 +45,7 @@ export function CommandMenu({ trigger }: { trigger?: (open: () => void) => React
   const router = useRouter();
   const { setTheme } = useTheme();
   const { agents, chats } = useWorkspace();
+  const { openAgent, openSettings } = useAppDialogs();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -86,7 +85,7 @@ export function CommandMenu({ trigger }: { trigger?: (open: () => void) => React
                 <Plus />
                 New chat
               </CommandItem>
-              <CommandItem value="new agent" onSelect={() => go("/agents/new")}>
+              <CommandItem value="new agent" onSelect={() => run(() => openAgent(null))}>
                 <Bot />
                 New agent
               </CommandItem>
@@ -142,6 +141,10 @@ export function CommandMenu({ trigger }: { trigger?: (open: () => void) => React
                   {label}
                 </CommandItem>
               ))}
+              <CommandItem value="page settings" onSelect={() => run(() => openSettings())}>
+                <Settings />
+                Settings
+              </CommandItem>
             </CommandGroup>
             <CommandGroup heading="Theme">
               <CommandItem value="theme light" onSelect={() => run(() => setTheme("light"))}>
@@ -161,24 +164,5 @@ export function CommandMenu({ trigger }: { trigger?: (open: () => void) => React
         </Command>
       </CommandDialog>
     </>
-  );
-}
-
-/** Sidebar entry that opens the palette and shows its shortcut. */
-export function CommandMenuButton({ onOpen }: { onOpen: () => void }) {
-  return (
-    <SidebarMenuButton
-      variant="outline"
-      onClick={onOpen}
-      aria-label="Search (⌘K)"
-      className="text-muted-foreground"
-      data-testid="command-menu-trigger"
-    >
-      <Search />
-      <span>Search</span>
-      <kbd className="ml-auto inline-flex h-5 items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-2xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-        ⌘K
-      </kbd>
-    </SidebarMenuButton>
   );
 }

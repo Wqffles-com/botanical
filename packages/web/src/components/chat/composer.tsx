@@ -1,7 +1,7 @@
 "use client";
 
 import { activeMentionQuery, type Agent, type ModelProfile } from "@botanical/core";
-import { Send, Square } from "lucide-react";
+import { ArrowUp, Square } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { AgentAvatar } from "@/components/agent-avatar";
 import { DictationActions, DictationNotice } from "@/components/chat/dictation-button";
@@ -141,11 +141,11 @@ export function Composer({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="px-4 pb-4 pt-2">
+    <form onSubmit={handleSubmit} className="px-3 pb-4 pt-1 sm:px-4">
       <div
         className={cn(
-          "relative mx-auto flex max-w-3xl flex-col rounded-xl border bg-card",
-          disabled ? "border-border opacity-70" : "border-border focus-within:border-primary/45",
+          "relative mx-auto flex max-w-3xl flex-col rounded-[1.75rem] bg-bubble shadow-sm ring-1 ring-border transition-shadow",
+          disabled ? "opacity-70" : "focus-within:ring-foreground/20",
         )}
       >
         {suggestions.length > 0 ? (
@@ -207,20 +207,20 @@ export function Composer({
           placeholder={placeholder}
           disabled={disabled}
           rows={1}
-          className="max-h-[200px] min-h-[44px] w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
+          className="max-h-[200px] min-h-[48px] w-full resize-none bg-transparent px-5 pt-3.5 pb-1 text-[0.9375rem] leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
           aria-describedby={unavailableHint ? "composer-unavailable" : undefined}
         />
         {unavailableHint ? (
           <p
             id="composer-unavailable"
             data-testid="profile-unavailable"
-            className="px-3.5 pb-1 text-2xs leading-snug text-muted-foreground"
+            className="px-5 pb-1 text-2xs leading-snug text-muted-foreground"
           >
             {unavailableHint}
           </p>
         ) : null}
         <DictationNotice dictation={dictation} />
-        <div className="flex items-end gap-2 px-2 pb-2">
+        <div className="flex items-center gap-1.5 px-2.5 pb-2.5">
           {profiles && onProfile ? (
             <ProfileSelect
               id="composer-profile"
@@ -231,23 +231,35 @@ export function Composer({
               compact
             />
           ) : null}
-          {unavailableHint ? null : (
-            <span className="mb-1 hidden text-2xs text-muted-foreground sm:inline">
-              {dictation.phase === "recording"
-                ? "Enter or Space to stop · Escape to cancel"
-                : "Enter to send · Shift+Enter newline"}
-            </span>
-          )}
+          {recording && !unavailableHint ? (
+            <span className="hidden text-2xs text-muted-foreground sm:inline">Enter or Space to stop · Escape to cancel</span>
+          ) : null}
           <span className="ml-auto flex items-center gap-2">
             <DictationActions dictation={dictation} />
             {working ? (
-              <Button type="button" variant="outline" size="icon" data-testid="stop" onClick={onStop} aria-label="Stop">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="size-9 rounded-full"
+                data-testid="stop"
+                onClick={onStop}
+                aria-label="Stop"
+              >
                 <Square className="size-3.5 fill-current" />
               </Button>
             ) : null}
             {recording ? null : (
-              <Button type="submit" size="icon" data-testid="send" disabled={!canSubmit} aria-label="Send">
-                <Send className="size-3.5" />
+              <Button
+                type="submit"
+                size="icon"
+                className="size-9 rounded-full"
+                data-testid="send"
+                disabled={!canSubmit}
+                aria-label="Send"
+                title="Send (Enter). Shift+Enter for a new line."
+              >
+                <ArrowUp className="size-4" />
               </Button>
             )}
           </span>

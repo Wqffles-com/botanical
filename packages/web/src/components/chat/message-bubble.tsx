@@ -39,9 +39,15 @@ export function MessageBubble({
   queued,
   toolCalls,
   actions,
+  showName,
+  continued,
 }: {
   message: ChatMessage;
   agent?: Agent | null;
+  /** Label replies with the agent's name (group chats, where several agents answer). */
+  showName?: boolean;
+  /** Follows a reply from the same agent: no avatar or name, so a run reads as one turn. */
+  continued?: boolean;
   /** Placeholder while the agent is on a turn. Replies arrive whole, so it has no text. */
   working?: boolean;
   /** A sent user message the agent has not picked up yet. */
@@ -91,7 +97,7 @@ export function MessageBubble({
         {editor ?? (
           <div
             className={cn(
-              "max-w-[min(72%,40rem)] rounded-2xl rounded-br-md bg-secondary px-3.5 py-2.5 text-sm leading-relaxed",
+              "max-w-[min(80%,40rem)] rounded-3xl bg-bubble-user px-4 py-2.5 text-sm leading-relaxed",
               queued && "opacity-70",
             )}
           >
@@ -111,13 +117,15 @@ export function MessageBubble({
 
   return (
     <article className="group/message flex gap-3" data-testid={working ? "working-message" : "message"} data-role={message.role}>
-      <div className={cn("shrink-0 self-start", working && "agent-working-spin")}>
-        <MessageAgentAvatar agent={identity} />
+      <div className={cn("w-6 shrink-0 self-start", working && "agent-working-spin")}>
+        {continued && !working ? null : <MessageAgentAvatar agent={identity} />}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col items-start gap-1 pt-0.5">
-        <div className="text-xs font-medium text-muted-foreground">{identity.name}</div>
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
+        {showName && !continued ? (
+          <div className="pt-1 text-xs font-medium text-muted-foreground">{identity.name}</div>
+        ) : null}
         {editor ?? (hasBody ? (
-          <div className="min-w-0 max-w-[min(85%,48rem)] rounded-2xl rounded-tl-md border bg-card px-3.5 py-2.5 text-sm leading-relaxed">
+          <div className="min-w-0 max-w-[min(92%,48rem)] rounded-3xl rounded-tl-lg bg-bubble px-4 py-2.5 text-sm leading-relaxed">
             {/* A step's text comes before the tool calls it makes. */}
             {message.content ? <Markdown>{message.content}</Markdown> : null}
             {calls.map((call) => (
@@ -125,13 +133,21 @@ export function MessageBubble({
             ))}
           </div>
         ) : null)}
-        {working ? <WorkingStatus name={identity.name} /> : null}
-        {message.usage ? (
-          <p className="text-2xs text-muted-foreground">
-            {message.usage.inputTokens} in · {message.usage.outputTokens} out
-          </p>
+        {working ? (
+          <div className="flex h-7 items-center">
+            <WorkingStatus name={identity.name} />
+          </div>
         ) : null}
-        {toolbar ? <div className="mt-1">{toolbar}</div> : null}
+        {toolbar || message.usage ? (
+          <div className="flex items-center gap-2">
+            {toolbar}
+            {message.usage ? (
+              <span className="text-2xs text-muted-foreground opacity-0 transition-opacity group-hover/message:opacity-100 pointer-coarse:opacity-100">
+                {message.usage.inputTokens} in · {message.usage.outputTokens} out
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </article>
   );

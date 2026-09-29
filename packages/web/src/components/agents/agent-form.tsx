@@ -22,6 +22,7 @@ import { Input } from "@botanical/ui/components/input";
 import { Checkbox } from "@botanical/ui/components/checkbox";
 import { Label } from "@botanical/ui/components/label";
 import { Textarea } from "@botanical/ui/components/textarea";
+import { cn } from "@/lib/utils";
 import { previewEffective } from "@/lib/permissions";
 import { createAgent, deleteAgent, updateAgent } from "@/lib/agent-api";
 import { fileToAgentPicture } from "@/lib/agent-picture";
@@ -47,6 +48,8 @@ export function AgentForm({
   roles = [],
   agents = [],
   toolsLoading,
+  layout = "page",
+  onDone,
 }: {
   agent?: AgentIdentity | null;
   tools: ToolInfo[];
@@ -54,7 +57,12 @@ export function AgentForm({
   roles?: RoleRecord[];
   agents?: Agent[];
   toolsLoading?: boolean;
+  /** `dialog` scrolls the fields between a fixed header and footer, for the agent dialog. */
+  layout?: "page" | "dialog";
+  /** Dialog only: called after a save, create, or delete, with where to go next (if anywhere). */
+  onDone?: (next?: string) => void;
 }) {
+  const dialog = layout === "dialog";
   const router = useRouter();
   const { refresh } = useWorkspace();
   const agentKey = agent ? `${agent.id}:${agent.updatedAt}` : "new";
@@ -85,13 +93,18 @@ export function AgentForm({
         const saved = await updateAgent(agent.id, draft);
         await refresh();
         toast.success(`Saved ${saved.name}.`);
-        router.refresh();
+        if (onDone) onDone();
+        else router.refresh();
       } else {
         const created = await createAgent(draft);
         await refresh();
         toast.success(`Created ${created.name}.`);
-        router.push(`/agents/${encodeURIComponent(created.id)}`);
-        router.refresh();
+        if (onDone) {
+          onDone(`/agents/${encodeURIComponent(created.id)}/chat`);
+        } else {
+          router.push(`/agents/${encodeURIComponent(created.id)}`);
+          router.refresh();
+        }
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save the agent.");
@@ -108,8 +121,12 @@ export function AgentForm({
       await refresh();
       toast.success(`Deleted ${agent.name}.`);
       setConfirmDelete(false);
-      router.push("/agents");
-      router.refresh();
+      if (onDone) {
+        onDone("/");
+      } else {
+        router.push("/agents");
+        router.refresh();
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not delete the agent.");
     } finally {
@@ -126,234 +143,248 @@ export function AgentForm({
   const effective = rolesMatchSaved ? agent.effectivePermissions : previewEffective(draft.roleIds, roles);
 
   return (
-    <form onSubmit={(event) => void onSubmit(event)} data-testid="agent-editor" className={pageContainerVariants({ size: "narrow" })}>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <AgentAvatar
-            name={draft.name || "New agent"}
-            icon={draft.icon}
-            color={draft.color}
-            shape={draft.shape}
-            picture={draft.picture}
-            size="xl"
-          />
-          <div className="min-w-0">
-            <h1 className="truncate text-3xl font-semibold tracking-tight">{title}</h1>
-            {agent ? <RoleBadges roles={agent.roles} /> : null}
-            <p className="mt-1 text-sm text-muted-foreground">
-              Name, title, shape, and picture show up in the sidebar, chat header, and messages.
-            </p>
-            {agent?.createdByAgentId ? (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Created by{" "}
-                <Link href={`/agents/${encodeURIComponent(agent.createdByAgentId)}`} className="underline-offset-2 hover:underline">
-                  {creator?.name ?? "another agent"}
-                </Link>
-              </p>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-8 grid gap-6">
-        <div className="grid gap-2">
-          <div className="flex items-baseline justify-between">
-            <Label htmlFor="agent-name">Name</Label>
-            <span className="text-xs text-muted-foreground tabular-nums">
-              {draft.name.trim().length}/{AGENT_NAME_MAX}
-            </span>
-          </div>
-          <Input
-            id="agent-name"
-            value={draft.name}
-            maxLength={AGENT_NAME_MAX}
-            placeholder="Name your agent"
-            onChange={(event) => patch({ name: event.target.value })}
-            required
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <div className="flex items-baseline justify-between">
-            <Label htmlFor="agent-title">Title</Label>
-            <span className="text-xs text-muted-foreground tabular-nums">
-              Short role label · {draft.title.trim().length}/{AGENT_TITLE_MAX}
-            </span>
-          </div>
-          <Input
-            id="agent-title"
-            value={draft.title}
-            maxLength={AGENT_TITLE_MAX}
-            placeholder="What it does, in a few words"
-            onChange={(event) => patch({ title: event.target.value })}
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <div className="flex items-baseline justify-between">
-            <Label htmlFor="agent-description">Description</Label>
-            <span className="text-xs text-muted-foreground">Shown in pickers</span>
-          </div>
-          <Input
-            id="agent-description"
-            value={draft.description}
-            maxLength={AGENT_DESCRIPTION_MAX}
-            placeholder="What this agent is for"
-            onChange={(event) => patch({ description: event.target.value })}
-          />
-        </div>
-
-        <div className="grid gap-6 sm:grid-cols-2 sm:gap-4">
-          <div className="grid content-start gap-2">
-            <Label>Icon</Label>
-            <AgentIconPicker
-              value={draft.icon}
-              color={draft.color}
-              onChange={(icon: AgentIconName) => patch({ icon })}
-            />
-          </div>
-          <div className="grid content-start gap-2">
-            <Label>Color</Label>
-            {/* Match the icon picker's 40px row so both columns line up. */}
-            <div className="flex min-h-10 items-center">
-              <AgentColorPicker value={draft.color} onChange={(color) => patch({ color })} />
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-2">
-          <Label>Shape</Label>
-          <AgentShapePicker
-            value={draft.shape}
-            color={draft.color}
-            icon={draft.icon}
-            onChange={(shape: AgentShape) => patch({ shape })}
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="agent-picture">Picture</Label>
-          <p className="text-xs text-muted-foreground">
-            Shown instead of the shape. PNG, JPEG, or WebP. Clear it to go back to the shape.
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
+    <form
+      onSubmit={(event) => void onSubmit(event)}
+      data-testid="agent-editor"
+      className={dialog ? "flex h-full min-h-0 flex-col" : pageContainerVariants({ size: "narrow" })}
+    >
+      <div className={cn(dialog && "scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 pt-6 pb-8 sm:px-8")}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
             <AgentAvatar
               name={draft.name || "New agent"}
               icon={draft.icon}
               color={draft.color}
               shape={draft.shape}
               picture={draft.picture}
-              size="md"
+              size="xl"
             />
-            <Button type="button" variant="outline" disabled={saving} onClick={() => pictureInput.current?.click()}>
-              <ImageUp />
-              {draft.picture ? "Replace picture" : "Upload picture"}
-            </Button>
-            <input
-              ref={pictureInput}
-              id="agent-picture"
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="sr-only"
-              tabIndex={-1}
-              disabled={saving}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                if (!file) return;
-                void fileToAgentPicture(file)
-                  .then((picture) => patch({ picture }))
-                  .catch((error: unknown) => {
-                    toast.error(error instanceof Error ? error.message : "Could not read that image.");
-                  });
-              }}
-            />
-            {draft.picture ? (
-              <Button type="button" variant="outline" disabled={saving} onClick={() => patch({ picture: null })}>
-                Clear picture
-              </Button>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="agent-prompt">Prompt</Label>
-          <Textarea
-            id="agent-prompt"
-            value={draft.prompt}
-            rows={12}
-            placeholder="You are…"
-            className="min-h-48 font-mono text-sm leading-relaxed"
-            onChange={(event) => patch({ prompt: event.target.value })}
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label>Roles</Label>
-          <p className="text-xs text-muted-foreground">
-            An agent with no roles is limited only by its tool allowlist. Roles add a capability ceiling.
-          </p>
-          {roles.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No roles yet. Create them in Settings.</p>
-          ) : (
-            <div className="flex flex-wrap gap-x-4 gap-y-2">
-              {roles.map((role) => {
-                const checked = draft.roleIds.includes(role.id);
-                return (
-                  <label key={role.id} className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={checked}
-                      disabled={saving}
-                      onCheckedChange={(next) => {
-                        const roleIds = next
-                          ? [...draft.roleIds, role.id]
-                          : draft.roleIds.filter((id) => id !== role.id);
-                        patch({ roleIds });
-                      }}
-                    />
-                    <span>{role.name}</span>
-                    {role.builtin ? <span className="text-xs text-muted-foreground">Built-in</span> : null}
-                  </label>
-                );
-              })}
+            <div className="min-w-0">
+              <h1 className={cn("truncate font-semibold tracking-tight", dialog ? "text-2xl" : "text-3xl")}>{title}</h1>
+              {agent ? <RoleBadges roles={agent.roles} /> : null}
+              <p className="mt-1 text-sm text-muted-foreground">
+                Name, title, shape, and picture show up in the sidebar, chat header, and messages.
+              </p>
+              {agent?.createdByAgentId ? (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Created by{" "}
+                  <Link href={`/agents/${encodeURIComponent(agent.createdByAgentId)}`} className="underline-offset-2 hover:underline">
+                    {creator?.name ?? "another agent"}
+                  </Link>
+                </p>
+              ) : null}
             </div>
-          )}
-          <PermissionsSummary permissions={effective} />
+          </div>
         </div>
 
-        <div className="grid gap-2">
-          <Label>Tools</Label>
-          <p className="text-xs text-muted-foreground">
-            Allowlist for this agent. Built-ins and MCP tools come from the server.
-          </p>
-          <AgentToolAllowlist
-            tools={tools}
-            value={draft.tools}
-            onChange={(next) => patch({ tools: next })}
-            loading={toolsLoading}
-            disabled={saving}
-          />
-        </div>
+        <div className="mt-8 grid gap-6">
+          <div className="grid gap-2">
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="agent-name">Name</Label>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {draft.name.trim().length}/{AGENT_NAME_MAX}
+              </span>
+            </div>
+            <Input
+              id="agent-name"
+              value={draft.name}
+              maxLength={AGENT_NAME_MAX}
+              placeholder="Name your agent"
+              onChange={(event) => patch({ name: event.target.value })}
+              required
+            />
+          </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="agent-profile">Default model</Label>
-          <p className="text-xs text-muted-foreground">
-            Pre-selected when you start a chat with this agent. You can pick a different model for any chat.
-          </p>
-          <div className="w-full sm:max-w-xl">
-            <ProfileSelect
-              id="agent-profile"
-              profiles={profiles}
-              value={draft.defaultProfileId}
-              onChange={(next) => patch({ defaultProfileId: next })}
-              noneLabel="None (pick per chat)"
+          <div className="grid gap-2">
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="agent-title">Title</Label>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                Short role label · {draft.title.trim().length}/{AGENT_TITLE_MAX}
+              </span>
+            </div>
+            <Input
+              id="agent-title"
+              value={draft.title}
+              maxLength={AGENT_TITLE_MAX}
+              placeholder="What it does, in a few words"
+              onChange={(event) => patch({ title: event.target.value })}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="agent-description">Description</Label>
+              <span className="text-xs text-muted-foreground">Shown in pickers</span>
+            </div>
+            <Input
+              id="agent-description"
+              value={draft.description}
+              maxLength={AGENT_DESCRIPTION_MAX}
+              placeholder="What this agent is for"
+              onChange={(event) => patch({ description: event.target.value })}
+            />
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2 sm:gap-4">
+            <div className="grid content-start gap-2">
+              <Label>Icon</Label>
+              <AgentIconPicker
+                value={draft.icon}
+                color={draft.color}
+                onChange={(icon: AgentIconName) => patch({ icon })}
+              />
+            </div>
+            <div className="grid content-start gap-2">
+              <Label>Color</Label>
+              {/* Match the icon picker's 40px row so both columns line up. */}
+              <div className="flex min-h-10 items-center">
+                <AgentColorPicker value={draft.color} onChange={(color) => patch({ color })} />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Shape</Label>
+            <AgentShapePicker
+              value={draft.shape}
+              color={draft.color}
+              icon={draft.icon}
+              onChange={(shape: AgentShape) => patch({ shape })}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="agent-picture">Picture</Label>
+            <p className="text-xs text-muted-foreground">
+              Shown instead of the shape. PNG, JPEG, or WebP. Clear it to go back to the shape.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <AgentAvatar
+                name={draft.name || "New agent"}
+                icon={draft.icon}
+                color={draft.color}
+                shape={draft.shape}
+                picture={draft.picture}
+                size="md"
+              />
+              <Button type="button" variant="outline" disabled={saving} onClick={() => pictureInput.current?.click()}>
+                <ImageUp />
+                {draft.picture ? "Replace picture" : "Upload picture"}
+              </Button>
+              <input
+                ref={pictureInput}
+                id="agent-picture"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                tabIndex={-1}
+                disabled={saving}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (!file) return;
+                  void fileToAgentPicture(file)
+                    .then((picture) => patch({ picture }))
+                    .catch((error: unknown) => {
+                      toast.error(error instanceof Error ? error.message : "Could not read that image.");
+                    });
+                }}
+              />
+              {draft.picture ? (
+                <Button type="button" variant="outline" disabled={saving} onClick={() => patch({ picture: null })}>
+                  Clear picture
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="agent-prompt">Prompt</Label>
+            <Textarea
+              id="agent-prompt"
+              value={draft.prompt}
+              rows={12}
+              placeholder="You are…"
+              className="min-h-48 font-mono text-sm leading-relaxed"
+              onChange={(event) => patch({ prompt: event.target.value })}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Roles</Label>
+            <p className="text-xs text-muted-foreground">
+              An agent with no roles is limited only by its tool allowlist. Roles add a capability ceiling.
+            </p>
+            {roles.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No roles yet. Create them in Settings.</p>
+            ) : (
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {roles.map((role) => {
+                  const checked = draft.roleIds.includes(role.id);
+                  return (
+                    <label key={role.id} className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={checked}
+                        disabled={saving}
+                        onCheckedChange={(next) => {
+                          const roleIds = next
+                            ? [...draft.roleIds, role.id]
+                            : draft.roleIds.filter((id) => id !== role.id);
+                          patch({ roleIds });
+                        }}
+                      />
+                      <span>{role.name}</span>
+                      {role.builtin ? <span className="text-xs text-muted-foreground">Built-in</span> : null}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            <PermissionsSummary permissions={effective} />
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Tools</Label>
+            <p className="text-xs text-muted-foreground">
+              Allowlist for this agent. Built-ins and MCP tools come from the server.
+            </p>
+            <AgentToolAllowlist
+              tools={tools}
+              value={draft.tools}
+              onChange={(next) => patch({ tools: next })}
+              loading={toolsLoading}
               disabled={saving}
             />
           </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="agent-profile">Default model</Label>
+            <p className="text-xs text-muted-foreground">
+              Pre-selected when you start a chat with this agent. You can pick a different model for any chat.
+            </p>
+            <div className="w-full sm:max-w-xl">
+              <ProfileSelect
+                id="agent-profile"
+                profiles={profiles}
+                value={draft.defaultProfileId}
+                onChange={(next) => patch({ defaultProfileId: next })}
+                noneLabel="None (pick per chat)"
+                disabled={saving}
+              />
+            </div>
+          </div>
         </div>
+
       </div>
 
-      <div className="sticky bottom-0 z-10 -mx-4 mt-8 flex items-center justify-end gap-2 border-t bg-background px-4 py-3 sm:-mx-6 sm:px-6">
+      <div
+        className={cn(
+          "flex items-center justify-end gap-2 border-t",
+          dialog
+            ? "shrink-0 px-5 py-3 sm:px-8"
+            : "sticky bottom-0 z-10 -mx-4 mt-8 bg-background px-4 py-3 sm:-mx-6 sm:px-6",
+        )}
+      >
         {agent ? (
           <Button
             type="button"

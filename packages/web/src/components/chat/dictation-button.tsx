@@ -3,12 +3,13 @@
 import { LoaderCircle, Mic, Square, X } from "lucide-react";
 import { Button } from "@botanical/ui/components/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@botanical/ui/components/tooltip";
+import { cn } from "@/lib/utils";
 import type { DictationController } from "./use-dictation";
 
 export function DictationNotice({ dictation }: { dictation: DictationController }) {
   if (!dictation.privacyNote && !dictation.interim && !dictation.error) return null;
   return (
-    <div className="px-3.5 pb-1 text-2xs leading-snug text-muted-foreground">
+    <div className="px-5 pb-1 text-2xs leading-snug text-muted-foreground">
       {dictation.privacyNote ? <p>{dictation.privacyNote}</p> : null}
       {dictation.interim ? <p aria-live="polite">{dictation.interim}</p> : null}
       {dictation.error ? <p role="alert">{dictation.error}</p> : null}
@@ -54,7 +55,7 @@ export function DictationActions({ dictation }: { dictation: DictationController
             variant="ghost"
             size="icon"
             data-testid="dictation-mic"
-            className={dictation.phase === "recording" ? "bg-muted" : undefined}
+            className={cn("size-9 rounded-full text-muted-foreground hover:text-foreground", dictation.phase === "recording" && "bg-muted text-foreground")}
             aria-label={dictation.micLabel}
             aria-pressed={dictation.phase === "recording"}
             disabled={dictation.micDisabled}

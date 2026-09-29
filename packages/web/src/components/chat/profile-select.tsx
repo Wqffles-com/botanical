@@ -27,6 +27,10 @@ const NONE = "__none__";
  * Two fields for one model profile: the provider (an API vendor or a coding
  * CLI) and the model it runs. The value is still the profile id.
  */
+/** Composer chips: borderless pills that only fill on hover. */
+const COMPACT_TRIGGER =
+  "h-8 min-w-0 rounded-full border-transparent bg-transparent px-3 text-muted-foreground hover:bg-accent hover:text-foreground dark:bg-transparent dark:hover:bg-accent";
+
 export function ProfileSelect({
   profiles,
   value,
@@ -75,7 +79,7 @@ export function ProfileSelect({
             aria-label="Provider"
             className={cn(
               "max-w-full",
-              compact ? "h-7 min-w-0" : "min-w-[180px] sm:flex-1",
+              compact ? COMPACT_TRIGGER : "min-w-[180px] sm:flex-1",
               (needed || unavailable) && "border-foreground/40",
             )}
             aria-invalid={needed || undefined}
@@ -101,7 +105,7 @@ export function ProfileSelect({
           <SelectTrigger
             data-testid="model-select"
             aria-label="Model"
-            className={cn("max-w-full", compact ? "h-7 min-w-0" : "min-w-[180px] sm:flex-1")}
+            className={cn("max-w-full", compact ? COMPACT_TRIGGER : "min-w-[180px] sm:flex-1")}
           >
             <SelectValue placeholder="Model">
               {(current: unknown) => {

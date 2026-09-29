@@ -116,8 +116,8 @@ export function NotificationBell() {
         render={
           <Button
             variant="ghost"
-            size="icon-sm"
-            className="relative overflow-visible"
+            size="icon"
+            className="relative overflow-visible rounded-full text-muted-foreground hover:text-foreground"
             aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
           />
         }
