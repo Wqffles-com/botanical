@@ -26,7 +26,7 @@ HTTP API: account auth, agents, chats, streaming turns, agent-to-agent mail, rou
 | `packages/server/src/listeners` | Webhook signature, body cap, and prompt framing |
 | `packages/server/src/streaming.ts` | SSE encode and heartbeat |
 | `packages/server/src/tools` | Builtin contributors (files, shell, web, memory, agent admin, `notify_user` in `packages/server/src/tools/notify.ts`, MCP) |
-| `packages/server/src/a2a` | Agent-message bus service and `send_agent_message` |
+| `packages/server/src/a2a` | Agent-message bus service and `send_agent_message`. Chat `@mentions` in `packages/server/src/a2a/mentions.ts` |
 | `packages/server/src/mcp-host.ts` | Boot MCP and snapshot for `GET /api/mcp/servers` |
 | `packages/server/src/cli-mcp.ts` | Per-run MCP endpoint for CLI profiles |
 | `packages/server/src/cli-install` | Install and device-login for coding CLIs. Logins land in a per-user CLI home; `userCliAvailability` checks that home, then the shared one |
@@ -42,7 +42,7 @@ From `packages/server/src/index.ts`: `createApp`, `loadConfig`, `createStore`, `
 
 Registered only through `router.add` in the handler file. `packages/server/src/app.ts` calls each `register*`. `OPTIONS` on any path returns 204 from `packages/server/src/router.ts` (not a registered route). No WebSocket handler.
 
-`POST /api/chats/:id/messages` with `async: true` queues the message and returns `202 { queued }` (optional `clientId` becomes the queue id). The turn runs detached from the request in `packages/server/src/runtime/chat-queue.ts`. A message queued during a turn steers it: the queue is the turn's `steering` source, so the agent loop takes the message before the model's next step, and Claude Code reads it on stdin. Messages the turn cannot take (another profile, step cap) are answered by the next turn. `GET /api/chats/:id/events` is an SSE feed of `status` (`running`, `queued`), whole `message` rows, `message-updated`, `messages-deleted` (`ids`), and `error`. `POST /api/chats/:id/stop` aborts the running queued turn. Without `async`, the route is SSE when the JSON body has `stream: true`, or when `stream` is omitted and `Accept` contains `text/event-stream` (`packages/server/src/streaming.ts`), and blocking JSON otherwise.
+`POST /api/chats/:id/messages` with `async: true` queues the message and returns `202 { queued }` (optional `clientId` becomes the queue id). The turn runs detached from the request in `packages/server/src/runtime/chat-queue.ts`. A message queued during a turn steers it: the queue is the turn's `steering` source, so the agent loop takes the message before the model's next step, and Claude Code reads it on stdin. Messages the turn cannot take (another profile, step cap) are answered by the next turn. `GET /api/chats/:id/events` is an SSE feed of `status` (`running`, `queued`), whole `message` rows, `message-updated`, `messages-deleted` (`ids`), and `error`. `POST /api/chats/:id/stop` aborts the running queued turn. An `@Name` of another agent in the posted content sends that agent a copy as A2A mail from the chat's agent (`fromChatId` set); the JSON responses list them in `mentions` (`packages/server/src/a2a/mentions.ts`). Without `async`, the route is SSE when the JSON body has `stream: true`, or when `stream` is omitted and `Accept` contains `text/event-stream` (`packages/server/src/streaming.ts`), and blocking JSON otherwise.
 
 | Method | Path | Handler |
 |--------|------|---------|

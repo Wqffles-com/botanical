@@ -13,6 +13,7 @@ Shared API types, response normalizers, and the HTTP client the web app uses. No
 | Path | Purpose |
 |------|---------|
 | `packages/core/src/client.ts` | `BotanicalClient` |
+| `packages/core/src/mentions.ts` | `findMentions`, `mentionedAgents`, `activeMentionQuery` (chat `@Name` parsing, shared by server and composer) |
 | `packages/core/src/paths.ts` | `API` path builders |
 | `packages/core/src/types.ts` | Wire types (`Agent`, `Chat`, `Health`, `RoleRecord`, …) |
 | `packages/core/src/normalize.ts` | Server JSON → those types |

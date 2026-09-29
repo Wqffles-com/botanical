@@ -366,3 +366,51 @@ describe("agent messages", () => {
     expect(notes.notifications.some((item) => item.kind === "run_succeeded")).toBe(true);
   });
 });
+
+describe("chat @mentions", () => {
+  test("mail the mentioned agent from the chat's agent", async () => {
+    const { app } = appWith();
+    const { token } = await login(app);
+    const owner = await createAgent(app, token, { name: "Scout" });
+    const other = await createAgent(app, token, { name: "Seed Keeper" });
+    const chatId = await createChat(app, token, owner.id, "mock");
+
+    const response = await postJson(
+      app,
+      `/api/chats/${chatId}/messages`,
+      { content: "Ask @seed keeper about tomatoes. Not @Scout, not me@Seed.", profileId: "mock", stream: false },
+      token,
+    );
+    expect(response.status).toBe(201);
+    const body = await readJson<{ mentions: Array<{ agentId: string; messageId?: string }> }>(response);
+    expect(body.mentions).toHaveLength(1);
+    expect(body.mentions[0]?.agentId).toBe(other.id);
+    expect(body.mentions[0]?.messageId).toBeString();
+
+    const inbox = await app.fetch(
+      new Request(`http://localhost/api/agent-messages?agentId=${other.id}`, { headers: bearer(token) }),
+    );
+    const listed = await readJson<{ messages: Array<{ fromAgentId: string; fromChatId: string; body: string }> }>(
+      inbox,
+    );
+    expect(listed.messages).toHaveLength(1);
+    expect(listed.messages[0]?.fromAgentId).toBe(owner.id);
+    expect(listed.messages[0]?.fromChatId).toBe(chatId);
+    expect(listed.messages[0]?.body).toContain("Ask @seed keeper about tomatoes.");
+  });
+
+  test("no mentions, no mail", async () => {
+    const { app } = appWith();
+    const { token } = await login(app);
+    const owner = await createAgent(app, token, { name: "Scout" });
+    const chatId = await createChat(app, token, owner.id, "mock");
+    const response = await postJson(
+      app,
+      `/api/chats/${chatId}/messages`,
+      { content: "hello", profileId: "mock", async: true },
+      token,
+    );
+    expect(response.status).toBe(202);
+    expect((await readJson<{ mentions: unknown[] }>(response)).mentions).toEqual([]);
+  });
+});
