@@ -116,6 +116,8 @@ export function createApp(deps: AppDeps): App {
     autorun: deps.config.a2aAutorun,
     profiles: deps.config.profiles,
     exclusive: (chatId, fn) => turns.exclusive(chatId, fn),
+    // Inbox turns land in the agent's own chat; an open thread sees them live.
+    onMessage: (message) => chatQueue.broadcast(message.chatId, { event: "message", data: { message } }),
   });
   const mcp = deps.mcp ?? emptyServerMcp();
   let runtimeDeps: RuntimeDeps | undefined;
@@ -129,13 +131,13 @@ export function createApp(deps: AppDeps): App {
   });
   const runtime = createRuntime(deps, a2a, mcp, cliTools);
   runtimeDeps = runtime.deps;
+  const chatQueue = createChatQueue({ store: deps.store, runtime: runtime.deps, turns });
   const jobs = createBackgroundJobs({
     store: deps.store,
-    runtime: runtime.deps,
     config: deps.config,
     turns,
+    chatQueue,
   });
-  const chatQueue = createChatQueue({ store: deps.store, runtime: runtime.deps, turns });
   const scheduler = createScheduler({
     store: deps.store,
     turns,

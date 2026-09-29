@@ -264,6 +264,12 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date; 
         if (agentOwners.get(input.agentId) !== acting()) throw new Error("agent not found");
         const memberIds = [...(input.memberIds ?? [])];
         if (memberIds.some((id) => agentOwners.get(id) !== acting())) throw new Error("agent not found");
+        // Like chats_agent_direct_uidx: an agent has at most one chat of its own.
+        if (memberIds.length === 0) {
+          for (const chat of chats.values()) {
+            if (chat.agentId === input.agentId && chat.memberIds.length === 0) throw new Error("agent already has a chat");
+          }
+        }
         const now = timestamp();
         const chat: Chat = {
           id: randomUUID(),
@@ -289,6 +295,9 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date; 
         if (patch.profileId !== undefined) next.profileId = patch.profileId;
         if (patch.memberIds !== undefined) {
           if (patch.memberIds.some((member) => agentOwners.get(member) !== acting())) throw new Error("agent not found");
+          if ((patch.memberIds.length === 0) !== (current.memberIds.length === 0)) {
+            throw new Error("a chat cannot switch between an agent's own chat and a group chat");
+          }
           next.memberIds = [...patch.memberIds];
         }
         chats.set(id, next);

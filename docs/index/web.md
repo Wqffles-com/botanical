@@ -18,11 +18,12 @@ There is no `middleware.ts`. `packages/web/src/proxy.ts` is the auth gate: publi
 
 | URL | File |
 |-----|------|
-| `/` | `packages/web/src/app/(app)/page.tsx` (redirects to the first agent or `/agents/new`) |
+| `/` | `packages/web/src/app/(app)/page.tsx` (redirects to the first agent's chat or `/agents/new`) |
 | `/login` | `packages/web/src/app/login/page.tsx` |
 | `/agents` | `packages/web/src/app/(app)/agents/page.tsx` |
 | `/agents/new` | `packages/web/src/app/(app)/agents/new/page.tsx` |
-| `/agents/[id]` | `packages/web/src/app/(app)/agents/[id]/page.tsx` |
+| `/agents/[id]` | `packages/web/src/app/(app)/agents/[id]/page.tsx` (agent settings) |
+| `/agents/[id]/chat` | `packages/web/src/app/(app)/agents/[id]/chat/page.tsx` (opens the agent's one chat; creates it on the agent's default profile, or asks for a profile) |
 | `/chats/new` | `packages/web/src/app/(app)/chats/new/page.tsx` |
 | `/chats/[id]` | `packages/web/src/app/(app)/chats/[id]/page.tsx` |
 | `/inbox` | `packages/web/src/app/(app)/inbox/page.tsx` |
@@ -37,7 +38,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | Path | Purpose |
 |------|---------|
 | `packages/web/src/components/app-shell.tsx` | Authenticated shell: sidebar, header with breadcrumb and notification bell |
-| `packages/web/src/components/app-sidebar.tsx` | Sidebar: new chat, search, workspace nav, agents, recent chats, user menu |
+| `packages/web/src/components/app-sidebar.tsx` | Sidebar: new chat, search, workspace nav, agents (each opens its chat), group chats, user menu |
 | `packages/web/src/components/app-breadcrumbs.tsx` | Header breadcrumb derived from the route and workspace names |
 | `packages/web/src/components/command-menu.tsx` | ⌘K palette: agents, chats, pages, theme |
 | `packages/web/src/components/nav-user.tsx` | Sidebar footer account menu: settings, theme (light, dark, system), sign out |
@@ -58,6 +59,9 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/components/settings/background-work-card.tsx` | Always-on scheduler and webhook limits on the general tab |
 | `packages/web/src/hooks/use-chat-thread.ts` | Thread loading, queued sends, message edit, resend, retry, and delete, and the chat events feed (reconnects and refetches after a gap) |
 | `packages/web/src/lib/chat-queue.ts` | Pending-bubble and message merge rules for the events feed |
+| `packages/web/src/lib/chat-groups.ts` | `ownChat`, `agentChatHref` (an agent's one chat, or `/agents/[id]/chat` before it exists), `groupChats`, `agentDefaultProfileId` |
+| `packages/web/src/components/chat/chat-actions-menu.tsx` | Chat header menu: compact the conversation, clear the chat |
+| `packages/web/src/components/chat/compaction-divider.tsx` | Divider where a chat was compacted, with the summary on click |
 | `packages/web/src/lib/chat-details.ts` | Details tab counts (messages, tool calls, tokens, context length) and workspace path helpers |
 | `packages/web/src/lib/chat-members.ts` | Group chat helpers: member toggle, member cap, a reply's author |
 | `packages/web/src/lib/inbox-message.ts` | Splits an agent-mail transcript row (`renderInbox` in agent-runtime) into sender, time, body, and forwarded mention |
@@ -91,6 +95,8 @@ Colocated `*.test.ts` under `packages/web/src`. Script: `bun test src`. `typeche
 - **Add a settings tab.** Extend `SettingsTab` in `packages/web/src/components/settings/settings-view.tsx` and add a panel under `packages/web/src/components/settings`.
 - **Call a new API.** Prefer `packages/core/src/client.ts`. For routes that client does not wrap, follow `packages/web/src/lib/mvp-api.ts`.
 - **Change chat sending or live updates.** `packages/web/src/hooks/use-chat-thread.ts` and `packages/web/src/lib/chat-queue.ts`.
+- **Change how an agent's chat opens.** `packages/web/src/app/(app)/agents/[id]/chat/page.tsx`, `packages/web/src/lib/chat-groups.ts`, and the agent links in `packages/web/src/components/app-sidebar.tsx` and `packages/web/src/components/command-menu.tsx`. The new-chat form opens an agent's chat when no members are picked.
+- **Change clear or compact in the UI.** `packages/web/src/components/chat/chat-actions-menu.tsx`, `packages/web/src/components/chat/compaction-divider.tsx`, and `clear` / `compact` in `packages/web/src/hooks/use-chat-thread.ts`.
 - **Change group chats.** Members on the new-chat form (`packages/web/src/components/chat/new-chat-form.tsx`) and in the header (`packages/web/src/components/chat/chat-members-menu.tsx`), per-reply authors in `packages/web/src/components/chat/chat-thread.tsx`, and `setMembers` / `workingAgentId` in `packages/web/src/hooks/use-chat-thread.ts`.
 - **Change how agent mail shows in a chat.** `packages/web/src/lib/inbox-message.ts` parses the row `renderInbox` (`packages/agent-runtime/src/inbox.ts`) writes; `packages/web/src/components/chat/inbox-message-card.tsx` renders it. Keep the two formats in step.
 - **Change the provider and model picker.** Grouping and labels in `packages/web/src/lib/profile-groups.ts`, fields in `packages/web/src/components/chat/profile-select.tsx`. `GET /api/profiles` marks a CLI profile with no pinned model `defaultModel: true` (`packages/server/src/routes/profiles.ts`).

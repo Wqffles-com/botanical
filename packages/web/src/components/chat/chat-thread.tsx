@@ -1,10 +1,12 @@
 "use client";
 
 import { MessageSquareOff } from "lucide-react";
-import type { Agent, Chat, ChatMessage, ModelProfile } from "@botanical/core";
+import { isCompactionMessage, type Agent, type Chat, type ChatMessage, type ModelProfile } from "@botanical/core";
 import { useEffect, useRef, type ReactNode } from "react";
+import { ChatActionsMenu } from "@/components/chat/chat-actions-menu";
 import { ChatAgentHeader } from "@/components/chat/chat-agent-header";
 import { ChatMembersMenu } from "@/components/chat/chat-members-menu";
+import { CompactionDivider } from "@/components/chat/compaction-divider";
 import { Composer } from "@/components/chat/composer";
 import { EmptyState } from "@botanical/ui/components/empty-state";
 import { MessageBubble } from "@/components/chat/message-bubble";
@@ -38,6 +40,8 @@ export function ChatThread({
   onMembers,
   onSend,
   onStop,
+  onClear,
+  onCompact,
   onEditMessage,
   onDeleteMessage,
   onResendMessage,
@@ -62,10 +66,14 @@ export function ChatThread({
   error: string | null;
   profileError: string | null;
   onProfile: (profileId: string | null) => void;
-  /** Replace the group members. Without it the chat shows no members control. */
+  /** Replace a group chat's members. Without it the chat shows no members control. */
   onMembers?: (memberIds: string[]) => Promise<void>;
   onSend: () => void;
   onStop: () => void;
+  /** Remove every message. With `onCompact`, the header shows the chat actions menu. */
+  onClear?: () => Promise<boolean>;
+  /** Summarize the chat so far into one message the agent reads instead of the older ones. */
+  onCompact?: () => Promise<boolean>;
   onEditMessage?: (messageId: string, content: string) => Promise<boolean>;
   onDeleteMessage?: (messageId: string, following: boolean) => Promise<boolean>;
   onResendMessage?: (messageId: string, content: string) => Promise<boolean>;
@@ -128,8 +136,9 @@ export function ChatThread({
         creator={creator}
         members={members.map((member) => member.name)}
         trailing={
-          <>
-            {agent && onMembers ? (
+          <div className="flex items-center gap-1">
+            {/* An agent's own chat stays one-on-one. Group chats are started from New chat. */}
+            {agent && onMembers && group ? (
               <ChatMembersMenu
                 owner={agent}
                 agents={agents}
@@ -138,8 +147,11 @@ export function ChatThread({
                 onChange={onMembers}
               />
             ) : null}
+            {onClear && onCompact ? (
+              <ChatActionsMenu disabled={locked} empty={messages.length === 0} onClear={onClear} onCompact={onCompact} />
+            ) : null}
             {headerActions}
-          </>
+          </div>
         }
       />
 
@@ -176,20 +188,25 @@ export function ChatThread({
             <p className="mt-2 max-w-md text-sm text-muted-foreground">
               {group
                 ? "Everyone answers in turn. Mention an agent with @Name to ask only that agent."
-                : identity?.description || "Send a message when a model profile is selected."}
+                : identity?.description ||
+                  "This is your one chat with this agent. Its routines, webhooks, and messages from other agents show up here too."}
             </p>
           </div>
         ) : (
           <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-end gap-5 px-4 py-6">
-            {rows.map((row) => (
-              <MessageBubble
-                key={row.key}
-                message={row.message}
-                agent={messageAuthor(row.message, chat, agents) ?? agent}
-                toolCalls={row.tools.length > 0 ? row.tools : undefined}
-                actions={actionsFor(row.message)}
-              />
-            ))}
+            {rows.map((row) =>
+              isCompactionMessage(row.message) ? (
+                <CompactionDivider key={row.key} message={row.message} />
+              ) : row.message.role === "system" ? null : (
+                <MessageBubble
+                  key={row.key}
+                  message={row.message}
+                  agent={messageAuthor(row.message, chat, agents) ?? agent}
+                  toolCalls={row.tools.length > 0 ? row.tools : undefined}
+                  actions={actionsFor(row.message)}
+                />
+              ),
+            )}
             {working ? (
               <MessageBubble
                 message={{ id: "working", chatId: chat.id, role: "assistant", content: "", createdAt: "" }}

@@ -17,7 +17,7 @@ What ships today:
 - **Coding-agent CLIs as profiles.** Grok Build (`grok`), Claude Code (`claude`), and Codex (`codex`) can run headless on the server, streaming their output into the chat. They use their own tools inside the agent's workspace directory.
 - **Unlimited custom agents.** Each agent has a name, description, Lucide icon, color, prompt, and tool allowlist. Each chat belongs to one agent, and other agents can join it as a group chat. A title, avatar shape, and uploaded picture are in progress.
 - **Async agent-to-agent messaging.** Agents send each other messages that land in the recipient's inbox. With `BOTANICAL_A2A_AUTORUN=true`, a delivered message starts a background turn for the recipient, with no browser needed.
-- **Routines.** Cron schedules run an agent on the server. Each run opens a new chat and records success or failure.
+- **Routines.** Cron schedules run an agent on the server. Each run posts into the agent's chat and records success or failure.
 - **Listeners.** A generic webhook starts an agent turn. The payload is passed as untrusted data. Typed issue listeners are still planned.
 - **Notifications.** The UI shows a badge when background work finishes or an agent calls `notify_user`.
 - **Memory.** Shared memories visible to every agent, plus private per-agent memories. Relevant memories are added to the prompt at the start of each turn.

@@ -16,7 +16,7 @@ This log records the project's design decisions and why they were made. Later en
 6. **Passcode auth.** Superseded on 2026-09-28 by accounts. See the multi-user entry below.
 7. **Stack.** TypeScript on Bun (Bun was picked over Deno when the repo was scaffolded).
 8. **Unlimited custom agents.** Each agent is defined by a prompt/description and a set of tools.
-9. **One agent per chat.** Each thread is owned by one agent, which keeps context and permissions unambiguous. Refined on 2026-09-29: a chat can add group members (see Group chats below).
+9. **One agent per chat.** Each thread is owned by one agent, which keeps context and permissions unambiguous. Refined on 2026-09-29: a chat can add group members (see Group chats below), and each agent has exactly one chat of its own (see One chat per agent below).
 10. **Async agent-to-agent messaging.** Agents can message each other asynchronously (an inbox model) without merging chats.
 11. **Core built-in tools.** Web search/fetch, shell/code execution, and file read/write. Anything heavier (browser or computer use) is opt-in, not core.
 12. **Server-side keys only.** Model API keys live in the server environment and are never supplied by or sent to the web client.
@@ -194,6 +194,8 @@ A Linux bind-mount of a host binary remains a commented example in the override.
 **Effect:** Scheduled runs and inbound webhooks start full agent turns while no browser is connected. Typed forge listeners are not part of this slice.
 
 ### New chat per run
+
+Superseded on 2026-09-29: runs and deliveries now land in the agent's one chat (see One chat per agent below).
 
 Each routine run and each accepted webhook delivery creates a new chat owned by that agent, titled with the routine or listener name and the local time, using the configured profile. The run or delivery row stores the chat id.
 
@@ -430,3 +432,26 @@ Short entries. Earlier entries still hold unless a status line here changes them
 - All agents in a chat use the chat's model profile. Only the first agent's turn can be steered; messages sent later wait for the next round.
 
 **Considered:** Letting every agent reply at once, in parallel. Not built: replies would ignore each other and the transcript order would depend on timing. A model-picked "next speaker" was also left out; mentions keep the choice visible to the user.
+
+---
+
+## 2026-09-29: One chat per agent
+
+**Status:** Accepted.
+**Effect:** Replaces "an agent has many chats". Each agent has exactly one chat of its own, and talking to an agent means opening that chat. Group chats stay as extra threads beside it. Supersedes "New chat per run" (2026-09-28).
+
+- An agent's own chat is the chat it owns with no members. `POST /api/chats` without members returns it, or creates it the first time; the web opens it from the agent in the sidebar. Postgres enforces one per agent (`chats_agent_direct_uidx`), and a chat never switches between the two kinds.
+- Everything the agent does lands there: routine runs, webhook deliveries, and A2A autorun inbox turns. Their user message names the source (`[Routine · …]`, `[Webhook · …]`), they run behind any turn already running, and an open chat sees them live. Stop aborts them.
+- Group chats (members set) are unchanged and can be started as often as you like. Members cannot be added to an agent's own chat, and a group chat keeps at least one member.
+- Deleting an agent deletes its own chat with it. A group chat it is in still blocks the delete.
+- Existing installs: migration `0009_one_chat_per_agent` keeps each agent's most recently active own chat and deletes the others with their messages. Run, delivery, and notification rows keep their record with no chat link.
+
+### Long chats: window, compaction, clear
+
+A chat that never ends outgrows the model's context, so:
+
+- **History window.** As before, the oldest turns that do not fit the profile's `maxContext` are left out of a request (`trimToBudget`).
+- **Compaction.** The model summarizes the chat so far into one stored message (role `system`, name `compaction`). From then on the model reads that summary in its system prompt plus only the messages after it. The older messages stay visible in the chat, below a "Conversation compacted" divider. It runs automatically after a round of replies once the chat passes 75% of the profile's context, and on demand from the chat menu (`POST /api/chats/:id/compact`). A later compaction folds in the previous summary.
+- **Clear.** The chat menu can delete every message (`DELETE /api/chats/:id/messages`). Memories, files, and settings stay.
+
+**Considered:** Keeping many chats per agent next to a pinned "main" chat. Not built: it keeps the question "which chat was that in?", which one chat per agent removes. Compacting before a turn instead of after was also left out: the user's new messages are already stored by then, so the summary would land after them.

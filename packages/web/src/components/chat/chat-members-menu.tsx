@@ -41,7 +41,7 @@ export function ChatMembersMenu({
   const members = memberIds.map((id) => byId.get(id)).filter((agent): agent is Agent => Boolean(agent));
   const candidates = agents.filter((agent) => agent.id !== owner.id);
   const full = memberIds.length >= MAX_CHAT_MEMBERS;
-  const label = members.length > 0 ? `${members.length + 1} agents` : "Add agents";
+  const label = `${members.length + 1} agents`;
 
   const toggle = async (id: string) => {
     setSaving(true);
@@ -101,12 +101,14 @@ export function ChatMembersMenu({
           ) : (
             candidates.map((agent) => {
               const checked = memberIds.includes(agent.id);
+              // A group chat keeps at least one member. The owner's own chat is where it talks alone.
+              const last = checked && memberIds.length === 1;
               return (
                 <MemberRow
                   key={agent.id}
                   agent={agent}
                   checked={checked}
-                  disabled={disabled || saving || (!checked && full)}
+                  disabled={disabled || saving || last || (!checked && full)}
                   onToggle={() => void toggle(agent.id)}
                 />
               );

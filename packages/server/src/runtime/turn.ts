@@ -1,4 +1,5 @@
 import {
+  autoCompact,
   AgentNotFoundError,
   BotanicalError,
   ChatNotFoundError,
@@ -6,6 +7,7 @@ import {
   ProfileRequiredError,
   runAgentTurn,
   type RuntimeDeps,
+  type MessageRecord,
   type RuntimeEvent,
   type TurnSteering,
 } from "@botanical/agent-runtime";
@@ -64,13 +66,52 @@ export interface ChatTurnInput {
 }
 
 /**
- * Answer a user message. A one-agent chat runs one turn. A group chat runs one turn per
+ * Answer a user message, then compact the chat when it has outgrown the model's context
+ * (`autoCompact`). A new summary goes out as a `compacted` event `{ message }` before the
+ * last `done`. A failed compaction is logged and leaves the chat as it was.
+ */
+export async function* streamChatReplies(
+  store: Store,
+  runtime: RuntimeDeps,
+  input: ChatTurnInput,
+): AsyncGenerator<SseEvent> {
+  let done: SseEvent | null = null;
+  for await (const event of streamRound(store, runtime, input)) {
+    if (event.event === "done") {
+      done = event;
+      continue;
+    }
+    yield event;
+  }
+  const finish = isRecord(done?.data) ? done.data.finishReason : undefined;
+  if (!input.signal?.aborted && finish !== "error" && finish !== "aborted") {
+    const summary = await compactAfterTurn(runtime, input);
+    if (summary) yield { event: "compacted", data: { type: "compacted", message: summary } };
+  }
+  if (done) yield done;
+}
+
+async function compactAfterTurn(runtime: RuntimeDeps, input: ChatTurnInput): Promise<MessageRecord | null> {
+  try {
+    return await autoCompact(runtime, {
+      chatId: input.chat.id,
+      profileId: input.profile.id,
+      ...(input.signal ? { signal: input.signal } : {}),
+    });
+  } catch (error) {
+    console.error("[turn] auto-compaction failed", error);
+    return null;
+  }
+}
+
+/**
+ * One round of replies to a user message. A one-agent chat runs one turn. A group chat runs one turn per
  * responder, one after another, so each agent reads the replies before its own
  * (`respondersFor`). A reply that @mentions another participant who has not answered
  * yet hands it the floor next. Each turn starts with an `agent` event `{ agentId }`.
  * Only the last `done` is forwarded. An error or a stop ends the round.
  */
-export async function* streamChatReplies(
+async function* streamRound(
   store: Store,
   runtime: RuntimeDeps,
   input: ChatTurnInput,

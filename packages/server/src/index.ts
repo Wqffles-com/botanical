@@ -1,6 +1,6 @@
 export { createA2AService } from "./a2a/service.ts";
 export type { A2AService, ListA2AOptions, SendA2AInput } from "./a2a/service.ts";
-export { A2A_BODY_MAX, INBOX_CHAT_TITLE, SEND_AGENT_MESSAGE_TOOL } from "./a2a/constants.ts";
+export { A2A_BODY_MAX, SEND_AGENT_MESSAGE_TOOL } from "./a2a/constants.ts";
 export { createSendAgentMessageTool } from "./a2a/tool.ts";
 export { createApp } from "./app.ts";
 export type { App, AppDeps } from "./app.ts";

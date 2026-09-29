@@ -9,7 +9,7 @@ import { Suspense, useState } from "react";
 function NewChatPageInner() {
   const router = useRouter();
   const params = useSearchParams();
-  const { agents, profiles, createChat } = useWorkspace();
+  const { agents, profiles, createChat, setChatProfile } = useWorkspace();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const initialAgentId = params.get("agentId");
@@ -25,7 +25,9 @@ function NewChatPageInner() {
         setPending(true);
         setError(null);
         try {
+          // Without members this opens the agent's own chat. If it already existed, switch it to the picked profile.
           const chat = await createChat({ agentId, memberIds, profileId, title: title.trim() || undefined });
+          if (memberIds.length === 0 && chat.profileId !== profileId) await setChatProfile(chat.id, profileId);
           router.push(`/chats/${chat.id}`);
         } catch (err) {
           setError(isProfileRequired(err) ? profileRequiredMessage(err) : errorText(err));

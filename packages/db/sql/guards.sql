@@ -57,13 +57,17 @@ BEGIN
   IF NEW.agent_id IS DISTINCT FROM OLD.agent_id THEN
     RAISE EXCEPTION 'chats.agent_id is immutable (one agent per chat)';
   END IF;
+  -- An agent's own chat stays a one-agent chat, and a group chat keeps at least one member.
+  IF (cardinality(NEW.member_ids) = 0) <> (cardinality(OLD.member_ids) = 0) THEN
+    RAISE EXCEPTION 'a chat cannot switch between an agent''s own chat and a group chat';
+  END IF;
   RETURN NEW;
 END;
 $$;
 
 DROP TRIGGER IF EXISTS chats_agent_id_immutable ON chats;
 CREATE TRIGGER chats_agent_id_immutable
-  BEFORE UPDATE OF agent_id ON chats
+  BEFORE UPDATE OF agent_id, member_ids ON chats
   FOR EACH ROW
   EXECUTE FUNCTION chats_reject_agent_change();
 

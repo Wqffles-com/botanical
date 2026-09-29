@@ -58,6 +58,18 @@ export {
 } from "./a2a";
 export { assertChatAgentBinding, chatParticipants, rejectAgentRebind } from "./binding";
 export { buildSystemPrompt, RESPONSE_STYLE } from "./prompt";
+export {
+  AUTO_COMPACT_RATIO,
+  COMPACTION_NAME,
+  CompactionFailedError,
+  NothingToCompactError,
+  autoCompact,
+  compactChat,
+  isCompaction,
+  needsCompaction,
+  sinceCompaction,
+  type CompactChatInput,
+} from "./compaction";
 export { renderMemorySection, selectMemories, type MemorySnippet } from "./memories";
 export {
   BUILTIN_ROLE_IDS,

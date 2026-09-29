@@ -14,6 +14,7 @@ The agent loop: prompt assembly, provider call, tool dispatch, permissions, and 
 |------|---------|
 | `packages/agent-runtime/src/loop.ts` | `prepareTurn`, `runAgentTurn`, `dispatchToolCall` |
 | `packages/agent-runtime/src/context.ts` | `trimToBudget` drops older turns to `maxContext` |
+| `packages/agent-runtime/src/compaction.ts` | `compactChat`, `autoCompact`, `needsCompaction`, `sinceCompaction`: summarize a long chat into one `system` row named `compaction` |
 | `packages/agent-runtime/src/prompt.ts` | `buildSystemPrompt` |
 | `packages/agent-runtime/src/tools.ts` | Collect tools, allowlist, MCP name parse |
 | `packages/agent-runtime/src/registry.ts` | `createToolRegistry`, contributor adapters |
@@ -40,7 +41,7 @@ The server enters the loop from `packages/server/src/runtime/turn.ts`.
 
 ## Exports
 
-`runAgentTurn`, `prepareTurn`, `dispatchToolCall`, `buildSystemPrompt`, `createToolRegistry`, `contributorFromBuiltins`, `createAgentMessageBus`, `DeliveryWorker`, `effectivePermissions`, `toolAccess`, `CAPABILITIES`, `BUILTIN_ROLES`, `createMemoryStore`, `claimInbox`, `renderInbox`. Capability ids in `packages/agent-runtime/src/permissions.ts`: `file.read`, `file.write`, `shell`, `code_exec`, `web`, `memory.read`, `memory.write`, `agent.create`, `agent.message`, `notify`. `notify_user` maps to `notify`. The tool itself is `packages/server/src/tools/notify.ts`.
+`runAgentTurn`, `prepareTurn`, `dispatchToolCall`, `buildSystemPrompt`, `compactChat`, `autoCompact`, `needsCompaction`, `sinceCompaction`, `isCompaction`, `COMPACTION_NAME`, `AUTO_COMPACT_RATIO`, `createToolRegistry`, `contributorFromBuiltins`, `createAgentMessageBus`, `DeliveryWorker`, `effectivePermissions`, `toolAccess`, `CAPABILITIES`, `BUILTIN_ROLES`, `createMemoryStore`, `claimInbox`, `renderInbox`. Capability ids in `packages/agent-runtime/src/permissions.ts`: `file.read`, `file.write`, `shell`, `code_exec`, `web`, `memory.read`, `memory.write`, `agent.create`, `agent.message`, `notify`. `notify_user` maps to `notify`. The tool itself is `packages/server/src/tools/notify.ts`.
 
 ## Env vars
 
@@ -53,6 +54,7 @@ None. Timeouts and credentials are supplied by the server and tool packages.
 ## Where to change X
 
 - **Change a turn (steps, tool round trip, transcript).** `packages/agent-runtime/src/loop.ts`.
+- **Change compaction.** `packages/agent-runtime/src/compaction.ts`. `toProviderMessages` in `packages/agent-runtime/src/loop.ts` sends only the messages after the latest compaction row and passes its summary to `buildSystemPrompt` (an `## Earlier in this chat` section). `autoCompact` runs when those messages pass `AUTO_COMPACT_RATIO` of the profile's `maxContext`. Tests: `packages/agent-runtime/test/compaction.test.ts`.
 - **Change how a group chat reads to an agent.** `toProviderMessages` in `packages/agent-runtime/src/loop.ts` turns other agents' replies into `[Name] …` user messages and drops their tool rows. `buildSystemPrompt` in `packages/agent-runtime/src/prompt.ts` names the other participants.
 - **Change mid-turn steering.** `runAgentTurn` in `packages/agent-runtime/src/loop.ts` takes `steering` messages before each model step and emits a `steer` event. It passes them to the provider as `ChatRequest.input` for live input.
 - **Change who may call a tool.** `packages/agent-runtime/src/permissions.ts` and the allowlist check in `packages/agent-runtime/src/tools.ts`.

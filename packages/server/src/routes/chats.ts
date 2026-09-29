@@ -1,6 +1,7 @@
 import { HttpError, isRecord, json, noContent, readJson } from "../http.ts";
 import { readRequestedProfileId, resolveProfile } from "../profiles.ts";
 import { authed, type Router } from "../router.ts";
+import { ensureAgentChat, findAgentChat, isAgentChat } from "../runtime/agent-chat.ts";
 import type { Store } from "../types.ts";
 import { LIMITS, readBoundedString, readRequiredId, requireParam } from "../validate.ts";
 
@@ -38,6 +39,11 @@ export function registerChats(router: Router): void {
           ? "New chat"
           : readBoundedString(body.title, "title", { required: true, max: LIMITS.title });
       if (!title) throw new HttpError(400, "invalid_body", "title is required");
+      if (memberIds.length === 0) {
+        // One chat per agent: without members this opens the agent's own chat, creating it the first time.
+        const { chat, created } = await ensureAgentChat(ctx.store, agent, profile.id);
+        return json(created ? 201 : 200, { chat });
+      }
       const chat = await ctx.store.chats.create({
         agentId: agent.id,
         memberIds,
@@ -45,6 +51,16 @@ export function registerChats(router: Router): void {
         title,
       });
       return json(201, { chat });
+    }),
+  );
+
+  router.add(
+    "GET",
+    "/api/agents/:id/chat",
+    authed(async (ctx) => {
+      const agent = await ctx.store.agents.get(requireParam(ctx.params, "id"));
+      if (!agent) throw new HttpError(404, "not_found", "Agent not found");
+      return json(200, { chat: await findAgentChat(ctx.store, agent.id) });
     }),
   );
 
@@ -78,7 +94,18 @@ export function registerChats(router: Router): void {
         patch.profileId = profile.id;
       }
       if (body.memberIds !== undefined) {
-        patch.memberIds = await readMemberIds(ctx.store, body.memberIds, existing.agentId);
+        const memberIds = await readMemberIds(ctx.store, body.memberIds, existing.agentId);
+        if (isAgentChat(existing) && memberIds.length > 0) {
+          throw new HttpError(
+            400,
+            "invalid_body",
+            "An agent's own chat has no members. Start a group chat with POST /api/chats instead.",
+          );
+        }
+        if (!isAgentChat(existing) && memberIds.length === 0) {
+          throw new HttpError(400, "invalid_body", "A group chat keeps at least one member. Delete the chat instead.");
+        }
+        patch.memberIds = memberIds;
       }
       if (patch.title === undefined && patch.profileId === undefined && patch.memberIds === undefined) {
         return json(200, { chat: existing });

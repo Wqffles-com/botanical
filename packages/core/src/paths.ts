@@ -27,6 +27,8 @@ export const API = {
     `/api/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}`,
   chatEvents: (chatId: string) => `/api/chats/${encodeURIComponent(chatId)}/events`,
   chatStop: (chatId: string) => `/api/chats/${encodeURIComponent(chatId)}/stop`,
+  chatCompact: (chatId: string) => `/api/chats/${encodeURIComponent(chatId)}/compact`,
+  agentChat: (agentId: string) => `/api/agents/${encodeURIComponent(agentId)}/chat`,
   agentMessages: "/api/agent-messages",
   agentMessage: (id: string) => `/api/agent-messages/${encodeURIComponent(id)}`,
   routines: "/api/routines",

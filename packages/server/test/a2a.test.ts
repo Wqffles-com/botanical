@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { runAsUser } from "@botanical/db";
 
 import { createSendAgentMessageTool } from "../src/a2a/tool.ts";
-import { INBOX_CHAT_TITLE } from "../src/a2a/constants.ts";
 import { bearer, createAgent, login, readJson, setup } from "./helpers.ts";
 
 const PROFILES = [
@@ -248,7 +247,7 @@ describe("agent messages", () => {
     const { token } = await login(app);
     const from = await createAgent(app, token, { name: "Scout" });
     const to = await createAgent(app, token, { name: "Keeper" });
-    await createChat(app, token, to.id);
+    const chatId = await createChat(app, token, to.id);
     await postJson(
       app,
       "/api/agent-messages",
@@ -256,13 +255,13 @@ describe("agent messages", () => {
       token,
     );
     await app.a2a.whenIdle();
-    const chats = await readJson<{ chats: { title: string }[] }>(
-      await app.fetch(new Request(`http://localhost/api/chats?agentId=${to.id}`, { headers: bearer(token) })),
+    const transcript = await readJson<{ messages: unknown[] }>(
+      await app.fetch(new Request(`http://localhost/api/chats/${chatId}/messages`, { headers: bearer(token) })),
     );
-    expect(chats.chats.map((chat) => chat.title)).not.toContain(INBOX_CHAT_TITLE);
+    expect(transcript.messages).toEqual([]);
   });
 
-  test("autorun writes the mail into the recipient Inbox chat and marks it read", async () => {
+  test("autorun writes the mail into the recipient's own chat and marks it read", async () => {
     const { app } = appWith({ BOTANICAL_A2A_AUTORUN: "true" });
     const { token } = await login(app);
     const from = await createAgent(app, token, { name: "Scout" });
@@ -288,9 +287,9 @@ describe("agent messages", () => {
     const chats = await readJson<{ chats: { id: string; title: string; agentId: string }[] }>(
       await app.fetch(new Request(`http://localhost/api/chats?agentId=${to.id}`, { headers: bearer(token) })),
     );
-    const inboxes = chats.chats.filter((chat) => chat.title === INBOX_CHAT_TITLE);
-    expect(inboxes).toHaveLength(1);
-    const inbox = inboxes[0];
+    // One chat per agent: the mail lands in the chat the recipient already has.
+    expect(chats.chats).toHaveLength(1);
+    const inbox = chats.chats[0];
     expect(inbox?.agentId).toBe(to.id);
 
     const transcript = await readJson<{ messages: { role: string; content: string }[] }>(
@@ -353,7 +352,8 @@ describe("agent messages", () => {
     const chats = await readJson<{ chats: { id: string; title: string }[] }>(
       await app.fetch(new Request(`http://localhost/api/chats?agentId=${to.id}`, { headers: bearer(token) })),
     );
-    const inbox = chats.chats.find((chat) => chat.title === INBOX_CHAT_TITLE);
+    expect(chats.chats).toHaveLength(1);
+    const inbox = chats.chats[0];
     const transcript = await readJson<{ messages: { role: string; content: string }[] }>(
       await app.fetch(new Request(`http://localhost/api/chats/${inbox?.id}/messages`, { headers: bearer(token) })),
     );

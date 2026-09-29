@@ -1,4 +1,4 @@
-import { prepareTurn, type RuntimeDeps } from "@botanical/agent-runtime";
+import { compactChat, prepareTurn, type RuntimeDeps } from "@botanical/agent-runtime";
 import { deliverMentions } from "../a2a/mentions.ts";
 import type { A2AService } from "../a2a/service.ts";
 import { HttpError, isRecord, json, readJson } from "../http.ts";
@@ -138,6 +138,52 @@ export function registerMessages(
       });
       queue.broadcast(chat.id, { event: "messages-deleted", data: { ids } });
       return json(200, { deleted: ids });
+    }),
+  );
+
+  router.add(
+    "DELETE",
+    "/api/chats/:id/messages",
+    authed(async (ctx) => {
+      const chat = await loadChat(ctx.store, requireParam(ctx.params, "id"));
+      assertIdle(queue, chat.id);
+      const ids = await turns.exclusive(chat.id, async () => {
+        const all = (await ctx.store.messages.listByChat(chat.id)).map((message) => message.id);
+        await ctx.store.messages.deleteByChat(chat.id);
+        return all;
+      });
+      queue.broadcast(chat.id, { event: "messages-deleted", data: { ids } });
+      return json(200, { deleted: ids });
+    }),
+  );
+
+  router.add(
+    "POST",
+    "/api/chats/:id/compact",
+    authed(async (ctx) => {
+      const chat = await loadChat(ctx.store, requireParam(ctx.params, "id"));
+      const body = await readJson(ctx.request, ctx.config);
+      if (!isRecord(body)) throw new HttpError(400, "invalid_body", "JSON object expected");
+      const profile = await resolveProfile(
+        ctx.store,
+        readRequestedProfileId(body.profileId, false),
+        chat.profileId,
+      );
+      await assertCliProfileReady(profile);
+      assertIdle(queue, chat.id);
+      const message = await turns.exclusive(chat.id, async () => {
+        let summary;
+        try {
+          summary = await compactChat(runtime, { chatId: chat.id, profileId: profile.id, signal: ctx.request.signal });
+        } catch (error) {
+          throw turnFailure(error);
+        }
+        const stored = (await ctx.store.messages.listByChat(chat.id)).find((row) => row.id === summary.id);
+        if (!stored) throw new HttpError(500, "internal_error", "Internal server error");
+        return stored;
+      });
+      queue.broadcast(chat.id, { event: "message", data: { message } });
+      return json(201, { message });
     }),
   );
 

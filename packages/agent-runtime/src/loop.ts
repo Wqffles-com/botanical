@@ -16,6 +16,7 @@ import type { MemorySnippet } from "./memories";
 import { selectMemories } from "./memories";
 import { toolAccess } from "./permissions";
 import { trimToBudget } from "./context";
+import { sinceCompaction } from "./compaction";
 import { buildSystemPrompt, type GroupContext } from "./prompt";
 import type { ChatMessage, LiveInput, SteeringMessage, TurnSteering } from "./provider";
 import type { AgentMessageBus } from "./bus";
@@ -353,14 +354,19 @@ function groupContext(chat: ChatRecord, agentId: string, names: ReadonlyMap<stri
 
 function toProviderMessages(
   agent: AgentRecord,
-  records: readonly MessageRecord[],
+  transcript: readonly MessageRecord[],
   memories: readonly MemorySnippet[],
   chat: ChatRecord,
   group: GroupContext | undefined,
   names: ReadonlyMap<string, string>,
 ): ChatMessage[] {
-  const messages: ChatMessage[] = [{ role: "system", content: buildSystemPrompt(agent, memories, group) }];
+  // After a compaction the model reads its summary instead of the messages before it.
+  const { summary, rest: records } = sinceCompaction(transcript);
+  const messages: ChatMessage[] = [
+    { role: "system", content: buildSystemPrompt(agent, memories, group, summary?.content) },
+  ];
   for (const record of records) {
+    if (record.role === "system") continue;
     // In a group chat, another agent's reply is something said to this agent, not its own words.
     // Its tool calls and results are its own business and stay out.
     const author = record.role === "assistant" || record.role === "tool" ? (record.agentId ?? chat.agentId) : null;

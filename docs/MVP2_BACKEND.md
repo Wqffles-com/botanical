@@ -254,7 +254,7 @@ Passcode session, same as the other operator routes, except `POST /api/hooks/:li
 
 Cron is five fields. Anything faster than once a minute is rejected. Timezone is an IANA name.
 
-A schedule run inserts `routine_runs` with `trigger: "schedule"` and opens a new chat. Status moves `queued` → `running` → `succeeded` or `failed`. `error` is set on failure. `chatId` links the transcript.
+A schedule run inserts `routine_runs` with `trigger: "schedule"` and posts into the agent's chat (one chat per agent). Status moves `queued` → `running` → `succeeded` or `failed`. `error` is set on failure. `chatId` links the transcript.
 
 ### Listeners
 

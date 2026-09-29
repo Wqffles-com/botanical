@@ -10,9 +10,10 @@ import {
 import { createMockProvider } from "@botanical/providers";
 
 import { HttpError } from "../http.ts";
-import type { Agent, AgentMessage, AgentMessageStatus, ModelProfile, Store } from "../types.ts";
+import { ensureAgentChat, findAgentChat } from "../runtime/agent-chat.ts";
+import type { Agent, AgentMessage, AgentMessageStatus, Message, ModelProfile, Store } from "../types.ts";
 import { AGENT_MESSAGE_STATUSES } from "../types.ts";
-import { A2A_BODY_MAX, INBOX_CHAT_TITLE } from "./constants.ts";
+import { A2A_BODY_MAX } from "./constants.ts";
 
 const DELIVER_BATCH = 100;
 const INBOX_BATCH = 50;
@@ -51,23 +52,25 @@ export interface A2AServiceOptions {
   profiles: readonly ModelProfile[];
   /** Serialize inbox writes with any other turn on the same chat. */
   exclusive?: <T>(chatId: string, fn: () => Promise<T>) => Promise<T>;
+  /** Told about each message an inbox turn stores, so an open chat shows it. */
+  onMessage?: (message: Message) => void;
 }
 
 /**
  * A2A API on top of the agent-runtime bus.
  * `send` persists a pending row, then delivers it. When `autorun` is set,
- * the recipient gets one background turn in a chat titled "Inbox".
+ * the recipient gets one background turn in its own chat (one chat per agent).
  * That turn does not call tools, so it cannot fan out more mail.
  */
 export function createA2AService(options: A2AServiceOptions): A2AService {
-  const { store, autorun, profiles, exclusive } = options;
+  const { store, autorun, profiles, exclusive, onMessage } = options;
   const bus = createAgentMessageBus(runtimeAgents(store), store.agentMessages);
   let tail: Promise<void> = Promise.resolve();
 
   function schedule(agentId: string): void {
     if (!autorun) return;
     tail = tail
-      .then(() => runInboxTurn(store, bus, profiles, agentId, exclusive))
+      .then(() => runInboxTurn(store, bus, profiles, agentId, exclusive, onMessage))
       .catch((error: unknown) => {
         console.error("[a2a] inbox turn failed", error);
       });
@@ -184,6 +187,7 @@ async function runInboxTurn(
   profiles: readonly ModelProfile[],
   agentId: string,
   exclusive?: <T>(chatId: string, fn: () => Promise<T>) => Promise<T>,
+  onMessage?: (message: Message) => void,
 ): Promise<void> {
   const agent = await store.agents.get(agentId);
   if (!agent) return;
@@ -205,7 +209,7 @@ async function runInboxTurn(
       for (const message of waiting) seen.add(message.id);
 
       if (!chatId) {
-        const chat = await ensureInboxChat(store, agentId, profile.id);
+        const { chat } = await ensureAgentChat(store, agent, profile.id);
         chatId = chat.id;
       }
       const claimed = await bus.markRead(waiting.map((message) => message.id));
@@ -214,9 +218,9 @@ async function runInboxTurn(
 
       const content = renderInbox(claimed, names);
       const write = async () => {
-        await store.messages.create({ chatId: chatId!, role: "user", content });
+        onMessage?.(await store.messages.create({ chatId: chatId!, role: "user", content }));
         const reply = await completeInbox(profile, content, claimed.length);
-        await store.messages.create({ chatId: chatId!, role: "assistant", content: reply });
+        onMessage?.(await store.messages.create({ chatId: chatId!, role: "assistant", content: reply, agentId }));
         await store.chats.update(chatId!, {});
       };
       if (exclusive) await exclusive(chatId, write);
@@ -261,32 +265,9 @@ async function resolveInboxProfile(
     return profiles.find((profile) => profile.id === id) ?? null;
   };
 
-  const chats = (await store.chats.list()).filter((chat) => chat.agentId === agent.id);
-  const inbox = chats
-    .filter((chat) => chat.title === INBOX_CHAT_TITLE)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
-  const inboxProfile = known(inbox?.profileId);
-  if (inboxProfile) return inboxProfile;
-
-  const suggested = known(readDefaultProfileId(agent));
-  if (suggested) return suggested;
-
-  const recent = chats
-    .filter((chat) => chat.title !== INBOX_CHAT_TITLE)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-  return known(recent?.profileId);
-}
-
-async function ensureInboxChat(store: Store, agentId: string, profileId: string) {
-  const existing = (await store.chats.list())
-    .filter((chat) => chat.agentId === agentId && chat.title === INBOX_CHAT_TITLE)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
-  if (existing) {
-    if (existing.profileId === profileId) return existing;
-    const updated = await store.chats.update(existing.id, { profileId });
-    return updated ?? existing;
-  }
-  return store.chats.create({ agentId, profileId, title: INBOX_CHAT_TITLE });
+  // The agent's own chat keeps the profile it last ran on; before its first chat, the agent's default.
+  const own = await findAgentChat(store, agent.id);
+  return known(own?.profileId ?? undefined) ?? known(readDefaultProfileId(agent));
 }
 
 async function completeInbox(profile: ModelProfile, content: string, count: number): Promise<string> {
