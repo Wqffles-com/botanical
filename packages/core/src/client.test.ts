@@ -326,6 +326,42 @@ describe("BotanicalClient", () => {
     }
   });
 
+  test("lists and reads an agent's workspace files", async () => {
+    const seen: string[] = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch(request) {
+        const url = new URL(request.url);
+        seen.push(`${url.pathname}${url.search}`);
+        if (url.pathname === "/api/agents/a%201/files") {
+          return Response.json({
+            path: url.searchParams.get("path") ?? ".",
+            entries: [{ name: "plan.md", path: "notes/plan.md", type: "file", size: 7, modifiedAt: "2026-01-01T00:00:00Z" }],
+            truncated: false,
+          });
+        }
+        if (url.pathname === "/api/agents/a%201/files/content") {
+          return Response.json({ path: url.searchParams.get("path"), content: "# Plan\n", bytes: 7 });
+        }
+        return Response.json({ error: "missing" }, { status: 404 });
+      },
+    });
+    try {
+      const client = new BotanicalClient({ baseUrl: `http://127.0.0.1:${server.port}` });
+      expect((await client.listAgentFiles("a 1")).path).toBe(".");
+      const listing = await client.listAgentFiles("a 1", "notes");
+      expect(listing.entries.map((entry) => entry.path)).toEqual(["notes/plan.md"]);
+      expect(await client.readAgentFile("a 1", "notes/plan.md")).toEqual({ path: "notes/plan.md", content: "# Plan\n", bytes: 7 });
+      expect(seen).toEqual([
+        "/api/agents/a%201/files",
+        "/api/agents/a%201/files?path=notes",
+        "/api/agents/a%201/files/content?path=notes%2Fplan.md",
+      ]);
+    } finally {
+      server.stop(true);
+    }
+  });
+
   test("opens an agent's own chat, clears it, and compacts it", async () => {
     const calls: Array<{ method: string; path: string; body?: unknown }> = [];
     const chat = {

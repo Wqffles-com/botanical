@@ -101,6 +101,8 @@ export type ProfileInfo = {
   kind: "api" | "cli";
   available: boolean;
   unavailableReason: string | null;
+  cli: string | null;
+  defaultModel: boolean;
 };
 
 export const EMPTY_AGENT_DRAFT: AgentDraft = {
@@ -288,6 +290,8 @@ export function profilesFromUnknown(value: unknown): ProfileInfo[] {
         typeof record.unavailableReason === "string" && record.unavailableReason.trim()
           ? record.unavailableReason
           : null,
+      cli: typeof record.cli === "string" && record.cli.trim() ? record.cli : null,
+      defaultModel: record.defaultModel === true,
     };
   });
 }

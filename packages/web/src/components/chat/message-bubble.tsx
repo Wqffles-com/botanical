@@ -5,10 +5,12 @@ import { useEffect, useState } from "react";
 import { Button } from "@botanical/ui/components/button";
 import { Textarea } from "@botanical/ui/components/textarea";
 import { MessageActions, type MessageActionHandlers } from "@/components/chat/message-actions";
+import { InboxMessageCard } from "@/components/chat/inbox-message-card";
 import { MessageAgentAvatar } from "@/components/chat/message-agent-avatar";
 import { Markdown } from "@/components/chat/markdown";
 import { ToolCallCard } from "@/components/chat/tool-call-card";
 import { agentIdentity } from "@/lib/agent-identity";
+import { parseInboxMessage } from "@/lib/inbox-message";
 import { toolCallsFromMessage, type UiToolCall } from "@/lib/chat-stream";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +51,7 @@ export function MessageBubble({
   actions?: MessageActionHandlers;
 }) {
   const [editing, setEditing] = useState(false);
+  const inbox = parseInboxMessage(message);
   // A user message is resent with the new text. A reply is corrected in place.
   const save = message.role === "user" ? actions?.onResend : actions?.onEdit;
   const canEdit = Boolean(save && message.content && !actions?.disabled);
@@ -69,10 +72,14 @@ export function MessageBubble({
       <MessageActions
         content={message.content}
         actions={actions}
-        align={message.role === "user" ? "end" : "start"}
+        align={message.role === "user" && !inbox ? "end" : "start"}
         onStartEdit={canEdit ? () => setEditing(true) : undefined}
       />
     ) : null;
+
+  if (inbox) {
+    return <InboxMessageCard entries={inbox} recipient={agent?.name} toolbar={actions ? toolbar : null} />;
+  }
 
   if (message.role === "user") {
     return (

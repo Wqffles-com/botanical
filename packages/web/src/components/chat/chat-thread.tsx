@@ -2,7 +2,7 @@
 
 import { MessageSquareOff } from "lucide-react";
 import { isCompactionMessage, type Agent, type Chat, type ChatMessage, type ModelProfile } from "@botanical/core";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { ChatActionsMenu } from "@/components/chat/chat-actions-menu";
 import { ChatAgentHeader } from "@/components/chat/chat-agent-header";
 import { ChatMembersMenu } from "@/components/chat/chat-members-menu";
@@ -17,6 +17,7 @@ import { identityFromUnknown } from "@/lib/agent-identity";
 import { isGroupChat, messageAuthor } from "@/lib/chat-members";
 import { pendingToMessage, type PendingMessage } from "@/lib/chat-queue";
 import { presentThread } from "@/lib/chat-stream";
+import { isInboxMessage } from "@/lib/inbox-message";
 import { useWorkspace } from "@/components/workspace-provider";
 
 export function ChatThread({
@@ -46,6 +47,7 @@ export function ChatThread({
   onResendMessage,
   onRetryMessage,
   creator,
+  headerActions,
 }: {
   chat: Chat | null;
   agent: Agent | null;
@@ -77,6 +79,8 @@ export function ChatThread({
   onResendMessage?: (messageId: string, content: string) => Promise<boolean>;
   onRetryMessage?: (messageId: string) => Promise<boolean>;
   creator?: Agent | null;
+  /** Extra header controls after the members menu (the side panel toggle). */
+  headerActions?: ReactNode;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
@@ -112,11 +116,13 @@ export function ChatThread({
   const actionsFor = (message: ChatMessage): MessageActionHandlers | undefined => {
     if (!onDeleteMessage) return undefined;
     const user = message.role === "user";
+    // Agent mail is not the human's to rewrite. It can still be copied or deleted.
+    const mail = isInboxMessage(message);
     return {
       disabled: locked,
       onDelete: (following) => onDeleteMessage(message.id, following),
       ...(onEditMessage && !user ? { onEdit: (content: string) => onEditMessage(message.id, content) } : {}),
-      ...(onResendMessage && user ? { onResend: (content: string) => onResendMessage(message.id, content) } : {}),
+      ...(onResendMessage && user && !mail ? { onResend: (content: string) => onResendMessage(message.id, content) } : {}),
       ...(onRetryMessage && !user ? { onRetry: () => onRetryMessage(message.id) } : {}),
     };
   };
@@ -144,6 +150,7 @@ export function ChatThread({
             {onClear && onCompact ? (
               <ChatActionsMenu disabled={locked} empty={messages.length === 0} onClear={onClear} onCompact={onCompact} />
             ) : null}
+            {headerActions}
           </div>
         }
       />

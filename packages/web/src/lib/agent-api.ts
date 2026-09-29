@@ -141,5 +141,7 @@ export async function listProfiles(): Promise<ProfileInfo[]> {
     kind: profile.kind === "cli" || profile.provider === "cli" ? "cli" : "api",
     available: profile.available !== false,
     unavailableReason: profile.unavailableReason ?? null,
+    cli: profile.cli ?? null,
+    defaultModel: profile.defaultModel === true,
   }));
 }

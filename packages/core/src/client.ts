@@ -70,6 +70,8 @@ import type {
   ListenerInput,
   ListenerPatch,
   MemoryRecord,
+  WorkspaceFile,
+  WorkspaceListing,
   ModelProfile,
   NotificationPage,
   AlwaysOnSettings,
@@ -278,6 +280,21 @@ export class BotanicalClient {
 
   async deleteMemory(id: string): Promise<void> {
     await this.requestJson(API.memory(id), { method: "DELETE" });
+  }
+
+  /** One directory of an agent's workspace. `path` is relative to it; omit for the root. */
+  async listAgentFiles(agentId: string, path?: string): Promise<WorkspaceListing> {
+    const suffix = path ? `?${new URLSearchParams({ path }).toString()}` : "";
+    const body = (await this.requestJson(`${API.agentFiles(agentId)}${suffix}`)) as WorkspaceListing;
+    return { path: body.path, entries: Array.isArray(body.entries) ? body.entries : [], truncated: Boolean(body.truncated) };
+  }
+
+  /** A UTF-8 text file from an agent's workspace. */
+  async readAgentFile(agentId: string, path: string): Promise<WorkspaceFile> {
+    const body = (await this.requestJson(
+      `${API.agentFileContent(agentId)}?${new URLSearchParams({ path }).toString()}`,
+    )) as WorkspaceFile;
+    return { path: body.path, content: String(body.content ?? ""), bytes: Number(body.bytes ?? 0) };
   }
 
   async listRoles(): Promise<RoleRecord[]> {
