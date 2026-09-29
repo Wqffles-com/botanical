@@ -13,6 +13,7 @@ import { ChatThreadSkeleton } from "@/components/chat/skeletons";
 import { identityFromUnknown } from "@/lib/agent-identity";
 import { pendingToMessage, type PendingMessage } from "@/lib/chat-queue";
 import { presentThread } from "@/lib/chat-stream";
+import { useWorkspace } from "@/components/workspace-provider";
 
 export function ChatThread({
   chat,
@@ -64,6 +65,8 @@ export function ChatThread({
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const identity = agent ? identityFromUnknown(agent) : null;
+  const { agents } = useWorkspace();
+  const mentionables = agents.filter((other) => other.id !== agent?.id);
 
   useEffect(() => {
     const el = scroller.current;
@@ -175,6 +178,7 @@ export function ChatThread({
         profileId={profileId}
         onProfile={onProfile}
         profileNeeded={!profileReady}
+        mentionables={mentionables}
       />
     </div>
   );

@@ -156,7 +156,7 @@ export function createApp(deps: AppDeps): App {
   registerRoles(router);
   registerMemories(router);
   registerChats(router);
-  registerMessages(router, runtime.deps, turns, chatQueue);
+  registerMessages(router, runtime.deps, turns, chatQueue, a2a);
   registerRoutines(router, jobs);
   registerListeners(router);
   registerHooks(router, { jobs, limiter: hookLimiter });

@@ -45,6 +45,8 @@ export {
   normalizeMessage,
   normalizeProfile,
 } from "./normalize";
+export { activeMentionQuery, findMentions, mentionedAgents } from "./mentions";
+export type { Mention, Mentionable } from "./mentions";
 export { API } from "./paths";
 export { parseNdjsonLine, parseSseFrame, readChatStream, readSseMessages } from "./sse";
 export { AGENT_MESSAGE_STATUSES, CLIENT_CONTRACT_VERSION, INBOX_CHAT_TITLE } from "./types";

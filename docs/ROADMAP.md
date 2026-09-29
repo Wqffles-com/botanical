@@ -11,7 +11,7 @@ Botanical is in early alpha. This page separates what already ships from what is
 - Model profiles for OpenAI-compatible APIs (the start script offers DeepSeek first) and for OpenAI, Anthropic, xAI, and OpenRouter. No silent default model.
 - Coding-agent CLI profiles (Grok Build, Claude Code, Codex) run headless on the server. Enabled with `BOTANICAL_CLI_PROFILES`. Installed and signed in inside the container from Settings. Each turn exposes Botanical tools through one MCP server named `botanical`.
 - Custom agents with name, description, Lucide icon, color, prompt, and tool allowlist. One agent per chat.
-- Async agent-to-agent messaging with an inbox. Optional autorun (`BOTANICAL_A2A_AUTORUN=true`) starts a background turn for the recipient.
+- Async agent-to-agent messaging with an inbox. `@Name` in a chat mails the mentioned agent, with composer autocomplete. Optional autorun (`BOTANICAL_A2A_AUTORUN=true`) starts a background turn for the recipient.
 - Shared and per-agent memory.
 - Agents that create agents, limited to their own permissions.
 - Roles and permissions over tools and MCP servers, enforced at dispatch.

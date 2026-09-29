@@ -1,4 +1,6 @@
 import { prepareTurn, type RuntimeDeps } from "@botanical/agent-runtime";
+import { deliverMentions } from "../a2a/mentions.ts";
+import type { A2AService } from "../a2a/service.ts";
 import { HttpError, isRecord, json, readJson } from "../http.ts";
 import { readRequestedProfileId, resolveProfile } from "../profiles.ts";
 import { assertCliProfileReady } from "./profiles.ts";
@@ -15,6 +17,7 @@ export function registerMessages(
   runtime: RuntimeDeps,
   turns: TurnCoordinator,
   queue: ChatQueue,
+  a2a: Pick<A2AService, "send">,
 ): void {
   router.add(
     "GET",
@@ -59,6 +62,8 @@ export function registerMessages(
         throw turnFailure(error);
       }
 
+      const mentions = await deliverMentions(ctx.store, a2a, chat, content);
+
       if (queued) {
         const userId = ctx.user?.id;
         if (!userId) throw new HttpError(401, "unauthorized", "Authentication required");
@@ -70,7 +75,7 @@ export function registerMessages(
           profileId: profile.id,
           ...(clientId ? { id: clientId } : {}),
         });
-        return json(202, { queued: item, profileId: profile.id });
+        return json(202, { queued: item, profileId: profile.id, mentions });
       }
 
       const turn = { chat, content, profile, signal: ctx.request.signal };
@@ -80,6 +85,7 @@ export function registerMessages(
           userMessage: result.userMessage,
           assistantMessage: result.assistantMessage,
           profileId: result.profileId,
+          mentions,
           ...(result.toolCall ? { toolCall: result.toolCall } : {}),
           ...(result.toolResult !== undefined ? { toolResult: result.toolResult } : {}),
           ...(result.error ? { error: result.error } : {}),

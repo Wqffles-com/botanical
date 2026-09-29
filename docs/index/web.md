@@ -48,7 +48,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/components/search-input.tsx` | Outline search field shared by the agents list and new-chat agent filter |
 | `packages/web/src/lib/accent.ts` | Accent names, swatches, and local cache |
 | `packages/web/src/lib/agent-picture.ts` | Browser resize of an uploaded avatar |
-| `packages/web/src/components/chat` | Thread, composer (sending stays open while the agent works), dictation, tool-call cards, new-chat form (pre-selects the agent's default model), message actions (`message-actions.tsx`: copy, edit, retry, delete) |
+| `packages/web/src/components/chat` | Thread, composer (sending stays open while the agent works), dictation, `@` agent mention autocomplete in the composer, new-chat form (pre-selects the agent's default model), message actions (`message-actions.tsx`: copy, edit, retry, delete) |
 | `packages/web/src/components/inbox/inbox-view.tsx` | Agent inbox |
 | `packages/web/src/components/routines` | Routine list and editor (`packages/web/src/lib/schedule.ts` humanizes cron) |
 | `packages/web/src/components/listeners` | Listener list and editor |

@@ -1,8 +1,9 @@
 "use client";
 
-import type { ModelProfile } from "@botanical/core";
+import { activeMentionQuery, type Agent, type ModelProfile } from "@botanical/core";
 import { Send, Square } from "lucide-react";
-import { useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { AgentAvatar } from "@/components/agent-avatar";
 import { DictationActions, DictationNotice } from "@/components/chat/dictation-button";
 import { spliceTranscript } from "@/components/chat/dictation";
 import { useDictation } from "@/components/chat/use-dictation";
@@ -23,6 +24,7 @@ export function Composer({
   profileId,
   onProfile,
   profileNeeded,
+  mentionables,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -36,6 +38,8 @@ export function Composer({
   profileId?: string | null;
   onProfile?: (profileId: string | null) => void;
   profileNeeded?: boolean;
+  /** Agents offered after `@`. Mentioning one sends it the message as agent mail. */
+  mentionables?: Agent[];
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const valueRef = useRef(value);
@@ -65,6 +69,29 @@ export function Composer({
     onInsert: insertTranscript,
   });
   const recording = dictation.phase === "recording";
+  const [caret, setCaret] = useState<number | null>(null);
+  const [highlight, setHighlight] = useState(0);
+  const [dismissed, setDismissed] = useState<number | null>(null);
+  const mention = caret === null ? null : activeMentionQuery(value, caret);
+  const suggestions =
+    mention && mention.start !== dismissed && mentionables
+      ? mentionables
+          .filter((agent) => agent.name.toLowerCase().startsWith(mention.query.toLowerCase()))
+          .slice(0, 6)
+      : [];
+  const active = Math.min(highlight, Math.max(suggestions.length - 1, 0));
+
+  function pickMention(agent: Agent) {
+    if (!mention) return;
+    const end = mention.start + 1 + mention.query.length;
+    const next = `${value.slice(0, mention.start)}@${agent.name} ${value.slice(end)}`;
+    const pos = mention.start + agent.name.length + 2;
+    valueRef.current = next;
+    caretRef.current = pos;
+    setCaret(pos);
+    setHighlight(0);
+    onChange(next);
+  }
   const canSubmit = !disabled && !recording && !unavailableHint && value.trim().length > 0;
 
   useEffect(() => {
@@ -85,6 +112,24 @@ export function Composer({
       event.preventDefault();
       return;
     }
+    if (suggestions.length > 0) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        setHighlight((active + step + suggestions.length) % suggestions.length);
+        return;
+      }
+      if ((event.key === "Enter" || event.key === "Tab") && !event.nativeEvent.isComposing) {
+        event.preventDefault();
+        pickMention(suggestions[active] as Agent);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setDismissed(mention?.start ?? null);
+        return;
+      }
+    }
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
     if (canSubmit) onSubmit();
@@ -99,10 +144,47 @@ export function Composer({
     <form onSubmit={handleSubmit} className="px-4 pb-4 pt-2">
       <div
         className={cn(
-          "mx-auto flex max-w-3xl flex-col rounded-xl border bg-card",
+          "relative mx-auto flex max-w-3xl flex-col rounded-xl border bg-card",
           disabled ? "border-border opacity-70" : "border-border focus-within:border-primary/45",
         )}
       >
+        {suggestions.length > 0 ? (
+          <ul
+            id="composer-mentions"
+            role="listbox"
+            aria-label="Mention an agent"
+            data-testid="mention-suggestions"
+            className="absolute bottom-full left-0 z-10 mb-1 w-64 max-w-full overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
+          >
+            {suggestions.map((agent, index) => (
+              <li
+                key={agent.id}
+                id={`composer-mention-${agent.id}`}
+                role="option"
+                aria-selected={index === active}
+                className={cn(
+                  "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm",
+                  index === active ? "bg-accent text-accent-foreground" : "",
+                )}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  pickMention(agent);
+                }}
+                onMouseEnter={() => setHighlight(index)}
+              >
+                <AgentAvatar
+                  size="sm"
+                  name={agent.name}
+                  icon={agent.icon}
+                  color={agent.color}
+                  shape={agent.shape}
+                  picture={agent.picture}
+                />
+                <span className="truncate">{agent.name}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <textarea
           ref={ref}
           id="composer"
@@ -110,8 +192,17 @@ export function Composer({
           value={value}
           onChange={(event) => {
             valueRef.current = event.target.value;
+            setCaret(event.target.selectionStart);
             onChange(event.target.value);
           }}
+          onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
+          onBlur={() => setCaret(null)}
+          role={mentionables ? "combobox" : undefined}
+          aria-expanded={mentionables ? suggestions.length > 0 : undefined}
+          aria-controls={suggestions.length > 0 ? "composer-mentions" : undefined}
+          aria-activedescendant={
+            suggestions.length > 0 ? `composer-mention-${(suggestions[active] as Agent).id}` : undefined
+          }
           onKeyDown={handleKey}
           placeholder={placeholder}
           disabled={disabled}
