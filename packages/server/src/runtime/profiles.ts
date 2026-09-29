@@ -117,8 +117,9 @@ export function createServerProfileResolver(
 }
 
 /**
- * Subscription CLIs run in the agent workspace. When `botanicalTools` is on,
- * the same turn exposes Botanical's tool catalog over a per-run MCP server.
+ * Subscription CLIs run in the agent workspace. When `botanicalTools` is on
+ * and the agent can use at least one tool, the same turn exposes Botanical's
+ * tool catalog over a per-run MCP server.
  * Tool calls from that server are already dispatched; they arrive as settled
  * tool-call events so the loop records them and does not run them twice.
  * Claude Code also takes messages sent mid-turn on stdin (`request.input`).
@@ -153,8 +154,11 @@ function cliProvider(profile: ModelProfile, cliTools: CliToolHost | undefined, e
         return;
       }
       const cwd = request.cwd?.trim() || process.cwd();
+      // `request.tools` is the agent's visible catalog, the same list the MCP
+      // endpoint would serve. With none, the CLI is not told about Botanical
+      // tools, so it does not go looking for them (issue #87).
       const session =
-        exposeTools && cliTools && request.agentId && request.chatId
+        exposeTools && cliTools && request.agentId && request.chatId && (request.tools?.length ?? 0) > 0
           ? cliTools.open({
               agentId: request.agentId,
               chatId: request.chatId,

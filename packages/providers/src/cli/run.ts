@@ -4,7 +4,7 @@ import type { Writable } from "node:stream";
 
 import { runCliChildEnv } from "./child-env.ts";
 import { claudeUserMessage, prepareCliLaunch, type CliMcpTarget } from "./launch.ts";
-import { isCliTurnResult, parseCliLine } from "./parse.ts";
+import { cliLineMarker, parseCliLine } from "./parse.ts";
 import { renderCliPrompt, type CliPromptMessage } from "./prompt.ts";
 import type { CliName } from "./types.ts";
 
@@ -218,16 +218,27 @@ async function readStdout(
 ): Promise<void> {
   let sawDelta = false;
   let sawFinal = false;
+  let sawText = false;
+  let newMessage = false;
   if (!child.stdout) return;
   const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
   try {
     for await (const line of lines) {
-      if (isCliTurnResult(line)) onTurnResult();
+      const marker = cliLineMarker(line);
+      if (marker === "result") onTurnResult();
+      // Text from separate model steps (around tool calls) would otherwise
+      // run together: "…contact Jan.The tool list…" (issue #87).
+      if (marker === "message-start" && sawText) newMessage = true;
       const parsed = parseCliLine(line);
       if (parsed.kind === "ignore") continue;
       if (parsed.kind === "plain" || parsed.kind === "delta") {
         if (parsed.kind === "delta") sawDelta = true;
-        if (parsed.text) sink.push({ type: "text-delta", text: parsed.text });
+        if (parsed.text) {
+          const text = newMessage && parsed.kind === "delta" ? `\n\n${parsed.text}` : parsed.text;
+          newMessage = false;
+          sawText = true;
+          sink.push({ type: "text-delta", text });
+        }
         continue;
       }
       if (sawDelta || sawFinal) continue;

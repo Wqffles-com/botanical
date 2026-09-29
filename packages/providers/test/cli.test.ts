@@ -48,6 +48,13 @@ describe("CLI stream parsing", () => {
     expect(events.at(-1)?.type).toBe("done");
   });
 
+  test("text from separate model steps is split into paragraphs", async () => {
+    const events = await collect("grok-steps");
+    const text = events.filter((event) => event.type === "text-delta").map((event) => event.text).join("");
+    expect(text).toBe("I'll look it up.\n\nDone.");
+    expect(events.at(-1)?.type).toBe("done");
+  });
+
   test("parses grok ACP session chunks and claude/codex shapes", () => {
     const acp = parseCliLine(
       JSON.stringify({
@@ -169,6 +176,7 @@ describe("CLI stream parsing", () => {
     expect(text).toContain("streaming-messages-json");
     expect(text).toContain("--include-partial-messages");
     expect(text).toContain("--always-approve");
+    expect(text).toContain("--no-wait-for-background");
     expect(text).toContain("--cwd");
     expect(text).toContain("--prompt-file");
     expect(text).not.toContain("Be brief.");
