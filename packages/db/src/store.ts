@@ -136,6 +136,7 @@ export interface AgentPatch {
 export interface Chat {
   id: string;
   agentId: string;
+  memberIds: string[];
   profileId: string;
   title: string;
   createdAt: string;
@@ -144,6 +145,7 @@ export interface Chat {
 
 export interface NewChat {
   agentId: string;
+  memberIds?: string[];
   profileId: string;
   title: string;
 }
@@ -151,6 +153,7 @@ export interface NewChat {
 export interface ChatPatch {
   title?: string;
   profileId?: string;
+  memberIds?: string[];
 }
 
 export interface Message {
@@ -163,6 +166,7 @@ export interface Message {
   toolCallId?: string;
   name?: string;
   profileId?: string | null;
+  agentId?: string | null;
 }
 
 export interface NewMessage {
@@ -173,6 +177,7 @@ export interface NewMessage {
   toolCallId?: string;
   name?: string;
   profileId?: string | null;
+  agentId?: string | null;
 }
 
 export interface Session {
@@ -399,6 +404,19 @@ function buildStore(
     throw new Error(`Unknown model profile ${JSON.stringify(id)}. Upsert it before use.`);
   }
 
+  /** The ids, each once, after checking every one is an agent of the bound user. */
+  async function requireOwnedAgents(ids: readonly string[]): Promise<string[]> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return [];
+    if (!unique.every(isUuid)) throw new Error('agent not found');
+    const rows = await db
+      .select({ id: agents.id })
+      .from(agents)
+      .where(and(inArray(agents.id, unique), eq(agents.userId, bound())));
+    if (rows.length !== unique.length) throw new Error('agent not found');
+    return unique;
+  }
+
   async function requireOwnedChat(chatId: string): Promise<boolean> {
     if (!isUuid(chatId)) return false;
     const rows = await db
@@ -521,7 +539,7 @@ function buildStore(
         const owned = await db
           .select({ id: chats.id })
           .from(chats)
-          .where(eq(chats.agentId, id))
+          .where(or(eq(chats.agentId, id), sql`${id}::uuid = any(${chats.memberIds})`))
           .limit(1);
         if (owned[0]) throw new Error('agent still owns chats');
         await db.delete(agents).where(and(eq(agents.id, id), eq(agents.userId, bound())));
@@ -557,12 +575,14 @@ function buildStore(
           .where(and(eq(agents.id, input.agentId), eq(agents.userId, bound())))
           .limit(1);
         if (!agent[0]) throw new Error('agent not found');
+        const memberIds = await requireOwnedAgents(input.memberIds ?? []);
         const profileUuid = await requireProfileUuid(input.profileId);
         const inserted = await db
           .insert(chats)
           .values({
             userId: bound(),
             agentId: input.agentId,
+            memberIds,
             profileId: profileUuid,
             title: input.title,
           })
@@ -573,8 +593,11 @@ function buildStore(
       },
       async update(id, patch) {
         if (!isUuid(id)) return null;
-        const values: { title?: string; profileId?: string; updatedAt: Date } = { updatedAt: new Date() };
+        const values: { title?: string; profileId?: string; memberIds?: string[]; updatedAt: Date } = {
+          updatedAt: new Date(),
+        };
         if (patch.title !== undefined) values.title = patch.title;
+        if (patch.memberIds !== undefined) values.memberIds = await requireOwnedAgents(patch.memberIds);
         if (patch.profileId !== undefined) values.profileId = await requireProfileUuid(patch.profileId);
         const updated = await db
           .update(chats)
@@ -613,7 +636,12 @@ function buildStore(
         const rows = await db
           .select({ id: chats.id })
           .from(chats)
-          .where(and(eq(chats.agentId, agentId), eq(chats.userId, bound())));
+          .where(
+            and(
+              or(eq(chats.agentId, agentId), sql`${agentId}::uuid = any(${chats.memberIds})`),
+              eq(chats.userId, bound()),
+            ),
+          );
         return rows.length;
       },
     },
@@ -645,6 +673,7 @@ function buildStore(
             toolCallId: input.toolCallId?.trim() || null,
             name: input.name?.trim() || null,
             profileId: profileUuid,
+            agentId: input.agentId && isUuid(input.agentId) ? input.agentId : null,
           })
           .returning();
         const row = inserted[0];
@@ -979,6 +1008,7 @@ function toChat(row: ChatRow, profilePublicId: string): Chat {
   return {
     id: row.id,
     agentId: row.agentId,
+    memberIds: [...(row.memberIds ?? [])],
     profileId: profilePublicId,
     title: row.title,
     createdAt: iso(row.createdAt),
@@ -1004,6 +1034,7 @@ function toMessage(row: MessageRow, profilePublicId: string | null): Message {
   if (row.toolCallId) message.toolCallId = row.toolCallId;
   if (row.name) message.name = row.name;
   if (profilePublicId) message.profileId = profilePublicId;
+  if (row.agentId) message.agentId = row.agentId;
   return message;
 }
 

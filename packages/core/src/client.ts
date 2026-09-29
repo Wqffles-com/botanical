@@ -359,11 +359,13 @@ export class BotanicalClient {
     const agentId = requireAgentId(input.agentId);
     const profileId = requireProfileId(input.profileId);
     const title = input.title?.trim();
+    const memberIds = [...new Set((input.memberIds ?? []).map((id) => id.trim()).filter((id) => id && id !== agentId))];
     const body = await this.requestJson(API.chats, {
       method: "POST",
       body: JSON.stringify({
         agentId,
         profileId,
+        ...(memberIds.length > 0 ? { memberIds } : {}),
         ...(title ? { title } : {}),
       }),
     });

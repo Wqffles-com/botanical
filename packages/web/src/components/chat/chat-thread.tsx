@@ -4,6 +4,7 @@ import { MessageSquareOff } from "lucide-react";
 import type { Agent, Chat, ChatMessage, ModelProfile } from "@botanical/core";
 import { useEffect, useRef } from "react";
 import { ChatAgentHeader } from "@/components/chat/chat-agent-header";
+import { ChatMembersMenu } from "@/components/chat/chat-members-menu";
 import { Composer } from "@/components/chat/composer";
 import { EmptyState } from "@botanical/ui/components/empty-state";
 import { MessageBubble } from "@/components/chat/message-bubble";
@@ -11,6 +12,7 @@ import type { MessageActionHandlers } from "@/components/chat/message-actions";
 import { ProfileRequiredBanner } from "@/components/chat/profile-required-banner";
 import { ChatThreadSkeleton } from "@/components/chat/skeletons";
 import { identityFromUnknown } from "@/lib/agent-identity";
+import { isGroupChat, messageAuthor } from "@/lib/chat-members";
 import { pendingToMessage, type PendingMessage } from "@/lib/chat-queue";
 import { presentThread } from "@/lib/chat-stream";
 import { useWorkspace } from "@/components/workspace-provider";
@@ -28,9 +30,11 @@ export function ChatThread({
   onDraft,
   pending,
   working,
+  workingAgentId,
   error,
   profileError,
   onProfile,
+  onMembers,
   onSend,
   onStop,
   onEditMessage,
@@ -51,9 +55,13 @@ export function ChatThread({
   onDraft: (value: string) => void;
   pending: PendingMessage[];
   working: boolean;
+  /** The agent answering right now, when the server says (group members take turns). */
+  workingAgentId?: string | null;
   error: string | null;
   profileError: string | null;
   onProfile: (profileId: string | null) => void;
+  /** Replace the group members. Without it the chat shows no members control. */
+  onMembers?: (memberIds: string[]) => Promise<void>;
   onSend: () => void;
   onStop: () => void;
   onEditMessage?: (messageId: string, content: string) => Promise<boolean>;
@@ -66,7 +74,11 @@ export function ChatThread({
   const stick = useRef(true);
   const identity = agent ? identityFromUnknown(agent) : null;
   const { agents } = useWorkspace();
-  const mentionables = agents.filter((other) => other.id !== agent?.id);
+  const group = isGroupChat(chat);
+  // In a group chat a mention picks who answers, so every agent can be named, the owner too.
+  const mentionables = group ? agents : agents.filter((other) => other.id !== agent?.id);
+  const members = group && chat ? agents.filter((other) => chat.memberIds.includes(other.id)) : [];
+  const workingAgent = (workingAgentId ? agents.find((other) => other.id === workingAgentId) : null) ?? agent;
 
   useEffect(() => {
     const el = scroller.current;
@@ -104,7 +116,23 @@ export function ChatThread({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ChatAgentHeader agent={identity} title={chat.title} creator={creator} />
+      <ChatAgentHeader
+        agent={identity}
+        title={chat.title}
+        creator={creator}
+        members={members.map((member) => member.name)}
+        trailing={
+          agent && onMembers ? (
+            <ChatMembersMenu
+              owner={agent}
+              agents={agents}
+              memberIds={chat.memberIds}
+              disabled={locked}
+              onChange={onMembers}
+            />
+          ) : null
+        }
+      />
 
       {!profileReady || profileError ? (
         <div className="border-b px-4 py-2">
@@ -133,9 +161,13 @@ export function ChatThread({
       >
         {messages.length === 0 && pending.length === 0 ? (
           <div className="mx-auto flex h-full max-w-3xl flex-col items-center justify-center px-6 text-center">
-            <h2 className="text-2xl font-semibold tracking-tight">{identity?.name ?? "New chat"}</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">
+              {group ? [identity?.name ?? "Agent", ...members.map((member) => member.name)].join(", ") : (identity?.name ?? "New chat")}
+            </h2>
             <p className="mt-2 max-w-md text-sm text-muted-foreground">
-              {identity?.description || "Send a message when a model profile is selected."}
+              {group
+                ? "Everyone answers in turn. Mention an agent with @Name to ask only that agent."
+                : identity?.description || "Send a message when a model profile is selected."}
             </p>
           </div>
         ) : (
@@ -144,7 +176,7 @@ export function ChatThread({
               <MessageBubble
                 key={row.key}
                 message={row.message}
-                agent={agent}
+                agent={messageAuthor(row.message, chat, agents) ?? agent}
                 toolCalls={row.tools.length > 0 ? row.tools : undefined}
                 actions={actionsFor(row.message)}
               />
@@ -152,7 +184,7 @@ export function ChatThread({
             {working ? (
               <MessageBubble
                 message={{ id: "working", chatId: chat.id, role: "assistant", content: "", createdAt: "" }}
-                agent={agent}
+                agent={workingAgent}
                 working
               />
             ) : null}
@@ -160,7 +192,7 @@ export function ChatThread({
               <MessageBubble key={row.id} message={pendingToMessage(chat.id, row)} queued />
             ))}
             <p className="sr-only" aria-live="polite">
-              {working ? `${identity?.name ?? "The agent"} is working` : ""}
+              {working ? `${workingAgent?.name ?? "The agent"} is working` : ""}
             </p>
           </div>
         )}
@@ -173,7 +205,13 @@ export function ChatThread({
         onStop={onStop}
         working={working}
         disabled={!profileReady}
-        placeholder={profileReady ? `Message ${identity?.name ?? "this agent"}…` : "Choose a model profile to write"}
+        placeholder={
+          !profileReady
+            ? "Choose a model profile to write"
+            : group
+              ? "Message the group…"
+              : `Message ${identity?.name ?? "this agent"}…`
+        }
         profiles={profiles}
         profileId={profileId}
         onProfile={onProfile}

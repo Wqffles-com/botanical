@@ -8,7 +8,7 @@ import { resolveProfile } from "../profiles.ts";
 import { assertCliProfileReady } from "../routes/profiles.ts";
 import type { SseEvent } from "../streaming.ts";
 import type { Store } from "../types.ts";
-import { streamChatTurn } from "./turn.ts";
+import { streamChatReplies } from "./turn.ts";
 import type { TurnCoordinator } from "./turns.ts";
 
 /** A user message accepted by `POST /api/chats/:id/messages` with `async: true`, not yet in the transcript. */
@@ -21,7 +21,8 @@ export interface QueuedMessage {
 
 /**
  * Events on `GET /api/chats/:id/events`:
- * - `status` `{ running, queued }` on connect and whenever the queue or run state changes.
+ * - `status` `{ running, queued, agentId? }` on connect and whenever the queue or run state changes.
+ *   `agentId` is the agent answering right now (it changes as group members take turns).
  * - `message` `{ message, queuedId? }` for each stored message. User messages carry the queue id they came from,
  *   including ones the running turn took mid-turn.
  * - `error` `{ error, code }` when a turn fails. A stopped turn does not report one.
@@ -33,6 +34,8 @@ export type ChatListener = (event: SseEvent) => void;
 interface ChatState {
   queue: QueuedMessage[];
   running: boolean;
+  /** The agent whose turn is running. */
+  agentId: string | null;
   controller: AbortController | null;
   listeners: Set<ChatListener>;
   /** The running turn's steering listeners, told when a message joins the queue. */
@@ -64,7 +67,7 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
   function stateFor(chatId: string): ChatState {
     let state = chats.get(chatId);
     if (!state) {
-      state = { queue: [], running: false, controller: null, listeners: new Set(), steerers: new Set() };
+      state = { queue: [], running: false, agentId: null, controller: null, listeners: new Set(), steerers: new Set() };
       chats.set(chatId, state);
     }
     return state;
@@ -85,7 +88,14 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
   }
 
   function statusEvent(state: ChatState): SseEvent {
-    return { event: "status", data: { running: state.running, queued: [...state.queue] } };
+    return {
+      event: "status",
+      data: {
+        running: state.running,
+        queued: [...state.queue],
+        ...(state.running && state.agentId ? { agentId: state.agentId } : {}),
+      },
+    };
   }
 
   async function runBatch(chatId: string, state: ChatState): Promise<void> {
@@ -145,7 +155,12 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
         },
       };
 
-      const turn = streamChatTurn(deps.store, deps.runtime, {
+      // A group chat names each speaker with an `agent` event as its turn starts.
+      if (chat.memberIds.length === 0) {
+        state.agentId = chat.agentId;
+        publish(state, statusEvent(state));
+      }
+      const turn = streamChatReplies(deps.store, deps.runtime, {
         chat,
         content: batch.map((item) => item.content).join("\n\n"),
         profile,
@@ -156,6 +171,14 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
       for await (const event of turn) {
         // Replies go out whole. Deltas and usage stay on the server.
         if (event.event === "text-delta" || event.event === "usage") continue;
+        if (event.event === "agent") {
+          const agentId = (event.data as { agentId?: unknown }).agentId;
+          if (typeof agentId === "string" && agentId !== state.agentId) {
+            state.agentId = agentId;
+            publish(state, statusEvent(state));
+          }
+          continue;
+        }
         if (event.event === "steer") {
           for (const item of steerMessages(event.data)) steered.set(item.messageId, item.id);
         }
@@ -167,6 +190,7 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
       fail(error);
     } finally {
       state.controller = null;
+      state.agentId = null;
       state.steerers.clear();
     }
   }

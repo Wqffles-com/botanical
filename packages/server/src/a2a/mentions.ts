@@ -1,5 +1,6 @@
 import { mentionedAgents } from "@botanical/core";
 
+import { participants } from "../runtime/group.ts";
 import type { Chat, Store } from "../types.ts";
 import { A2A_BODY_MAX } from "./constants.ts";
 import type { A2AService } from "./service.ts";
@@ -13,8 +14,10 @@ export interface MentionDelivery {
 
 /**
  * `@Name` in a user's chat message sends the mentioned agent a copy as A2A mail
- * from the chat's own agent, with `fromChatId` set. The chat stays with its one
- * agent (DECISIONS 9); the mentioned agent reads it in its inbox (DECISIONS 10).
+ * from the chat's own agent, with `fromChatId` set. The chat stays with its
+ * agents (DECISIONS 9); the mentioned agent reads it in its inbox (DECISIONS 10).
+ * Members of a group chat are already in the thread, so they get no mail: the mention
+ * picks who answers there (`respondersFor` in runtime/group.ts).
  * A failed delivery is reported, never thrown, so the chat message still goes through.
  */
 export async function deliverMentions(
@@ -24,7 +27,8 @@ export async function deliverMentions(
   content: string,
 ): Promise<MentionDelivery[]> {
   if (!content.includes("@")) return [];
-  const agents = (await store.agents.list()).filter((agent) => agent.id !== chat.agentId);
+  const inChat = new Set(participants(chat));
+  const agents = (await store.agents.list()).filter((agent) => !inChat.has(agent.id));
   const mentioned = mentionedAgents(content, agents);
   const deliveries: MentionDelivery[] = [];
   for (const agent of mentioned) {

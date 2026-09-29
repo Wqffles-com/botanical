@@ -101,7 +101,7 @@ Responsibilities (some are planned; see [ROADMAP.md](./ROADMAP.md)):
 
 ### Agent UX rules (locked)
 
-- **One agent per chat** — thread owned by one chosen agent
+- **One owning agent per chat** — thread owned by one chosen agent; other agents can join as group members (DECISIONS, 2026-09-29)
 - User may define unlimited agents
 - Agents may message each other asynchronously without merging chats
 

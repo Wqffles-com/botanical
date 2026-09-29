@@ -31,6 +31,8 @@ export interface MessageRecord {
   name?: string;
   /** Profile used for this turn. Set on user, assistant, and tool rows. */
   profileId?: string;
+  /** Agent that wrote an assistant or tool row. Absent on user rows and older rows (the chat's owner). */
+  agentId?: string;
   createdAt: string;
 }
 
@@ -43,4 +45,5 @@ export interface NewMessage {
   toolCallId?: string;
   name?: string;
   profileId?: string;
+  agentId?: string;
 }

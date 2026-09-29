@@ -23,9 +23,11 @@ export default function ChatPage() {
       onDraft={thread.setDraft}
       pending={thread.pending}
       working={thread.working}
+      workingAgentId={thread.workingAgentId}
       error={thread.error}
       profileError={thread.profileError}
       onProfile={(profileId) => void thread.setProfile(profileId)}
+      onMembers={thread.setMembers}
       onSend={() => void thread.send()}
       onStop={thread.stop}
       onEditMessage={thread.editMessage}

@@ -262,10 +262,13 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date; 
       },
       async create(input: NewChat) {
         if (agentOwners.get(input.agentId) !== acting()) throw new Error("agent not found");
+        const memberIds = [...(input.memberIds ?? [])];
+        if (memberIds.some((id) => agentOwners.get(id) !== acting())) throw new Error("agent not found");
         const now = timestamp();
         const chat: Chat = {
           id: randomUUID(),
           agentId: input.agentId,
+          memberIds,
           profileId: input.profileId,
           title: input.title,
           createdAt: now,
@@ -284,6 +287,10 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date; 
         };
         if (patch.title !== undefined) next.title = patch.title;
         if (patch.profileId !== undefined) next.profileId = patch.profileId;
+        if (patch.memberIds !== undefined) {
+          if (patch.memberIds.some((member) => agentOwners.get(member) !== acting())) throw new Error("agent not found");
+          next.memberIds = [...patch.memberIds];
+        }
         chats.set(id, next);
         return clone(next);
       },
@@ -296,7 +303,8 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date; 
         if (agentOwners.get(agentId) !== acting()) return 0;
         let count = 0;
         for (const chat of chats.values()) {
-          if (chat.agentId === agentId && chatOwners.get(chat.id) === acting()) count += 1;
+          const inChat = chat.agentId === agentId || chat.memberIds.includes(agentId);
+          if (inChat && chatOwners.get(chat.id) === acting()) count += 1;
         }
         return count;
       },
@@ -601,6 +609,7 @@ function materializeMessage(input: NewMessage, id: string, createdAt: string): M
   if (input.toolCallId?.trim()) message.toolCallId = input.toolCallId.trim();
   if (input.name?.trim()) message.name = input.name.trim();
   if (input.profileId) message.profileId = input.profileId;
+  if (input.agentId) message.agentId = input.agentId;
   return message;
 }
 

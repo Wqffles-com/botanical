@@ -64,7 +64,7 @@ export function registerAgents(router: Router): void {
         throw new HttpError(
           409,
           "agent_in_use",
-          "This agent still owns chats. Delete those chats first.",
+          "This agent still owns or is a member of chats. Delete those chats or remove it from them first.",
         );
       }
       await ctx.store.agents.delete(id);

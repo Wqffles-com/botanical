@@ -31,6 +31,8 @@ export const LIMITS = {
   toolId: 128,
   toolIds: 64,
   id: 200,
+  /** Group chat members beside the owning agent. */
+  chatMembers: 7,
 } as const;
 
 export { DEFAULT_AGENT_COLOR, DEFAULT_AGENT_ICON };

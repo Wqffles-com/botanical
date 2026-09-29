@@ -21,11 +21,11 @@ function NewChatPageInner() {
       initialAgentId={initialAgentId}
       pending={pending}
       error={error}
-      onSubmit={async ({ agentId, profileId, title }) => {
+      onSubmit={async ({ agentId, memberIds, profileId, title }) => {
         setPending(true);
         setError(null);
         try {
-          const chat = await createChat({ agentId, profileId, title: title.trim() || undefined });
+          const chat = await createChat({ agentId, memberIds, profileId, title: title.trim() || undefined });
           router.push(`/chats/${chat.id}`);
         } catch (err) {
           setError(isProfileRequired(err) ? profileRequiredMessage(err) : errorText(err));

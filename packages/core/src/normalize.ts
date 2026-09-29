@@ -306,6 +306,7 @@ export function normalizeChat(body: unknown): Chat {
   return {
     id: requireRecordId(record, "Chat"),
     agentId: stringField(record, ["agentId", "agent_id"]),
+    memberIds: stringList(record.memberIds ?? record.member_ids),
     profileId: profile || null,
     title: stringField(record, ["title"], "Untitled chat") || "Untitled chat",
     createdAt,
@@ -351,6 +352,7 @@ export function normalizeMessage(body: unknown): ChatMessage {
   const toolCallId = stringField(record, ["toolCallId", "tool_call_id"]);
   const name = stringField(record, ["name"]);
   const profileId = stringField(record, ["profileId", "profile_id"]);
+  const agentId = stringField(record, ["agentId", "agent_id"]);
   return {
     id: requireRecordId(record, "Message"),
     chatId: stringField(record, ["chatId", "chat_id"]),
@@ -361,6 +363,7 @@ export function normalizeMessage(body: unknown): ChatMessage {
     ...(toolCallId ? { toolCallId } : {}),
     ...(name ? { name } : {}),
     ...(profileId ? { profileId } : {}),
+    ...(agentId ? { agentId } : {}),
     ...(usage ? { usage } : {}),
   };
 }
@@ -606,11 +609,17 @@ export function normalizeQueuedMessage(body: unknown): QueuedMessage {
 }
 
 /** One `GET /api/chats/:id/events` message. Unknown names return null. */
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.trim() !== "");
+}
+
 export function normalizeChatEvent(event: string, data: unknown): ChatEvent | null {
   const record = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : {};
   if (event === "status") {
     const queued = Array.isArray(record.queued) ? record.queued.map(normalizeQueuedMessage) : [];
-    return { type: "status", running: record.running === true, queued };
+    const agentId = stringField(record, ["agentId"]);
+    return { type: "status", running: record.running === true, queued, ...(agentId ? { agentId } : {}) };
   }
   if (event === "message" && record.message) {
     const queuedId = stringField(record, ["queuedId"]);
