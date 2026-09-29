@@ -153,6 +153,7 @@ export function normalizeProfile(body: unknown): ModelProfile {
   if (available !== undefined) profile.available = available;
   if (typeof record.unavailableReason === "string") profile.unavailableReason = record.unavailableReason;
   if (typeof record.cli === "string") profile.cli = record.cli;
+  if (record.defaultModel === true) profile.defaultModel = true;
   return profile;
 }
 

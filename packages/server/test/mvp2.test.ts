@@ -210,11 +210,20 @@ describe("CLI profiles", () => {
       BOTANICAL_PROFILES: JSON.stringify([
         { id: "grok", name: "Grok", provider: "xai", model: "grok-4" },
         { id: "grok-build", kind: "cli", cli: "grok", label: "Grok Build", bin: "/no/such/grok-binary" },
+        { id: "grok-fast", kind: "cli", cli: "grok", label: "Grok fast", model: "grok-code-fast-1", bin: "/no/such/grok-binary" },
       ]),
     });
     const { token } = await login(app);
     const profiles = await readJson<{
-      profiles: { id: string; kind: string; available: boolean; unavailableReason?: string; provider: string }[];
+      profiles: {
+        id: string;
+        kind: string;
+        available: boolean;
+        unavailableReason?: string;
+        provider: string;
+        model: string;
+        defaultModel?: boolean;
+      }[];
       defaultProfileId: null;
     }>(await app.fetch(new Request("http://localhost/api/profiles", { headers: bearer(token) })));
     expect(profiles.defaultProfileId).toBeNull();
@@ -222,6 +231,11 @@ describe("CLI profiles", () => {
     expect(cli).toMatchObject({ kind: "cli", provider: "cli", available: false });
     expect(cli?.unavailableReason).toContain("/no/such/grok-binary");
     expect(profiles.profiles.find((profile) => profile.id === "grok")?.available).toBe(true);
+    // Only a CLI profile without a pinned model leaves the model to the CLI.
+    expect(cli?.defaultModel).toBe(true);
+    expect(profiles.profiles.find((profile) => profile.id === "grok-fast")).toMatchObject({ model: "grok-code-fast-1" });
+    expect(profiles.profiles.find((profile) => profile.id === "grok-fast")?.defaultModel).toBeUndefined();
+    expect(profiles.profiles.find((profile) => profile.id === "grok")?.defaultModel).toBeUndefined();
 
     const headers = { "content-type": "application/json", ...bearer(token) };
     const agent = await readJson<{ agent: { id: string } }>(
