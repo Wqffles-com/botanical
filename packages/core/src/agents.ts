@@ -48,6 +48,22 @@ export function isAgentPicture(value: unknown): value is string {
   return typeof value === "string" && value.length <= AGENT_PICTURE_MAX && AGENT_PICTURE_PATTERN.test(value);
 }
 
+/**
+ * Botanical's own tools: memory, the agent directory, and messaging. New and
+ * example agents allowlist them, so every chat can reach them, including a
+ * coding CLI through the `botanical` MCP server (issue #92). Roles still apply.
+ */
+export const PLATFORM_TOOLS = [
+  "memory_write",
+  "memory_search",
+  "memory_list",
+  "memory_delete",
+  "agent_list",
+  "agent_create",
+  "notify_user",
+  "send_agent_message",
+] as const;
+
 /** Stable timestamp for the example rows so list order is by id. */
 export const EXAMPLE_AGENTS_CREATED_AT = "2026-09-24T00:00:00.000Z";
 
@@ -63,7 +79,7 @@ export interface ExampleAgent {
 
 /**
  * Three starter agents. Postgres seed SQL in packages/db/sql/seed-agents.sql
- * must stay in lockstep with these ids, names, icons, colors, and prompts.
+ * must stay in lockstep with these ids, names, icons, colors, prompts, and tools.
  * `defaultProfileId` is intentionally absent: a chat still needs an explicit pick.
  */
 export const EXAMPLE_AGENTS: readonly ExampleAgent[] = [
@@ -75,7 +91,7 @@ export const EXAMPLE_AGENTS: readonly ExampleAgent[] = [
     description: "Tends the plots and keeps everyday work in order.",
     prompt:
       "You are Gardener. Help with plans, notes, and everyday tasks. Be precise and calm. Use tools when they add facts. The user picks the model profile for each chat.",
-    tools: ["web_search", "web_fetch"],
+    tools: ["web_search", "web_fetch", ...PLATFORM_TOOLS],
   },
   {
     id: "22222222-2222-4222-8222-222222222222",
@@ -85,7 +101,7 @@ export const EXAMPLE_AGENTS: readonly ExampleAgent[] = [
     description: "Writes and repairs code.",
     prompt:
       "You are Builder, a software agent. Prefer working code over essays. Read files before editing them. Ask before destructive commands.",
-    tools: ["shell", "code_exec", "file_read", "file_write", "file_list"],
+    tools: ["shell", "code_exec", "file_read", "file_write", "file_list", ...PLATFORM_TOOLS],
   },
   {
     id: "33333333-3333-4333-8333-333333333333",
@@ -95,7 +111,7 @@ export const EXAMPLE_AGENTS: readonly ExampleAgent[] = [
     description: "Searches, fetches, and cites.",
     prompt:
       "You are Scout. Search and fetch before answering. Cite what you found and say what is still unknown.",
-    tools: ["web_search", "web_fetch"],
+    tools: ["web_search", "web_fetch", ...PLATFORM_TOOLS],
   },
 ];
 

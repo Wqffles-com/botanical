@@ -76,7 +76,10 @@ const STDERR_LIMIT = 4_000;
  * on every exit path, and a pre-existing Grok project config is restored.
  */
 export async function* runCli(input: RunCliInput): AsyncGenerator<CliStreamEvent> {
-  const prompt = renderCliPrompt(input.messages, { botanicalTools: Boolean(input.mcp) });
+  const prompt = renderCliPrompt(input.messages, {
+    botanicalTools: Boolean(input.mcp),
+    ...(input.mcp?.tools ? { toolNames: input.mcp.tools } : {}),
+  });
   const plan = prepareCliLaunch({
     cli: input.cli,
     cwd: input.cwd,

@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
-import { currentUserId, runAsUser } from "@botanical/db";
+import { runAsUser } from "@botanical/db";
 
 import {
   collectTools,
@@ -23,6 +23,8 @@ import type { Router } from "./router.ts";
  * Per-run streamable HTTP MCP endpoint. Not a public API route and not
  * accepted with the session cookie — only the run's bearer token.
  * v0 has one operator and no tenant id, so the principal is `"local"`.
+ * Each run is bound to the user who started the turn, and every request on it
+ * runs as that user, so the store scopes agents, memory, and chats to them.
  */
 export const CLI_MCP_PATH = "/internal/mcp/runs";
 
@@ -36,7 +38,7 @@ interface ToolRun {
   agentId: string;
   chatId: string;
   principal: typeof PRINCIPAL;
-  userId: string | null;
+  userId: string;
   signal?: AbortSignal;
   listeners: Set<(event: CliToolCallEvent) => void>;
 }
@@ -50,7 +52,8 @@ export interface CliToolSession {
 }
 
 export interface CliToolHost {
-  open(input: { agentId: string; chatId: string; signal?: AbortSignal }): CliToolSession;
+  /** Throws when `userId` is blank: a run never falls back to an unscoped store. */
+  open(input: { agentId: string; chatId: string; userId: string; signal?: AbortSignal }): CliToolSession;
   size(): number;
   handle(request: Request, runId: string, config: ServerConfig): Promise<Response>;
 }
@@ -70,6 +73,8 @@ export function createCliToolHost(options: {
 
   return {
     open(input) {
+      const userId = input.userId.trim();
+      if (!userId) throw new Error("A CLI tool run needs the acting user");
       const runId = randomUUID();
       const token = randomBytes(32).toString("base64url");
       const run: ToolRun = {
@@ -78,7 +83,7 @@ export function createCliToolHost(options: {
         agentId: input.agentId,
         chatId: input.chatId,
         principal: PRINCIPAL,
-        userId: currentUserId(),
+        userId,
         ...(input.signal ? { signal: input.signal } : {}),
         listeners: new Set(),
       };
@@ -109,7 +114,7 @@ export function createCliToolHost(options: {
     handle(request, runId, config) {
       const run = runs.get(runId);
       const work = () => handleRun(options.getDeps, runs, request, runId, config);
-      return run?.userId ? runAsUser(run.userId, work) : work();
+      return run ? runAsUser(run.userId, work) : work();
     },
   };
 }
@@ -196,7 +201,8 @@ function bearerMatches(expected: string, presented: string): boolean {
 
 async function listTools(deps: RuntimeDeps, run: ToolRun): Promise<Array<Record<string, unknown>>> {
   const agent = await deps.store.agents.get(run.agentId);
-  if (!agent) return [];
+  // An empty list reads as "no tools" to the CLI. A missing agent is a fault.
+  if (!agent) throw new Error(`Agent ${run.agentId} not found for this run`);
   const catalog = await collectTools(deps.toolSources);
   const visible = catalog.filter((tool) => toolAccess(agent, tool).ok);
   const names = facingNames(visible);
@@ -253,7 +259,15 @@ function resolveToolName(agent: AgentRecord, catalog: readonly ListedTool[], req
   return invert(facingNames(catalog)).get(requested) ?? requested;
 }
 
-function facingNames(tools: readonly ListedTool[]): Map<string, string> {
+/**
+ * Names `tools/list` serves for these tools, in order. `tools` must be the
+ * agent's visible catalog in catalog order, as the agent loop sends it.
+ */
+export function cliToolNames(tools: readonly { name: string }[]): string[] {
+  return [...facingNames(tools).values()];
+}
+
+function facingNames(tools: readonly { name: string }[]): Map<string, string> {
   const used = new Set<string>();
   const names = new Map<string, string>();
   for (const tool of tools) {
@@ -269,7 +283,7 @@ function facingNames(tools: readonly ListedTool[]): Map<string, string> {
   return names;
 }
 
-function modelFacingName(tool: ListedTool): string {
+function modelFacingName(tool: { name: string }): string {
   const parsed = parseToolName(tool.name);
   if (!parsed) return tool.name;
   return providerToolName(parsed.serverId, parsed.toolName);

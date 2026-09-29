@@ -22,6 +22,7 @@ export {
   isAgentIcon,
   isAgentPicture,
   isAgentShape,
+  PLATFORM_TOOLS,
 } from "./agents";
 export type { AgentColor, AgentShape, ExampleAgent } from "./agents";
 export { BotanicalClient } from "./client";

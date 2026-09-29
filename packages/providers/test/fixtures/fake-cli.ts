@@ -57,6 +57,8 @@ if (mode === "capture") {
     process.stdout.write(`MCP_ENVREF:${text.includes("${BOTANICAL_MCP_TOKEN}") ? "yes" : "no"}\n`);
     process.stdout.write(`MCP_LEAK:${token.length > 0 && text.includes(token) ? "yes" : "no"}\n`);
     process.stdout.write(`MCP_MODE:${(statSync(mcpPath).mode & 0o777).toString(8)}\n`);
+    const server = JSON.parse(text)?.mcpServers?.botanical;
+    process.stdout.write(`MCP_ALWAYS_LOAD:${server?.alwaysLoad === true ? "yes" : "no"}\n`);
   }
   process.stdout.write(`TOKEN_ENV:${token.length > 0 ? "ok" : "missing"}\n`);
   process.exit(0);
@@ -69,6 +71,10 @@ if (mode === "mcp-call") {
   const token = process.env.BOTANICAL_MCP_TOKEN ?? "";
   const runId = url.split("/").filter(Boolean).pop() ?? "";
   process.stdout.write(`RUN_ID:${runId}\n`);
+  const promptIndex = args.indexOf("--prompt-file");
+  const promptPath = promptIndex >= 0 ? args[promptIndex + 1] : undefined;
+  const prompt = promptPath ? readFileSync(promptPath, "utf8") : "";
+  process.stdout.write(`PROMPT_TOOLS:${/has these Botanical tools: ([^.]*)\./.exec(prompt)?.[1] ?? "none"}\n`);
   if (!url || !token) {
     console.error("missing mcp url or token");
     process.exit(2);

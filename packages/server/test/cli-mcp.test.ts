@@ -36,6 +36,14 @@ function rpc(
   );
 }
 
+async function signIn(app: ReturnType<typeof setup>["app"], email?: string): Promise<{ token: string; userId: string }> {
+  const { token } = await login(app, undefined, email ? { email } : undefined);
+  const me = await readJson<{ user: { id: string } }>(
+    await app.fetch(new Request("http://localhost/api/auth/me", { headers: bearer(token) })),
+  );
+  return { token, userId: me.user.id };
+}
+
 const initialize = {
   jsonrpc: "2.0",
   id: 1,
@@ -45,7 +53,9 @@ const initialize = {
 
 describe("per-run CLI MCP", () => {
   test("auth, initialize, role-filtered list, memory call, and revocation", async () => {
-    const { app, store } = setup();
+    const { app, store: shared } = setup();
+    const { token, userId } = await signIn(app);
+    const store = shared.forUser(userId);
     const ada = await store.agents.create({
       name: "Ada",
       description: "",
@@ -53,7 +63,7 @@ describe("per-run CLI MCP", () => {
       toolIds: ["memory_write", "memory_search", "file_read"],
     });
     const chat = await store.chats.create({ agentId: ada.id, profileId: "grok", title: "CLI" });
-    const session = app.cliTools.open({ agentId: ada.id, chatId: chat.id });
+    const session = app.cliTools.open({ agentId: ada.id, chatId: chat.id, userId });
 
     expect((await rpc(app, session.runId, null, initialize)).status).toBe(401);
     expect((await rpc(app, session.runId, "not-the-token", initialize)).status).toBe(401);
@@ -108,7 +118,7 @@ describe("per-run CLI MCP", () => {
       toolIds: ["memory_write", "memory_search", "file_read", "shell"],
       roleIds: [BUILTIN_ROLE_IDS.Reviewer],
     });
-    const denied = app.cliTools.open({ agentId: reviewer.id, chatId: chat.id });
+    const denied = app.cliTools.open({ agentId: reviewer.id, chatId: chat.id, userId });
     const deniedList = await readJson<{ result: { tools: { name: string }[] } }>(
       await rpc(app, denied.runId, denied.token, { jsonrpc: "2.0", id: 5, method: "tools/list" }),
     );
@@ -132,7 +142,6 @@ describe("per-run CLI MCP", () => {
     const visible = await store.memories.listVisible(reviewer.id, { limit: 20 });
     expect(visible.some((row) => row.content === "should not stick")).toBe(false);
 
-    const { token } = await login(app);
     const cookieOnly = await app.fetch(
       new Request(`http://localhost${CLI_MCP_PATH}/${session.runId}`, {
         method: "POST",
@@ -170,7 +179,9 @@ describe("per-run CLI MCP", () => {
       },
     };
     registry.register(notes);
-    const { app, store } = setup({}, { toolRegistry: registry, installPlatformTools: true });
+    const { app, store: shared } = setup({}, { toolRegistry: registry, installPlatformTools: true });
+    const { userId } = await signIn(app);
+    const store = shared.forUser(userId);
     const ada = await store.agents.create({
       name: "Ada",
       description: "",
@@ -178,7 +189,7 @@ describe("per-run CLI MCP", () => {
       toolIds: ["mcp.notes.search", "memory_write"],
     });
     const chat = await store.chats.create({ agentId: ada.id, profileId: "grok", title: "notes" });
-    const session = app.cliTools.open({ agentId: ada.id, chatId: chat.id });
+    const session = app.cliTools.open({ agentId: ada.id, chatId: chat.id, userId });
     const listed = await readJson<{ result: { tools: { name: string }[] } }>(
       await rpc(app, session.runId, session.token, { jsonrpc: "2.0", id: 1, method: "tools/list" }),
     );
@@ -194,6 +205,52 @@ describe("per-run CLI MCP", () => {
     expect(called.result.isError).toBe(false);
     expect(called.result.content[0]?.text).toBe("called mcp.notes.search");
     session.close();
+  });
+
+  test("a run is scoped to its user, and a missing agent is an error, not an empty list", async () => {
+    const { app, store: shared } = setup();
+    const owner = await signIn(app);
+    const member = await signIn(app, "member@example.com");
+    const store = shared.forUser(member.userId);
+    const fern = await store.agents.create({
+      name: "Fern",
+      description: "",
+      systemPrompt: "Fern",
+      toolIds: ["memory_write", "memory_search"],
+    });
+    const chat = await store.chats.create({ agentId: fern.id, profileId: "grok", title: "CLI" });
+
+    expect(() => app.cliTools.open({ agentId: fern.id, chatId: chat.id, userId: " " })).toThrow(/acting user/);
+    expect(app.cliTools.size()).toBe(0);
+
+    const session = app.cliTools.open({ agentId: fern.id, chatId: chat.id, userId: member.userId });
+    const listed = await readJson<{ result: { tools: { name: string }[] } }>(
+      await rpc(app, session.runId, session.token, { jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    );
+    expect(listed.result.tools.map((tool) => tool.name).sort()).toEqual(["memory_search", "memory_write"]);
+    const called = await readJson<{ result: { isError: boolean; content: { text: string }[] } }>(
+      await rpc(app, session.runId, session.token, {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: { name: "memory_write", arguments: { scope: "agent", content: "member fern" } },
+      }),
+    );
+    expect(called.result.isError).toBe(false);
+    const memories = await store.memories.listVisible(fern.id, { limit: 10 });
+    expect(memories.some((memory) => memory.content === "member fern")).toBe(true);
+
+    // The owner's scope cannot see the member's agent.
+    const foreign = app.cliTools.open({ agentId: fern.id, chatId: chat.id, userId: owner.userId });
+    const missing = await readJson<{ error?: { code: number; message: string }; result?: unknown }>(
+      await rpc(app, foreign.runId, foreign.token, { jsonrpc: "2.0", id: 3, method: "tools/list" }),
+    );
+    expect(missing.result).toBeUndefined();
+    expect(missing.error?.code).toBe(-32603);
+    expect(missing.error?.message).toContain("not found");
+
+    session.close();
+    foreign.close();
   });
 
   test("a CLI turn calls memory through the endpoint and revokes the token", async () => {
@@ -220,7 +277,9 @@ describe("per-run CLI MCP", () => {
     });
     process.env.BOTANICAL_INTERNAL_URL = `http://127.0.0.1:${server.port}`;
     try {
-      const { token } = await login(app);
+      // The first account owns legacy rows. The turn runs as a second user (issue #92).
+      await signIn(app);
+      const { token, userId } = await signIn(app, "member@example.com");
       const headers = { "content-type": "application/json", ...bearer(token) };
       const agentResponse = await app.fetch(
         new Request("http://localhost/api/agents", {
@@ -261,10 +320,8 @@ describe("per-run CLI MCP", () => {
       const tool = messages.messages.find((message) => message.role === "tool");
       expect(tool?.name).toBe("memory_write");
       expect(tool?.content).toContain("\"id\"");
-      const me = await readJson<{ user: { id: string } }>(
-        await app.fetch(new Request("http://localhost/api/auth/me", { headers: bearer(token) })),
-      );
-      const memories = await runAsUser(me.user.id, () => store.memories.listVisible(agentId, { limit: 10 }));
+      expect(assistant?.content).toContain("PROMPT_TOOLS:memory_write, memory_search");
+      const memories = await runAsUser(userId, () => store.memories.listVisible(agentId, { limit: 10 }));
       expect(memories.some((memory) => memory.content === "fern from cli" && memory.agentId === agentId)).toBe(true);
       const runId = /RUN_ID:([^\s]+)/.exec(assistant?.content ?? "")?.[1] ?? "";
       expect(runId.length).toBeGreaterThan(0);
