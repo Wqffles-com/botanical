@@ -35,6 +35,15 @@ export const CLI_MCP_SERVER_NAME = "botanical";
  */
 export const GROK_FOLDER_TRUST_ENV = { GROK_FOLDER_TRUST: "0" } as const;
 
+/**
+ * Claude Code defers MCP tools behind `ToolSearch` by default: the model sees
+ * only `mcp__botanical__*` names and must load each schema before calling it.
+ * Headless turns often skip that step and report the tool as unavailable
+ * (issue #69). Botanical exposes a small catalog, so load it up front.
+ * https://code.claude.com/docs/en/mcp (`ENABLE_TOOL_SEARCH`)
+ */
+export const CLAUDE_TOOL_SEARCH_ENV = { ENABLE_TOOL_SEARCH: "false" } as const;
+
 export interface CliMcpTarget {
   url: string;
   token: string;
@@ -90,6 +99,7 @@ export function prepareCliLaunch(input: {
         ? {
             [CLI_MCP_TOKEN_ENV]: input.mcp.token,
             ...(input.cli === "grok" ? GROK_FOLDER_TRUST_ENV : {}),
+            ...(input.cli === "claude" ? CLAUDE_TOOL_SEARCH_ENV : {}),
           }
         : {},
       cleanup() {

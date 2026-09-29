@@ -15,7 +15,7 @@ export function renderCliPrompt(
 ): string {
   const parts: string[] = [
     options?.botanicalTools
-      ? 'You are running headless inside Botanical. Botanical tools and the user\'s MCP servers are available from the MCP server named "botanical" (for example memory_write). Use those when the task needs Botanical state. Your own tools still run in this working directory. Botanical will not answer permission prompts.'
+      ? 'You are running headless inside Botanical. Botanical tools and the user\'s MCP servers are available from the MCP server named "botanical" (for example memory_write; Claude Code names it mcp__botanical__memory_write). Use those, not local files, when the task needs Botanical state such as memory. Your own tools still run in this working directory. Botanical will not answer permission prompts.'
       : "You are running headless inside Botanical. Use your own tools in this working directory. Botanical does not call tools for you and will not answer permission prompts.",
   ];
   for (const message of messages) {

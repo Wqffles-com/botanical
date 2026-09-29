@@ -270,6 +270,17 @@ describe("CLI prompt and MCP config", () => {
     expect(claude.join("\0")).not.toContain(marker);
     expect(claude.join("\0")).not.toContain("http://127.0.0.1:9/internal/mcp/runs/abc");
 
+    // Issue #69: deferred MCP tools read as "unavailable" to headless turns.
+    const claudePlan = prepareCliLaunch({
+      cli: "claude",
+      cwd: "/work",
+      prompt: "hello",
+      mcp: { url: "http://127.0.0.1:9/internal/mcp/runs/abc", token: "t" },
+    });
+    expect(claudePlan.env.ENABLE_TOOL_SEARCH).toBe("false");
+    claudePlan.cleanup();
+    expect(prepareCliLaunch({ cli: "claude", cwd: "/work", prompt: "hello" }).env.ENABLE_TOOL_SEARCH).toBeUndefined();
+
     const codex = buildCliArgs({
       cli: "codex",
       cwd: "/work",
