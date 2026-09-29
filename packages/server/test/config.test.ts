@@ -22,11 +22,11 @@ describe("loadConfig", () => {
     expect(config.deploymentMode).toBe("SELF_HOST");
     expect(config.brandName).toBe("Botanical");
     expect(config.databaseUrl).toBeUndefined();
-    expect(config.a2aAutorun).toBe(false);
+    expect(config.a2aAutorun).toBe(true);
   });
 
-  test("A2A autorun is opt-in", () => {
-    expect(loadConfig(baseEnv({ BOTANICAL_A2A_AUTORUN: "true" })).a2aAutorun).toBe(true);
+  test("A2A autorun can be disabled", () => {
+    expect(loadConfig(baseEnv({ BOTANICAL_A2A_AUTORUN: "false" })).a2aAutorun).toBe(false);
     expect(() => loadConfig(baseEnv({ BOTANICAL_A2A_AUTORUN: "yes" }))).toThrow(/BOTANICAL_A2A_AUTORUN/);
   });
 
