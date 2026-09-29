@@ -202,6 +202,14 @@ function Update-GeneratedSecrets {
 
   $pw = Get-EnvValue 'POSTGRES_PASSWORD'
   if (Test-Placeholder $pw) {
+    # Postgres only reads POSTGRES_PASSWORD when it initializes an empty volume.
+    $volume = "${project}_botanical_pg"
+    & docker volume inspect $volume 1>$null 2>$null
+    if ($LASTEXITCODE -eq 0) {
+      Write-StartError ("start.ps1: volume $volume already exists but .env has no POSTGRES_PASSWORD, so a new one would not match the database.`n" +
+        "Copy POSTGRES_PASSWORD (and DATABASE_URL) from the .env that created it, set COMPOSE_PROJECT_NAME to a new name, " +
+        "or remove the volume with: docker volume rm $volume")
+    }
     $pw = Get-HexSecret 24
     Set-EnvValue 'POSTGRES_PASSWORD' $pw
     Write-Host 'Generated POSTGRES_PASSWORD'
@@ -301,7 +309,6 @@ function Wait-ForWeb([string]$Port) {
 
 Test-DockerReady
 Copy-EnvExampleIfMissing
-Update-GeneratedSecrets
 
 if ($ShellProject) {
   $project = $ShellProject
@@ -313,6 +320,8 @@ $env:COMPOSE_PROJECT_NAME = $project
 if ([string]::IsNullOrEmpty((Get-EnvValue 'COMPOSE_PROJECT_NAME'))) {
   Set-EnvValue 'COMPOSE_PROJECT_NAME' $project
 }
+
+Update-GeneratedSecrets
 
 $IncludeCli = Read-UserSettings
 $webPort = Get-EnvValue 'WEB_PORT'
