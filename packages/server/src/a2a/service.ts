@@ -6,13 +6,14 @@ import {
   type AgentMessageBus,
   type AgentMessageRecord,
   type AgentRepository as RuntimeAgentRepository,
+  type RuntimeDeps,
 } from "@botanical/agent-runtime";
-import { createMockProvider } from "@botanical/providers";
 
 import { HttpError } from "../http.ts";
 import { ensureAgentChat, findAgentChat } from "../runtime/agent-chat.ts";
 import type { Agent, AgentMessage, AgentMessageStatus, Message, ModelProfile, Store } from "../types.ts";
 import { AGENT_MESSAGE_STATUSES } from "../types.ts";
+import { collectChatTurn } from "../runtime/turn.ts";
 import { A2A_BODY_MAX } from "./constants.ts";
 
 const DELIVER_BATCH = 100;
@@ -50,6 +51,8 @@ export interface A2AServiceOptions {
   store: Store;
   autorun: boolean;
   profiles: readonly ModelProfile[];
+  /** Runs the recipient's real agent turn. Resolved lazily: the runtime is built after this service. */
+  runtime: () => RuntimeDeps;
   /** Serialize inbox writes with any other turn on the same chat. */
   exclusive?: <T>(chatId: string, fn: () => Promise<T>) => Promise<T>;
   /** Told about each message an inbox turn stores, so an open chat shows it. */
@@ -59,18 +62,18 @@ export interface A2AServiceOptions {
 /**
  * A2A API on top of the agent-runtime bus.
  * `send` persists a pending row, then delivers it. When `autorun` is set,
- * the recipient gets one background turn in its own chat (one chat per agent).
- * That turn does not call tools, so it cannot fan out more mail.
+ * the recipient is woken with a real agent turn in its own chat (one chat per agent),
+ * with the rendered inbox as the user message.
  */
 export function createA2AService(options: A2AServiceOptions): A2AService {
-  const { store, autorun, profiles, exclusive, onMessage } = options;
+  const { store, autorun, profiles, runtime, exclusive, onMessage } = options;
   const bus = createAgentMessageBus(runtimeAgents(store), store.agentMessages);
   let tail: Promise<void> = Promise.resolve();
 
   function schedule(agentId: string): void {
     if (!autorun) return;
     tail = tail
-      .then(() => runInboxTurn(store, bus, profiles, agentId, exclusive, onMessage))
+      .then(() => runInboxTurn(store, bus, profiles, runtime, agentId, exclusive, onMessage))
       .catch((error: unknown) => {
         console.error("[a2a] inbox turn failed", error);
       });
@@ -185,6 +188,7 @@ async function runInboxTurn(
   store: Store,
   bus: AgentMessageBus,
   profiles: readonly ModelProfile[],
+  runtime: () => RuntimeDeps,
   agentId: string,
   exclusive?: <T>(chatId: string, fn: () => Promise<T>) => Promise<T>,
   onMessage?: (message: Message) => void,
@@ -218,10 +222,12 @@ async function runInboxTurn(
 
       const content = renderInbox(claimed, names);
       const write = async () => {
-        onMessage?.(await store.messages.create({ chatId: chatId!, role: "user", content }));
-        const reply = await completeInbox(profile, content, claimed.length);
-        onMessage?.(await store.messages.create({ chatId: chatId!, role: "assistant", content: reply, agentId }));
-        await store.chats.update(chatId!, {});
+        const chat = await store.chats.get(chatId!);
+        if (!chat) throw new Error("Inbox chat not found");
+        const result = await collectChatTurn(store, runtime(), { chat, content, profile });
+        onMessage?.(result.userMessage);
+        if (result.assistantMessage) onMessage?.(result.assistantMessage);
+        if (result.error) throw new Error(result.error.message);
       };
       if (exclusive) await exclusive(chatId, write);
       else await write();
@@ -268,23 +274,6 @@ async function resolveInboxProfile(
   // The agent's own chat keeps the profile it last ran on; before its first chat, the agent's default.
   const own = await findAgentChat(store, agent.id);
   return known(own?.profileId ?? undefined) ?? known(readDefaultProfileId(agent));
-}
-
-async function completeInbox(profile: ModelProfile, content: string, count: number): Promise<string> {
-  if (profile.provider !== "mock") {
-    return `Inbox turn recorded. Profile ${profile.id} (${profile.provider}/${profile.model}) was selected explicitly. ${count} message(s) received.`;
-  }
-  const provider = createMockProvider(profile.id, {
-    reply: () => `Acknowledged ${count} inbox message(s).`,
-  });
-  let text = "";
-  for await (const event of provider.complete({
-    model: profile.model,
-    messages: [{ role: "user", content }],
-  })) {
-    if (event.type === "text-delta") text += event.text;
-  }
-  return text || `Acknowledged ${count} inbox message(s).`;
 }
 
 function readDefaultProfileId(agent: Agent): string | undefined {

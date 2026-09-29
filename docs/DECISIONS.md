@@ -108,7 +108,7 @@ Botanical is meant to run **always on, on a server the user controls** (their ow
 
 The point is that agents keep working while the user is away:
 
-- **Today:** agent-to-agent messages can start background turns for the recipient (`BOTANICAL_A2A_AUTORUN=true`), and all state lives in Postgres on the server.
+- **Today:** agent-to-agent messages wake the recipient with a real agent turn (`BOTANICAL_A2A_AUTORUN`, on by default), and all state lives in Postgres on the server.
 - **Shipped 2026-09-28:** routines and generic webhook listeners. Typed forge listeners stay planned. See the entry below and [ROADMAP.md](./ROADMAP.md).
 
 Consequences: docs and quickstarts lead with deploying to a server. Features should assume a long-running process and must not depend on an open browser tab.

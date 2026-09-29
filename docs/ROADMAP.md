@@ -13,7 +13,7 @@ Botanical is in early alpha. This page separates what already ships from what is
 - Custom agents with name, description, Lucide icon, color, prompt, and tool allowlist.
 - **One chat per agent**: each agent has a single chat, opened from the sidebar. Routine runs, webhook deliveries, and agent mail land there too. Long chats stay usable: a context window, automatic and manual compaction into a summary, and a clear action.
 - **Group chats**: start a separate chat with several agents. Each answers in turn and reads the others' replies, or only the agents you `@mention` answer. An agent can hand off by mentioning another.
-- Async agent-to-agent messaging with an inbox. `@Name` in a chat mails the mentioned agent, with composer autocomplete. Optional autorun (`BOTANICAL_A2A_AUTORUN=true`) starts a background turn for the recipient.
+- Async agent-to-agent messaging with an inbox. `@Name` in a chat mails the mentioned agent, with composer autocomplete. Autorun (on by default; `BOTANICAL_A2A_AUTORUN=false` disables it) wakes the recipient with a real agent turn.
 - Shared and per-agent memory.
 - Agents that create agents, limited to their own permissions.
 - Roles and permissions over tools and MCP servers, enforced at dispatch.

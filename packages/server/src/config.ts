@@ -172,7 +172,7 @@ export function loadConfig(
       max: 5_000_000,
       name: "BOTANICAL_MAX_BODY_BYTES",
     }),
-    a2aAutorun: parseBool(env.BOTANICAL_A2A_AUTORUN, "BOTANICAL_A2A_AUTORUN", false),
+    a2aAutorun: parseBool(env.BOTANICAL_A2A_AUTORUN, "BOTANICAL_A2A_AUTORUN", true),
     dictation: loadDictation(env),
     publicOrigin: parsePublicOrigin(env.BOTANICAL_PUBLIC_ORIGIN),
   };

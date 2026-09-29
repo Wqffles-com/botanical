@@ -95,7 +95,7 @@ The turn runs through `@botanical/agent-runtime`. The agent's `systemPrompt` is 
 
 Messages live in `store.agentMessages`. With `DATABASE_URL` unset that repository is in memory. When packages/db returns the same methods, those rows persist in Postgres `agent_messages`.
 
-Set `BOTANICAL_A2A_AUTORUN=true` to run one background turn for the recipient in a chat titled `Inbox`. The turn records the mail and an acknowledgement. It does not call tools. The profile is the inbox chat's profile, the agent's `defaultProfileId` when that field exists and is configured, or the profile on the recipient's newest other chat. There is still no silent global default: with no explicit profile the message stays `delivered` and no chat is created.
+A2A mail wakes the recipient by default: it gets a real agent turn (tools included) in its own chat, with the mail as the user message. Set `BOTANICAL_A2A_AUTORUN=false` to only queue mail. The profile is the inbox chat's profile, the agent's `defaultProfileId` when that field exists and is configured, or the profile on the recipient's newest other chat. There is still no silent global default: with no explicit profile the message stays `delivered` and no chat is created.
 
 During a turn the built-in `send_agent_message` tool sends mail when that id is on the agent's allowlist. The sender is the chat's agent.
 

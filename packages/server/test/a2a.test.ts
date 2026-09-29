@@ -242,8 +242,8 @@ describe("agent messages", () => {
     expect(inbox.messages).toEqual([expect.objectContaining({ body: "Beds are dry.", status: "delivered" })]);
   });
 
-  test("autorun is off unless BOTANICAL_A2A_AUTORUN is set", async () => {
-    const { app } = appWith();
+  test("autorun is off when BOTANICAL_A2A_AUTORUN=false", async () => {
+    const { app } = appWith({ BOTANICAL_A2A_AUTORUN: "false" });
     const { token } = await login(app);
     const from = await createAgent(app, token, { name: "Scout" });
     const to = await createAgent(app, token, { name: "Keeper" });
@@ -300,7 +300,7 @@ describe("agent messages", () => {
     expect(joined).toContain("Second note");
     expect(joined).toContain("Asynchronous messages from other agents");
     expect(transcript.messages.some((message) => message.role === "assistant")).toBe(true);
-    expect(joined).toContain("Profile grok");
+    expect(joined).toContain("Reply from grok-4");
 
     const mail = await readJson<{ messages: { status: string }[] }>(
       await app.fetch(
@@ -336,7 +336,7 @@ describe("agent messages", () => {
     expect(mail.messages.map((message) => message.status)).toEqual(["delivered"]);
   });
 
-  test("mock autorun acknowledges through the mock provider", async () => {
+  test("autorun wakes the recipient with a real turn", async () => {
     const { app } = appWith({ BOTANICAL_A2A_AUTORUN: "true" });
     const { token } = await login(app);
     const from = await createAgent(app, token, { name: "Scout" });
@@ -358,7 +358,7 @@ describe("agent messages", () => {
       await app.fetch(new Request(`http://localhost/api/chats/${inbox?.id}/messages`, { headers: bearer(token) })),
     );
     const assistant = transcript.messages.find((message) => message.role === "assistant");
-    expect(assistant?.content).toBe("Acknowledged 1 inbox message(s).");
+    expect(assistant?.content).toContain("Ping");
     const notes = await readJson<{ notifications: { kind: string }[]; unreadCount: number }>(
       await app.fetch(new Request("http://localhost/api/notifications", { headers: bearer(token) })),
     );

@@ -111,16 +111,20 @@ export function createApp(deps: AppDeps): App {
   const turns = createTurnCoordinator({
     concurrency: () => deps.store.alwaysOnSettings.peek().backgroundConcurrency,
   });
+  let runtimeDeps: RuntimeDeps | undefined;
   const a2a = createA2AService({
     store: deps.store,
     autorun: deps.config.a2aAutorun,
     profiles: deps.config.profiles,
+    runtime: () => {
+      if (!runtimeDeps) throw new Error("Runtime is not ready");
+      return runtimeDeps;
+    },
     exclusive: (chatId, fn) => turns.exclusive(chatId, fn),
     // Inbox turns land in the agent's own chat; an open thread sees them live.
     onMessage: (message) => chatQueue.broadcast(message.chatId, { event: "message", data: { message } }),
   });
   const mcp = deps.mcp ?? emptyServerMcp();
-  let runtimeDeps: RuntimeDeps | undefined;
   const cliTools = createCliToolHost({
     port: deps.config.port,
     env: deps.env ?? (process.env as Env),
