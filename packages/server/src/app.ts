@@ -39,6 +39,7 @@ import { registerRoles } from "./routes/roles.ts";
 import { registerRoutines } from "./routes/routines.ts";
 import { registerTools } from "./routes/tools.ts";
 import { registerTranscription } from "./routes/transcription.ts";
+import { registerWorkspace } from "./routes/workspace.ts";
 import { createChatQueue, type ChatQueue } from "./runtime/chat-queue.ts";
 import { createBackgroundJobs } from "./runtime/jobs.ts";
 import { createTurnCoordinator, type TurnCoordinator } from "./runtime/turns.ts";
@@ -153,6 +154,7 @@ export function createApp(deps: AppDeps): App {
   registerAuth(router);
   registerAccountSettings(router);
   registerAgents(router);
+  registerWorkspace(router);
   registerRoles(router);
   registerMemories(router);
   registerChats(router);

@@ -86,6 +86,29 @@ export interface MemoryRecord {
   updatedAt: string;
 }
 
+/** One entry in an agent's workspace directory (`GET /api/agents/:id/files`). */
+export interface WorkspaceEntry {
+  name: string;
+  /** POSIX path relative to the agent's workspace. */
+  path: string;
+  type: "file" | "directory" | "symlink" | "other";
+  size: number;
+  modifiedAt: string;
+}
+
+export interface WorkspaceListing {
+  /** Directory listed, relative to the workspace. `.` is the root. */
+  path: string;
+  entries: WorkspaceEntry[];
+  truncated: boolean;
+}
+
+export interface WorkspaceFile {
+  path: string;
+  content: string;
+  bytes: number;
+}
+
 export interface RoleRecord {
   id: string;
   name: string;

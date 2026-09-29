@@ -48,7 +48,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/components/search-input.tsx` | Outline search field shared by the agents list and new-chat agent filter |
 | `packages/web/src/lib/accent.ts` | Accent names, swatches, and local cache |
 | `packages/web/src/lib/agent-picture.ts` | Browser resize of an uploaded avatar |
-| `packages/web/src/components/chat` | Thread, composer (sending stays open while the agent works), dictation, `@` agent mention autocomplete in the composer, new-chat form (pre-selects the agent's default model, optional group members), group members popover in the chat header (`chat-members-menu.tsx`), message actions (`message-actions.tsx`: copy, edit, retry, delete), agent mail rows (`inbox-message-card.tsx`) |
+| `packages/web/src/components/chat` | Thread, composer (sending stays open while the agent works), dictation, `@` agent mention autocomplete in the composer, new-chat form (pre-selects the agent's default model, optional group members), group members popover in the chat header (`chat-members-menu.tsx`), message actions (`message-actions.tsx`: copy, edit, retry, delete), agent mail rows (`inbox-message-card.tsx`), right side panel (`chat-side-panel.tsx`: Files, Memory, Details tabs) |
 | `packages/web/src/components/inbox/inbox-view.tsx` | Agent inbox |
 | `packages/web/src/components/routines` | Routine list and editor (`packages/web/src/lib/schedule.ts` humanizes cron) |
 | `packages/web/src/components/listeners` | Listener list and editor |
@@ -58,6 +58,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/components/settings/background-work-card.tsx` | Always-on scheduler and webhook limits on the general tab |
 | `packages/web/src/hooks/use-chat-thread.ts` | Thread loading, queued sends, message edit, resend, retry, and delete, and the chat events feed (reconnects and refetches after a gap) |
 | `packages/web/src/lib/chat-queue.ts` | Pending-bubble and message merge rules for the events feed |
+| `packages/web/src/lib/chat-details.ts` | Details tab counts (messages, tool calls, tokens, context length) and workspace path helpers |
 | `packages/web/src/lib/chat-members.ts` | Group chat helpers: member toggle, member cap, a reply's author |
 | `packages/web/src/lib/inbox-message.ts` | Splits an agent-mail transcript row (`renderInbox` in agent-runtime) into sender, time, body, and forwarded mention |
 | `packages/web/src/lib/mvp-api.ts` | Profiles, tools, MCP, settings fetches outside `API` |
@@ -93,5 +94,6 @@ Colocated `*.test.ts` under `packages/web/src`. Script: `bun test src`. `typeche
 - **Change group chats.** Members on the new-chat form (`packages/web/src/components/chat/new-chat-form.tsx`) and in the header (`packages/web/src/components/chat/chat-members-menu.tsx`), per-reply authors in `packages/web/src/components/chat/chat-thread.tsx`, and `setMembers` / `workingAgentId` in `packages/web/src/hooks/use-chat-thread.ts`.
 - **Change how agent mail shows in a chat.** `packages/web/src/lib/inbox-message.ts` parses the row `renderInbox` (`packages/agent-runtime/src/inbox.ts`) writes; `packages/web/src/components/chat/inbox-message-card.tsx` renders it. Keep the two formats in step.
 - **Change the provider and model picker.** Grouping and labels in `packages/web/src/lib/profile-groups.ts`, fields in `packages/web/src/components/chat/profile-select.tsx`. `GET /api/profiles` marks a CLI profile with no pinned model `defaultModel: true` (`packages/server/src/routes/profiles.ts`).
+- **Change the chat side panel.** `packages/web/src/components/chat/chat-side-panel.tsx` (tabs), `packages/web/src/lib/chat-details.ts` (Details numbers), and `packages/web/src/app/(app)/chats/[id]/page.tsx` (header toggle; an inline column from `md` up, a sheet below, open state in `localStorage` `botanical.chatPanel`). Files read `GET /api/agents/:id/files`; Memory lists shared memories and the selected agent's own. In a group chat a select picks the agent.
 - **Change message actions.** `packages/web/src/components/chat/message-actions.tsx`, the inline editor in `packages/web/src/components/chat/message-bubble.tsx`, and the handlers in `packages/web/src/hooks/use-chat-thread.ts`.
 - **Change the shell or theme.** `packages/web/src/components/app-shell.tsx`, `packages/ui/src/styles.css`, `packages/ui/src/components`.

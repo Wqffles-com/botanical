@@ -98,6 +98,9 @@ export type {
   TokenUsage,
   ToolCall,
   UpdateAgentInput,
+  WorkspaceEntry,
+  WorkspaceFile,
+  WorkspaceListing,
   UpdateAgentMessageInput,
   UpdateChatInput,
 } from "./types";
