@@ -22,6 +22,33 @@ export interface ToolDefinition {
   parameters: Record<string, unknown>;
 }
 
+/** A user message sent while a turn is running. `id` is the caller's (the chat queue id). */
+export interface SteeringMessage {
+  id: string;
+  content: string;
+}
+
+/**
+ * Messages the user sends while a turn runs. The loop takes them before each
+ * model step, so the model reads them mid-turn instead of after it.
+ */
+export interface TurnSteering {
+  /** Remove and return the messages that are waiting. */
+  take(): SteeringMessage[];
+  /** Called whenever a message starts waiting. Returns the unsubscribe function. */
+  subscribe(listener: () => void): () => void;
+}
+
+/**
+ * Live input for a provider that can accept user messages while it runs
+ * (Claude Code reads them on stdin). `take` returns the text; the loop stores
+ * what was taken. Providers without live input ignore it.
+ */
+export interface LiveInput {
+  take(): string[];
+  subscribe(listener: () => void): () => void;
+}
+
 export interface ChatRequest {
   model: string;
   messages: ChatMessage[];
@@ -34,6 +61,8 @@ export interface ChatRequest {
   /** Bound by the turn loop so a CLI profile can open a per-run tool endpoint. */
   agentId?: string;
   chatId?: string;
+  /** Set when the turn can be steered. */
+  input?: LiveInput;
 }
 
 export type ChatEvent =

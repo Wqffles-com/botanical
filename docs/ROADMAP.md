@@ -24,7 +24,7 @@ Botanical is in early alpha. This page separates what already ships from what is
 - **Routines**: cron schedules that run an agent on the server. Each run opens a new chat.
 - **Listeners**: generic inbound webhooks (`POST /api/hooks/:id`) that start an agent turn. Typed forge listeners are still planned.
 - **Notifications** when a background run finishes or fails, plus a `notify_user` tool when an agent needs attention.
-- **Async chat**: keep sending while the agent works. Messages queue on the server, a batch gets one reply, and replies arrive whole. Closing the tab does not stop the turn.
+- **Async chat**: keep sending while the agent works. A message sent mid-turn steers the running turn: the model reads it before its next step (Claude Code reads it on stdin). Replies arrive whole. Closing the tab does not stop the turn.
 
 ## In progress
 

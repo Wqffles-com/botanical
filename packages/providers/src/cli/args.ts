@@ -21,6 +21,10 @@ import type { CliName } from "./types.ts";
  *   https://developers.openai.com/codex/noninteractive
  *   https://developers.openai.com/codex/mcp
  *
+ * Claude Code reads its prompt as `--input-format stream-json` user messages,
+ * so more messages can be written to stdin while it runs (steering). stdin is
+ * closed once the CLI reports a `result`.
+ *
  * Grok uses `streaming-messages-json` plus `--include-partial-messages`
  * because that stream is Anthropic-style text deltas. ACP `streaming-json`
  * is still parsed if a binary emits it.
@@ -58,6 +62,8 @@ export function buildCliArgs(input: CliArgInput): string[] {
       ];
     case "claude":
       return [
+        "--input-format",
+        "stream-json",
         "--output-format",
         "stream-json",
         "--verbose",

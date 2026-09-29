@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { RuntimeDeps } from "@botanical/agent-runtime";
+import type { RuntimeDeps, SteeringMessage, TurnSteering } from "@botanical/agent-runtime";
 import { runAsUser } from "@botanical/db";
 
 import { HttpError } from "../http.ts";
@@ -22,7 +22,8 @@ export interface QueuedMessage {
 /**
  * Events on `GET /api/chats/:id/events`:
  * - `status` `{ running, queued }` on connect and whenever the queue or run state changes.
- * - `message` `{ message, queuedId? }` for each stored message. User messages carry the queue id they came from.
+ * - `message` `{ message, queuedId? }` for each stored message. User messages carry the queue id they came from,
+ *   including ones the running turn took mid-turn.
  * - `error` `{ error, code }` when a turn fails. A stopped turn does not report one.
  */
 export type ChatListener = (event: SseEvent) => void;
@@ -32,6 +33,8 @@ interface ChatState {
   running: boolean;
   controller: AbortController | null;
   listeners: Set<ChatListener>;
+  /** The running turn's steering listeners, told when a message joins the queue. */
+  steerers: Set<() => void>;
 }
 
 const QUEUE_ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -39,10 +42,16 @@ const QUEUE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 /**
  * Async chat messaging. A posted message joins the chat's queue and the request
  * returns at once. One drain per chat runs turns on the server, detached from the
- * request, so closing the tab does not stop the agent. Everything queued while a
- * turn runs is answered together by the next turn, one reply for the batch.
+ * request, so closing the tab does not stop the agent.
  *
- * Queued messages are written to the transcript only when their turn starts, so
+ * A message sent while a turn runs steers that turn: the agent loop takes it
+ * before the model's next step (after pending tool results), and a CLI with live
+ * input (Claude Code) reads it on stdin while it works. If the model has already
+ * finished, the same turn continues to answer it. Messages the turn cannot take
+ * (another profile, or the step cap was hit) are answered by the next turn,
+ * together, one reply for the batch.
+ *
+ * Queued messages are written to the transcript only when a turn takes them, so
  * they never land between an assistant tool call and its result. The queue lives
  * in this process: a restart drops messages that were still waiting.
  */
@@ -53,7 +62,7 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
   function stateFor(chatId: string): ChatState {
     let state = chats.get(chatId);
     if (!state) {
-      state = { queue: [], running: false, controller: null, listeners: new Set() };
+      state = { queue: [], running: false, controller: null, listeners: new Set(), steerers: new Set() };
       chats.set(chatId, state);
     }
     return state;
@@ -106,13 +115,32 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
       const last = batch[batch.length - 1] as QueuedMessage;
       const profile = await resolveProfile(deps.store, last.profileId, chat.profileId);
       await assertCliProfileReady(profile);
+      // Stored row id -> queue id, for messages the turn took mid-run.
+      const steered = new Map<string, string>();
       const flush = async () => {
         const messages = await deps.store.messages.listByChat(chatId);
         for (const message of messages) {
           if (seen.has(message.id)) continue;
           seen.add(message.id);
-          publish(state, { event: "message", data: { message } });
+          const queuedId = steered.get(message.id);
+          publish(state, { event: "message", data: queuedId ? { message, queuedId } : { message } });
         }
+      };
+      const steering: TurnSteering = {
+        take() {
+          // Only messages for this turn's profile. A switch waits for its own turn.
+          const taken: SteeringMessage[] = [];
+          while (state.queue[0] && state.queue[0].profileId === last.profileId) {
+            const item = state.queue.shift() as QueuedMessage;
+            taken.push({ id: item.id, content: item.content });
+          }
+          if (taken.length > 0) publish(state, statusEvent(state));
+          return taken;
+        },
+        subscribe(listener) {
+          state.steerers.add(listener);
+          return () => state.steerers.delete(listener);
+        },
       };
 
       const turn = streamChatTurn(deps.store, deps.runtime, {
@@ -121,10 +149,14 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
         profile,
         signal: controller.signal,
         appendUserMessage: false,
+        steering,
       });
       for await (const event of turn) {
         // Replies go out whole. Deltas and usage stay on the server.
         if (event.event === "text-delta" || event.event === "usage") continue;
+        if (event.event === "steer") {
+          for (const item of steerMessages(event.data)) steered.set(item.messageId, item.id);
+        }
         if (event.event === "error") fail(new TurnError(event.data));
         await flush();
       }
@@ -133,6 +165,7 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
       fail(error);
     } finally {
       state.controller = null;
+      state.steerers.clear();
     }
   }
 
@@ -179,6 +212,13 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
       state.queue.push(item);
       if (!state.running) startDrain(input.chatId, state, input.userId);
       publish(state, statusEvent(state));
+      for (const steerer of [...state.steerers]) {
+        try {
+          steerer();
+        } catch (error) {
+          console.error("[chat-queue] steering listener failed", error);
+        }
+      }
       return item;
     },
 
@@ -222,6 +262,15 @@ class TurnError extends Error {
     super(typeof record.error === "string" ? record.error : "The model request failed");
     this.code = typeof record.code === "string" ? record.code : "error";
   }
+}
+
+function steerMessages(data: unknown): Array<{ id: string; messageId: string }> {
+  const messages = typeof data === "object" && data !== null ? (data as { messages?: unknown }).messages : undefined;
+  if (!Array.isArray(messages)) return [];
+  return messages.filter(
+    (item): item is { id: string; messageId: string } =>
+      typeof item?.id === "string" && typeof item?.messageId === "string",
+  );
 }
 
 function errorBody(error: unknown): { error: string; code: string } {

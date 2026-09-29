@@ -19,7 +19,7 @@ The agent loop: prompt assembly, provider call, tool dispatch, permissions, and 
 | `packages/agent-runtime/src/registry.ts` | `createToolRegistry`, contributor adapters |
 | `packages/agent-runtime/src/permissions.ts` | Capabilities, role grants, `toolAccess` |
 | `packages/agent-runtime/src/profiles.ts` | `ProfileResolver` passed in by the server |
-| `packages/agent-runtime/src/provider.ts` | Chat/event types the loop expects |
+| `packages/agent-runtime/src/provider.ts` | Chat/event types the loop expects. `TurnSteering` and `LiveInput` for messages sent mid-turn |
 | `packages/agent-runtime/src/bus.ts` | `createAgentMessageBus` |
 | `packages/agent-runtime/src/inbox.ts` | Claim and render inbox mail into a turn |
 | `packages/agent-runtime/src/worker.ts` | `DeliveryWorker` |
@@ -53,6 +53,7 @@ None. Timeouts and credentials are supplied by the server and tool packages.
 ## Where to change X
 
 - **Change a turn (steps, tool round trip, transcript).** `packages/agent-runtime/src/loop.ts`.
+- **Change mid-turn steering.** `runAgentTurn` in `packages/agent-runtime/src/loop.ts` takes `steering` messages before each model step and emits a `steer` event. It passes them to the provider as `ChatRequest.input` for live input.
 - **Change who may call a tool.** `packages/agent-runtime/src/permissions.ts` and the allowlist check in `packages/agent-runtime/src/tools.ts`.
 - **Add a builtin the loop can call.** Implement a `ToolContributor` (`packages/agent-runtime/src/registry.ts`) and register it from `packages/server` (see [server](server.md)).
 - **Change inbox injection.** `packages/agent-runtime/src/inbox.ts` and `packages/agent-runtime/src/prompt.ts`.

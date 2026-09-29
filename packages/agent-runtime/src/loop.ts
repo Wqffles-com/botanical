@@ -17,7 +17,7 @@ import { selectMemories } from "./memories";
 import { toolAccess } from "./permissions";
 import { trimToBudget } from "./context";
 import { buildSystemPrompt } from "./prompt";
-import type { ChatMessage } from "./provider";
+import type { ChatMessage, LiveInput, SteeringMessage, TurnSteering } from "./provider";
 import type { AgentMessageBus } from "./bus";
 import type { MessageRepository } from "./store";
 import type { Store } from "./store";
@@ -63,6 +63,11 @@ export interface RunTurnInput {
    * (a queued batch). `content` is then only used for memory recall and the title.
    */
   appendUserMessage?: boolean;
+  /**
+   * Messages sent while this turn runs. They are stored and shown to the model
+   * before its next step. A provider with live input may take them sooner.
+   */
+  steering?: TurnSteering;
 }
 
 export interface PreparedTurn {
@@ -139,10 +144,38 @@ export async function* runAgentTurn(
   const recalled = await recallMemories(deps, agent.id, input.content);
   const cwd = deps.workspaceFor?.(agent.id);
 
+  const steering = input.steering;
+  // Messages a provider took as live input, stored at its next event.
+  const taken: SteeringMessage[] = [];
+  const liveInput: LiveInput | undefined = steering
+    ? {
+        take() {
+          const items = steering.take();
+          taken.push(...items);
+          return items.map((item) => item.content);
+        },
+        subscribe: (listener) => steering.subscribe(listener),
+      }
+    : undefined;
+  const storeSteering = async (items: SteeringMessage[]): Promise<RuntimeEvent | null> => {
+    const stored: Array<{ id: string; messageId: string }> = [];
+    for (const item of items) {
+      const row = await deps.store.messages.append({ chatId: chat.id, role: "user", content: item.content, profileId });
+      transcript.push(row);
+      stored.push({ id: item.id, messageId: row.id });
+    }
+    return stored.length > 0 ? { type: "steer", messages: stored } : null;
+  };
+
   for (let step = 1; step <= maxSteps; step += 1) {
     if (input.signal?.aborted) {
       yield { type: "done", finishReason: "aborted" };
       return;
+    }
+    // Tool results for the last step are stored, so a user message can go in here.
+    if (steering && step > 1) {
+      const steered = await storeSteering(steering.take());
+      if (steered) yield steered;
     }
     yield { type: "step", step };
 
@@ -164,7 +197,12 @@ export async function* runAgentTurn(
       agentId: agent.id,
       chatId: chat.id,
       ...(cwd ? { cwd } : {}),
+      ...(liveInput ? { input: liveInput } : {}),
     })) {
+      if (taken.length > 0) {
+        const steered = await storeSteering(taken.splice(0));
+        if (steered) yield steered;
+      }
       if (event.type === "text-delta") {
         text += event.text;
         yield event;
@@ -199,6 +237,10 @@ export async function* runAgentTurn(
         yield { type: "error", error: errorMessage };
       }
     }
+    if (taken.length > 0) {
+      const steered = await storeSteering(taken.splice(0));
+      if (steered) yield steered;
+    }
 
     const assistant = await deps.store.messages.append({
       chatId: chat.id,
@@ -232,6 +274,14 @@ export async function* runAgentTurn(
       return;
     }
     if (pending.length === 0) {
+      // The model finished, but the user wrote meanwhile: keep going and answer in this turn.
+      if (steering && step < maxSteps) {
+        const steered = await storeSteering(steering.take());
+        if (steered) {
+          yield steered;
+          continue;
+        }
+      }
       yield { type: "done", finishReason: "stop" };
       return;
     }

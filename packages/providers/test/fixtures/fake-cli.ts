@@ -5,6 +5,7 @@
  */
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { createInterface } from "node:readline";
 
 const args = process.argv.slice(2);
 const mode = process.env.FAKE_CLI_MODE ?? "grok";
@@ -169,6 +170,26 @@ if (mode === "claude") {
       message: { content: [{ type: "text", text: "Hello Claude" }] },
     })}\n`,
   );
+  process.exit(0);
+}
+
+if (mode === "claude-live") {
+  // Claude Code with --input-format stream-json: one line per user message, stdin open until EOF.
+  const delta = (text: string) =>
+    process.stdout.write(
+      `${JSON.stringify({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text } } })}\n`,
+    );
+  let count = 0;
+  for await (const line of createInterface({ input: process.stdin })) {
+    if (!line.trim()) continue;
+    const message = JSON.parse(line) as { type: string; message: { content: Array<{ text: string }> } };
+    const text = message.message.content[0]?.text ?? "";
+    count += 1;
+    delta(`got:${text.split("\n").at(-1)}\n`);
+    if (count === 1) delta("waiting\n");
+    else process.stdout.write(`${JSON.stringify({ type: "result", result: "done" })}\n`);
+  }
+  delta(`stdin closed after ${count}\n`);
   process.exit(0);
 }
 

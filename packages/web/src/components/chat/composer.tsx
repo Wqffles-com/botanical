@@ -28,7 +28,7 @@ export function Composer({
   onChange: (value: string) => void;
   onSubmit: () => void;
   onStop: () => void;
-  /** The agent is on a turn. Sending still works; the message joins the queue. */
+  /** The agent is on a turn. Sending still works; the message steers the running turn. */
   working: boolean;
   disabled?: boolean;
   placeholder: string;

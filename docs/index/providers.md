@@ -22,7 +22,7 @@ Streaming model adapters and headless coding-CLI profiles. This is the only pack
 | `packages/providers/src/runtime.ts` | Bridge into the agent-runtime provider shape |
 | `packages/providers/src/capabilities.ts` | Per-model capability flags |
 | `packages/providers/src/collect.ts` | `collectChat` test helper |
-| `packages/providers/src/cli` | Install, login, args, and `runCli` for CLI profiles |
+| `packages/providers/src/cli` | Install, login, args, and `runCli` for CLI profiles. `runCli` `input` writes mid-turn messages to Claude Code's stream-json stdin |
 | `packages/providers/test` | `bun test` |
 
 Provider type ids: `openai`, `anthropic`, `xai`, `deepseek`, `openrouter`, `openai-compat`, `mock`. CLI names in `packages/providers/src/cli/types.ts`: `grok`, `claude`, `codex`. Preset profile ids: `grok-build`, `claude-code`, `codex`.

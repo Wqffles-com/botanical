@@ -121,6 +121,7 @@ export function createServerProfileResolver(
  * the same turn exposes Botanical's tool catalog over a per-run MCP server.
  * Tool calls from that server are already dispatched; they arrive as settled
  * tool-call events so the loop records them and does not run them twice.
+ * Claude Code also takes messages sent mid-turn on stdin (`request.input`).
  */
 function cliProvider(profile: ModelProfile, cliTools: CliToolHost | undefined, env: Env): RuntimeProvider {
   const exposeTools = profile.botanicalTools !== false && cliTools != null;
@@ -174,6 +175,7 @@ function cliProvider(profile: ModelProfile, cliTools: CliToolHost | undefined, e
           ...(profile.passModel && profile.model ? { model: profile.model } : {}),
           ...(request.signal ? { signal: request.signal } : {}),
           ...(session ? { mcp: { url: session.url, token: session.token }, toolEvents: session.events } : {}),
+          ...(request.input ? { input: request.input } : {}),
           env: cliEnv,
         })) {
           if (event.type === "tool-call") {

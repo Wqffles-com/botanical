@@ -89,6 +89,39 @@ describe("CLI stream parsing", () => {
     expect(codexText).toBe("Codex says hi");
   });
 
+  test("claude takes messages on stdin while it runs and stdin closes after the result", async () => {
+    const waiting: string[] = [];
+    const listeners = new Set<() => void>();
+    const events = [];
+    for await (const event of runCli({
+      cli: "claude",
+      bin: fixture,
+      cwd: "/tmp",
+      messages: [{ role: "user", content: "Hi" }],
+      timeoutMs: 10_000,
+      env: { ...process.env, FAKE_CLI_MODE: "claude-live", HOME: "/tmp" },
+      input: {
+        take: () => waiting.splice(0),
+        subscribe(listener) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      },
+    })) {
+      events.push(event);
+      if (event.type === "text-delta" && event.text === "waiting\n") {
+        waiting.push("steer now");
+        for (const listener of listeners) listener();
+      }
+    }
+    const text = events.filter((event) => event.type === "text-delta").map((event) => event.text).join("");
+    expect(text).toContain("got:Hi");
+    expect(text).toContain("got:steer now");
+    expect(text).toContain("stdin closed after 2");
+    expect(events.some((event) => event.type === "error")).toBe(false);
+    expect(listeners.size).toBe(0);
+  });
+
   test("plain stdout is forwarded when the stream is not JSON", async () => {
     const events = await collect("plain");
     const text = events.filter((event) => event.type === "text-delta").map((event) => event.text).join("");

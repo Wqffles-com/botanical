@@ -9,6 +9,8 @@ export type RuntimeEvent =
       type: "inbox";
       messages: Array<{ id: string; fromAgentId: string; body: string; createdAt: string }>;
     }
+  /** User messages sent during the turn, now stored. `id` is the steering id, `messageId` the stored row. */
+  | { type: "steer"; messages: Array<{ id: string; messageId: string }> }
   | { type: "text-delta"; text: string }
   | { type: "tool-call"; id: string; name: string; arguments: unknown }
   | { type: "tool-result"; id: string; name: string; result: unknown; isError: boolean }
