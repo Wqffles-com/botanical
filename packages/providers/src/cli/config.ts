@@ -206,7 +206,8 @@ export function expandCliModels(specs: readonly CliProfileSpec[]): CliProfileSpe
       const id = `${spec.id}--${model.replace(/[^A-Za-z0-9_-]/g, "-")}`.slice(0, 64);
       if (ids.has(id)) continue;
       ids.add(id);
-      out.push({ ...base, id, model });
+      // Global profile names are unique, so each sibling needs its own label.
+      out.push({ ...base, id, label: `${base.label} (${model})`.slice(0, 120), model });
     }
   }
   return out;
