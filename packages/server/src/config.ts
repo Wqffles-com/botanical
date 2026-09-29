@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import {
+  expandCliModels,
   mergeCliProfiles,
   parseCliProfileShortcut,
   parseProfilesDocument,
@@ -308,7 +309,7 @@ function loadProfiles(
     const override = split.api === undefined ? undefined : validateOverride(split.api);
     const selected = selectProfiles(override, env);
     const apiProfiles = selected.map((profile) => toModelProfile(profile));
-    const cliProfiles = cli.map((spec) => toCliProfile(spec));
+    const cliProfiles = expandCliModels(cli).map((spec) => toCliProfile(spec));
     const ids = new Set<string>();
     for (const profile of [...apiProfiles, ...cliProfiles]) {
       if (ids.has(profile.id)) {

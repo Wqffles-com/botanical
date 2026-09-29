@@ -11,6 +11,7 @@ import {
   CLI_MCP_TOKEN_ENV,
   mergeCliProfiles,
   parseCliLine,
+  expandCliModels,
   parseCliProfileShortcut,
   prepareCliLaunch,
   renderCliPrompt,
@@ -538,3 +539,28 @@ function probe(overrides: Partial<CliAvailabilityProbe>): CliAvailabilityProbe {
     ...overrides,
   };
 }
+
+describe("expandCliModels", () => {
+  test("lists known models as sibling profiles next to the CLI default", () => {
+    const [spec] = parseCliProfileShortcut("claude-code");
+    const expanded = expandCliModels([spec!]);
+    expect(expanded.map((s) => [s.id, s.model])).toEqual([
+      ["claude-code", undefined],
+      ["claude-code--opus", "opus"],
+      ["claude-code--sonnet", "sonnet"],
+      ["claude-code--haiku", "haiku"],
+    ]);
+  });
+
+  test("uses configured models, skips the pinned one, and sanitizes ids", () => {
+    const { cli } = splitProfileDocument([
+      { id: "grok-build", kind: "cli", cli: "grok", model: "grok-4.7", models: ["grok-4.7", "grok-5.0"] },
+      { id: "codex", kind: "cli", cli: "codex", models: [] },
+    ]);
+    expect(expandCliModels(cli).map((s) => [s.id, s.model])).toEqual([
+      ["grok-build", "grok-4.7"],
+      ["grok-build--grok-5-0", "grok-5.0"],
+      ["codex", undefined],
+    ]);
+  });
+});
