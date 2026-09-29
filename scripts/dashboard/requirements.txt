@@ -1,0 +1,9 @@
+# No third-party Python packages. The renderer uses the standard library only.
+#
+# System tools, on PATH:
+#   git
+#   gh          GitHub CLI (https://cli.github.com/)
+#   google-chrome or chromium
+#
+# Authenticate gh with `gh auth login`, or set GH_TOKEN or GITHUB_TOKEN.
+# The script never accepts a token as an argument.

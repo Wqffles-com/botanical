@@ -22,7 +22,7 @@ Map of this repo for coding agents. Per-package pages: [server](server.md), [age
 | `.env.example` | Annotated env template |
 | `packages/` | Workspace packages (see graph below) |
 | `deploy/` | Image entrypoints, Postgres init, static-web bootstrap, alternate `deploy/server` |
-| `scripts/` | e2e runner, release zip, smoke harness |
+| `scripts/` | e2e runner, release zip, smoke harness, progress dashboard |
 | `config/` | `config/mcp.json` (empty servers) and `config/mcp.example.json` |
 | `docs/` | Product and deploy docs, plus this index |
 | `docs/DECISIONS.md` | Dated product decisions (decision, reason, status) |
@@ -100,6 +100,7 @@ From the repo root, after `bun install` (Bun is the package manager and the API 
 | `bun run e2e` | `scripts/e2e/run.mjs` against `BASE_URL` (default `http://localhost:3000`) |
 | `bun run e2e:self-test` | Same runner with `--self-test` (local fixture, no compose stack) |
 | `bun run check:index` | `scripts/check-index.ts` |
+| `python3 scripts/dashboard/render_dashboard.py` | Progress dashboard PNG (`scripts/dashboard/README.md`) |
 
 CI typecheck and unit-test loops are in `.github/workflows/ci.yml`. They skip `packages/e2e`. Per-package test commands are on each page below.
 
