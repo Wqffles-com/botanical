@@ -293,7 +293,7 @@ export function AgentForm({
         <div className="grid gap-2">
           <Label>Roles</Label>
           <p className="text-xs text-muted-foreground">
-            An agent with no roles is limited only by its tool allowlist. Roles add a capability ceiling.
+            Roles decide which tools the agent can use. An agent with no roles uses the tool allowlist below.
           </p>
           {roles.length === 0 ? (
             <p className="text-sm text-muted-foreground">No roles yet. Create them in Settings.</p>
@@ -326,7 +326,9 @@ export function AgentForm({
         <div className="grid gap-2">
           <Label>Tools</Label>
           <p className="text-xs text-muted-foreground">
-            Allowlist for this agent. Built-ins and MCP tools come from the server.
+            {draft.roleIds.length > 0
+              ? "Not used while the agent has roles: the roles above decide its tools."
+              : "Allowlist for this agent. Built-ins and MCP tools come from the server."}
           </p>
           <AgentToolAllowlist
             tools={tools}

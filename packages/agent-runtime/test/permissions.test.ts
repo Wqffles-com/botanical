@@ -48,6 +48,18 @@ describe("permission dispatch", () => {
     expect(events.some((event) => event.type === "tool-result" && event.isError)).toBe(false);
   });
 
+  test("roles grant tools without an allowlist entry", async () => {
+    const { events, provider } = await turn({
+      allow: [],
+      roles: [coder],
+      tools: [fileWrite, agentCreate],
+      call: "file_write",
+    });
+    expect(provider.requests[0]?.tools?.map((tool) => tool.name)).toEqual(["file_write"]);
+    expect(resultText(events)).toContain("wrote");
+    expect(events.some((event) => event.type === "tool-result" && event.isError)).toBe(false);
+  });
+
   test("Reviewer file_write is denied at dispatch and hidden from the model", async () => {
     const { events, provider } = await turn({
       allow: ["file_write"],
@@ -109,19 +121,22 @@ describe("permission dispatch", () => {
 });
 
 describe("agent creation cannot escalate", () => {
-  test("Coder cannot grant agent.create or a tool outside its allowlist", () => {
+  test("Coder grants only what its roles allow; the allowlist does not matter", () => {
     const coderSubject = {
       name: "Ada",
-      toolAllowlist: ["file_read", "file_write", "agent_create"],
+      toolAllowlist: ["agent_create"],
       a2aEnabled: false,
       roles: [coder],
     };
-    expect(
-      escalationError(coderSubject, { toolIds: ["file_write"], roles: [] }),
-    ).toBeNull();
+    expect(escalationError(coderSubject, { toolIds: ["file_write", "shell"], roles: [] })).toBeNull();
     expect(escalationError(coderSubject, { toolIds: ["agent_create"], roles: [] })).toContain("agent.create");
-    expect(escalationError(coderSubject, { toolIds: ["shell"], roles: [] })).toContain("outside its allowlist");
     expect(escalationError(coderSubject, { toolIds: [], roles: [orchestrator] })).toContain("cannot grant role");
+  });
+
+  test("an agent without roles cannot grant a tool outside its allowlist", () => {
+    const subject = { name: "Ada", toolAllowlist: ["file_read"], a2aEnabled: false };
+    expect(escalationError(subject, { toolIds: ["file_read"], roles: [] })).toBeNull();
+    expect(escalationError(subject, { toolIds: ["shell"], roles: [] })).toContain("outside its allowlist");
   });
 });
 

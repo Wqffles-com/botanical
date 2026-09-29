@@ -5,8 +5,9 @@ import type { AgentRoleGrant } from "./permissions";
 export const idSchema = z.string().regex(ID_RE, "id must be 1–80 chars of letters, digits, _ or -");
 
 /**
- * User-defined agent. `prompt` is the system prompt. `toolAllowlist` gates
- * built-ins and MCP tools. Empty allowlist means no external tools.
+ * User-defined agent. `prompt` is the system prompt. For an agent without
+ * roles, `toolAllowlist` gates built-ins and MCP tools, and an empty allowlist
+ * means no external tools. An agent with roles gets its tools from them.
  * Runtime A2A tools are controlled by `a2aEnabled`, not the allowlist.
  */
 export const createAgentSchema = z
@@ -54,8 +55,8 @@ export interface AgentRecord {
   /** Set when another agent created this one. Absent for user-created agents. */
   createdByAgentId?: string | null;
   /**
-   * Assigned roles. Absent or empty means allowlist-only (pre-roles behavior).
-   * When present, dispatch requires the union of these permissions as well.
+   * Assigned roles. Absent or empty means the allowlist decides. When present,
+   * the union of these permissions decides and the allowlist is not used.
    */
   roles?: AgentRoleGrant[];
 }

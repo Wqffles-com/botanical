@@ -5,6 +5,7 @@ import {
   ValidationError,
   isCapability,
   type AgentRecord,
+  type AgentRoleGrant,
   type ChatRecord,
   type MessageRecord,
   type Store as RuntimeStore,
@@ -122,14 +123,7 @@ function toAgent(agent: Agent): AgentRecord {
     toolAllowlist: [...agent.toolIds],
     a2aEnabled: false,
     createdByAgentId: agent.createdByAgentId,
-    roles: agent.roles.map((role) => ({
-      id: role.id,
-      name: role.name,
-      permissions: {
-        capabilities: role.permissions.capabilities.filter(isCapability),
-        mcp: role.permissions.mcp,
-      },
-    })),
+    roles: runtimeRoles(agent),
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
   };
@@ -162,3 +156,14 @@ function toMessage(message: Message): MessageRecord {
   return row;
 }
 
+/** The agent's roles as the runtime's permission checks read them. */
+export function runtimeRoles(agent: Agent): AgentRoleGrant[] {
+  return agent.roles.map((role) => ({
+    id: role.id,
+    name: role.name,
+    permissions: {
+      capabilities: role.permissions.capabilities.filter(isCapability),
+      mcp: role.permissions.mcp,
+    },
+  }));
+}

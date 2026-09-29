@@ -147,7 +147,7 @@ Ids or unique names are accepted.
 | `notify_user` | `notify` |
 | `mcp.<server>.<tool>` | MCP grant for that server and tool |
 
-A call is allowed when the allowlist matches (or `a2aEnabled` for runtime A2A tools) **and**, when the agent has roles, the role union permits the capability. Dispatch returns `permission denied: agent "Ada" lacks capability "file.write" (roles: Reviewer)` instead of throwing.
+A call is allowed when, for an agent with roles, the role union permits the capability, or, for an agent with no roles, the allowlist matches. Runtime A2A tools also need `a2aEnabled`. (Revised 2026-09-29: roles used to narrow the allowlist rather than replace it.) Dispatch returns `permission denied: agent "Ada" lacks capability "file.write" (roles: Reviewer)` instead of throwing.
 
 Seeded roles:
 
@@ -169,8 +169,8 @@ Authorization: Bearer <per-run token>
 ```
 
 - **Transport.** MCP over streamable HTTP with JSON responses. Supported methods: `initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call`.
-- **Tools.** `tools/list` returns exactly what an API-model turn for the same agent would get: the built-in tools on the agent's allowlist (memory, `agent_create` / `agent_list`, files, shell, web), plus the operator's MCP tools, filtered by the agent's roles. MCP tools use their model-facing names such as `mcp__notes__search`. The server is named `botanical`, so a CLI shows `mcp__botanical__memory_write` and so on.
-- **Enforcement.** `tools/call` uses the same dispatch function as the agent loop: allowlist, role capability check, then the tool itself with the agent's workspace scoping, limits, and output truncation. A denied call is a normal MCP result with `isError: true` and the same text an API turn gets, for example `permission denied: agent "Ada" lacks capability "memory.write" (roles: Reviewer)`.
+- **Tools.** `tools/list` returns exactly what an API-model turn for the same agent would get: the built-in tools (memory, `agent_create` / `agent_list`, files, shell, web) and the operator's MCP tools that the agent's roles grant, or, for an agent with no roles, those on its allowlist. MCP tools use their model-facing names such as `mcp__notes__search`. The server is named `botanical`, so a CLI shows `mcp__botanical__memory_write` and so on.
+- **Enforcement.** `tools/call` uses the same dispatch function as the agent loop: role capability or allowlist check, then the tool itself with the agent's workspace scoping, limits, and output truncation. A denied call is a normal MCP result with `isError: true` and the same text an API turn gets, for example `permission denied: agent "Ada" lacks capability "memory.write" (roles: Reviewer)`.
 - **Identity.** The run is bound to the agent, chat, and turn when it opens. Nothing the CLI sends can change the agent.
 - **Auth and lifetime.** A fresh 32-byte random token per run, compared in constant time. Session cookies are not accepted. The token is revoked when the turn ends for any reason (finish, error, cancel, timeout). Afterwards the URL returns `404`. A live run with a missing or wrong token returns `401`.
 - **Address.** The CLI is a child process of the server, so the URL defaults to `http://127.0.0.1:<PORT>`. Set `BOTANICAL_INTERNAL_URL` if the server is reachable from its own process some other way.

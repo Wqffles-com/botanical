@@ -1,11 +1,11 @@
 /**
  * Capability checks for built-in and MCP tools.
  *
- * Combination rule (2026-09-27): a tool is callable when the agent's allowlist
- * matches it (runtime A2A tools follow `a2aEnabled` instead) AND, when the
- * agent has one or more roles, the union of those roles permits the tool.
- * Agents with no roles keep allowlist-only behavior so existing agents are
- * unchanged. Dispatch must call `toolAccess` even if the tool was omitted
+ * Combination rule: an agent with one or more roles may call a tool when the
+ * union of its roles permits the tool's capability. Its allowlist is not
+ * consulted, so a role grants tools on its own. An agent with no roles may
+ * call exactly the tools its allowlist matches. Runtime A2A tools also need
+ * `a2aEnabled`. Dispatch must call `toolAccess` even if the tool was omitted
  * from the model payload — models can name tools they were not offered.
  */
 
@@ -184,20 +184,21 @@ export type ToolAccess =
   | { ok: false; kind: "allowlist" | "permission"; message: string };
 
 /**
- * Allowlist (or A2A flag) first, then role capabilities when the agent has roles.
- * No roles → allowlist result stands.
+ * Runtime A2A tools need `a2aEnabled`. Then roles decide when the agent has
+ * any; otherwise the allowlist does.
  */
 export function toolAccess(agent: ToolAccessSubject, tool: ToolAccessTarget): ToolAccess {
-  if (tool.origin === "runtime") {
-    if (!agent.a2aEnabled) {
-      return { ok: false, kind: "allowlist", message: notAllowed(agent.name, tool.name) };
-    }
-  } else if (!toolAllowed(agent.toolAllowlist, tool.name)) {
+  if (tool.origin === "runtime" && !agent.a2aEnabled) {
     return { ok: false, kind: "allowlist", message: notAllowed(agent.name, tool.name) };
   }
 
   const permissions = effectivePermissions(agent.roles);
-  if (permissions.unrestricted) return { ok: true };
+  if (permissions.unrestricted) {
+    if (tool.origin !== "runtime" && !toolAllowed(agent.toolAllowlist, tool.name)) {
+      return { ok: false, kind: "allowlist", message: notAllowed(agent.name, tool.name) };
+    }
+    return { ok: true };
+  }
 
   const capability = requiredCapability(tool);
   if (!capabilityPermitted(permissions, capability)) {
@@ -308,8 +309,8 @@ export interface GrantRequest {
 /**
  * Ceiling for tools and roles an agent may hand to an agent it creates.
  * Role-bearing agents use the union of their roles. No-role agents use the
- * capabilities implied by their allowlist. A requested tool must also match
- * the creator's allowlist, so a role cannot smuggle a tool the creator cannot call.
+ * capabilities implied by their allowlist, and a requested tool must also
+ * match that allowlist, so they cannot grant a tool they cannot call.
  */
 export function grantCeiling(agent: ToolAccessSubject): EffectivePermissions {
   const fromRoles = effectivePermissions(agent.roles);
@@ -319,8 +320,9 @@ export function grantCeiling(agent: ToolAccessSubject): EffectivePermissions {
 
 export function escalationError(agent: ToolAccessSubject, requested: GrantRequest): string | null {
   const ceiling = grantCeiling(agent);
+  const byAllowlist = effectivePermissions(agent.roles).unrestricted;
   for (const toolId of requested.toolIds) {
-    if (!toolAllowed(agent.toolAllowlist, toolId)) {
+    if (byAllowlist && !toolAllowed(agent.toolAllowlist, toolId)) {
       return `permission denied: agent "${agent.name}" cannot grant tool "${toolId}" outside its allowlist`;
     }
     const capability = requiredCapability({

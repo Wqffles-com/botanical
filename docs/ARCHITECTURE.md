@@ -130,7 +130,7 @@ Profile can change between steps if the user requests a switch or a policy escal
 - **Web search / fetch** — search + HTTP fetch with size limits
 - **Shell / code exec** — Linux namespace jail; gated by allowlists and roles (UI approval prompts are planned)
 - **File read / write** — workspace-scoped paths only
-- **Memory and agent admin (MVP2)** — `memory_*`, `agent_create`, `agent_list`. With roles, a tool runs only when the allowlist matches and the role union permits its capability. Agents with no roles stay allowlist-only. See [DECISIONS.md](./DECISIONS.md).
+- **Memory and agent admin (MVP2)** — `memory_*`, `agent_create`, `agent_list`. With roles, a tool runs when the role union permits its capability; the allowlist is not used. Agents with no roles stay allowlist-only. See [DECISIONS.md](./DECISIONS.md).
 
 ### Opt-in (not core)
 
@@ -301,7 +301,7 @@ Background work uses the same turn as an interactive chat message: system prompt
 
 **Tuning.** Those four values live in the `settings` table, not in environment variables. `GET` and `PATCH /api/settings/always-on` are passcode-gated and marked instance-admin, so they become admin-only when accounts land. Absent keys use the defaults. A short cache (about a minute) lets a saved value apply without a restart.
 
-**Notifications.** A row is written when a routine, listener, or A2A autorun turn finishes or fails, and when an agent calls `notify_user` (allowlist plus the `notify` capability when the agent has roles). The web UI polls the list.
+**Notifications.** A row is written when a routine, listener, or A2A autorun turn finishes or fails, and when an agent calls `notify_user` (the `notify` capability when the agent has roles, otherwise the allowlist). The web UI polls the list.
 
 The in-memory store implements the same claim, so unit tests do not need Postgres. Postgres is what makes the lease safe across processes.
 

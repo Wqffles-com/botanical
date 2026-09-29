@@ -10,6 +10,7 @@ import {
 import { createMockProvider } from "@botanical/providers";
 
 import { HttpError } from "../http.ts";
+import { runtimeRoles } from "../runtime/store.ts";
 import type { Agent, AgentMessage, AgentMessageStatus, ModelProfile, Store } from "../types.ts";
 import { AGENT_MESSAGE_STATUSES } from "../types.ts";
 import { A2A_BODY_MAX, INBOX_CHAT_TITLE } from "./constants.ts";
@@ -347,6 +348,7 @@ function toRuntimeAgent(agent: Agent) {
     prompt: agent.systemPrompt,
     toolAllowlist: [...agent.toolIds],
     a2aEnabled: true,
+    roles: runtimeRoles(agent),
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
   };

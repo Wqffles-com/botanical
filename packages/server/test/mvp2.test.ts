@@ -181,7 +181,7 @@ describe("agent_create privileges", () => {
       { agentId: builder.id, chatId: "c" },
     );
     expect(deniedTool.isError).toBe(true);
-    expect(deniedTool.content).toContain("outside its allowlist");
+    expect(deniedTool.content).toContain('lacks capability \\"shell\\"');
 
     const orchestrator = await store.agents.create({
       name: "Lead",

@@ -55,6 +55,6 @@ None. Timeouts and credentials are supplied by the server and tool packages.
 - **Change a turn (steps, tool round trip, transcript).** `packages/agent-runtime/src/loop.ts`.
 - **Change how a group chat reads to an agent.** `toProviderMessages` in `packages/agent-runtime/src/loop.ts` turns other agents' replies into `[Name] …` user messages and drops their tool rows. `buildSystemPrompt` in `packages/agent-runtime/src/prompt.ts` names the other participants.
 - **Change mid-turn steering.** `runAgentTurn` in `packages/agent-runtime/src/loop.ts` takes `steering` messages before each model step and emits a `steer` event. It passes them to the provider as `ChatRequest.input` for live input.
-- **Change who may call a tool.** `packages/agent-runtime/src/permissions.ts` and the allowlist check in `packages/agent-runtime/src/tools.ts`.
+- **Change who may call a tool.** `packages/agent-runtime/src/permissions.ts` (`toolAccess`: roles decide, or the allowlist for an agent with no roles) and the allowlist matcher in `packages/agent-runtime/src/tools.ts`.
 - **Add a builtin the loop can call.** Implement a `ToolContributor` (`packages/agent-runtime/src/registry.ts`) and register it from `packages/server` (see [server](server.md)).
 - **Change inbox injection.** `packages/agent-runtime/src/inbox.ts` and `packages/agent-runtime/src/prompt.ts`.

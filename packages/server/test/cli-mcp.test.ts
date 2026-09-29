@@ -119,6 +119,25 @@ describe("per-run CLI MCP", () => {
       roleIds: [BUILTIN_ROLE_IDS.Reviewer],
     });
     const denied = app.cliTools.open({ agentId: reviewer.id, chatId: chat.id, userId });
+
+    // A role grants tools on its own: no allowlist entries needed.
+    const coder = await store.agents.create({
+      name: "Cody",
+      description: "",
+      systemPrompt: "Code.",
+      toolIds: [],
+      roleIds: [BUILTIN_ROLE_IDS.Coder],
+    });
+    const coding = app.cliTools.open({ agentId: coder.id, chatId: chat.id, userId });
+    const codingList = await readJson<{ result: { tools: { name: string }[] } }>(
+      await rpc(app, coding.runId, coding.token, { jsonrpc: "2.0", id: 7, method: "tools/list" }),
+    );
+    const codingNames = codingList.result.tools.map((tool) => tool.name);
+    expect(codingNames).toContain("memory_write");
+    expect(codingNames).toContain("send_agent_message");
+    expect(codingNames).toContain("file_write");
+    expect(codingNames).not.toContain("agent_create");
+    coding.close();
     const deniedList = await readJson<{ result: { tools: { name: string }[] } }>(
       await rpc(app, denied.runId, denied.token, { jsonrpc: "2.0", id: 5, method: "tools/list" }),
     );
