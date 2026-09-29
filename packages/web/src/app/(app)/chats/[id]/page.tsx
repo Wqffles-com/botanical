@@ -28,6 +28,10 @@ export default function ChatPage() {
       onProfile={(profileId) => void thread.setProfile(profileId)}
       onSend={() => void thread.send()}
       onStop={thread.stop}
+      onEditMessage={thread.editMessage}
+      onDeleteMessage={thread.deleteMessage}
+      onResendMessage={thread.resend}
+      onRetryMessage={thread.retry}
       creator={thread.creator}
     />
   );

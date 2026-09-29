@@ -276,6 +276,55 @@ describe("BotanicalClient", () => {
     }
   });
 
+  test("edits and deletes messages, and reads their events", async () => {
+    const calls: Array<{ method: string; path: string; body?: unknown }> = [];
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const url = new URL(request.url);
+        const path = url.pathname + url.search;
+        if (request.method === "PATCH" && url.pathname === "/api/chats/c1/messages/m1") {
+          const body = await request.json();
+          calls.push({ method: "PATCH", path, body });
+          return Response.json({
+            message: { id: "m1", chatId: "c1", role: "assistant", content: "Fixed", createdAt: "2026-09-28T00:00:00.000Z" },
+          });
+        }
+        if (request.method === "DELETE" && url.pathname === "/api/chats/c1/messages/m1") {
+          calls.push({ method: "DELETE", path });
+          return Response.json({ deleted: ["m1", "m2"] });
+        }
+        if (url.pathname === "/api/chats/c1/events") {
+          const body = [
+            'event: message-updated\ndata: {"message":{"id":"m1","chatId":"c1","role":"assistant","content":"Fixed","createdAt":"2026-09-28T00:00:00.000Z"}}\n\n',
+            'event: messages-deleted\ndata: {"ids":["m1",2,"m2"]}\n\n',
+          ].join("");
+          return new Response(body, { headers: { "content-type": "text/event-stream" } });
+        }
+        return Response.json({ error: "missing" }, { status: 404 });
+      },
+    });
+    try {
+      const client = new BotanicalClient({ baseUrl: `http://127.0.0.1:${server.port}` });
+      await expect(client.updateMessage("c1", "m1", "  ")).rejects.toBeInstanceOf(Error);
+      expect(await client.updateMessage("c1", "m1", " Fixed ")).toMatchObject({ id: "m1", content: "Fixed" });
+      expect(await client.deleteMessage("c1", "m1", { following: true })).toEqual(["m1", "m2"]);
+      expect(calls).toEqual([
+        { method: "PATCH", path: "/api/chats/c1/messages/m1", body: { content: "Fixed" } },
+        { method: "DELETE", path: "/api/chats/c1/messages/m1?following=true" },
+      ]);
+
+      const events = [];
+      for await (const event of client.chatEvents("c1")) events.push(event);
+      expect(events).toEqual([
+        { type: "message-updated", message: expect.objectContaining({ id: "m1", content: "Fixed" }) },
+        { type: "messages-deleted", ids: ["m1", "m2"] },
+      ]);
+    } finally {
+      server.stop(true);
+    }
+  });
+
   test("normalizes snake_case rows", () => {
     expect(normalizeProfile({ id: "p", name: "Fast", provider: "deepseek", model_id: "deepseek-chat" }).model).toBe(
       "deepseek-chat",

@@ -232,6 +232,10 @@ export interface Store {
   readonly messages: {
     listByChat(chatId: string): Promise<Message[]>;
     create(input: NewMessage): Promise<Message>;
+    /** Replace a message's text. Null when the message is not in this chat. */
+    updateContent(chatId: string, id: string, content: string): Promise<Message | null>;
+    /** Delete the given messages of one chat. Returns how many were removed. */
+    deleteMany(chatId: string, ids: readonly string[]): Promise<number>;
     deleteByChat(chatId: string): Promise<number>;
   };
   readonly sessions: {
@@ -646,6 +650,32 @@ function buildStore(
         const row = inserted[0];
         if (!row) throw new Error('message insert failed');
         return toMessage(row, input.profileId?.trim() || null);
+      },
+      async updateContent(chatId, id, content) {
+        if (!isUuid(id) || !(await requireOwnedChat(chatId))) return null;
+        const updated = await db
+          .update(messages)
+          .set({ content, updatedAt: new Date() })
+          .where(and(eq(messages.chatId, chatId), eq(messages.id, id)))
+          .returning();
+        const row = updated[0];
+        if (!row) return null;
+        const profile = row.profileId
+          ? await db
+              .select({ publicId: modelProfiles.publicId })
+              .from(modelProfiles)
+              .where(eq(modelProfiles.id, row.profileId))
+          : [];
+        return toMessage(row, profile[0]?.publicId ?? null);
+      },
+      async deleteMany(chatId, ids) {
+        const valid = ids.filter(isUuid);
+        if (valid.length === 0 || !(await requireOwnedChat(chatId))) return 0;
+        const removed = await db
+          .delete(messages)
+          .where(and(eq(messages.chatId, chatId), inArray(messages.id, valid)))
+          .returning({ id: messages.id });
+        return removed.length;
       },
       async deleteByChat(chatId) {
         if (!(await requireOwnedChat(chatId))) return 0;

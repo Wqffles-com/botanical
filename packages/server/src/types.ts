@@ -359,6 +359,10 @@ export interface ChatRepository {
 export interface MessageRepository {
   listByChat(chatId: string): Promise<Message[]>;
   create(input: NewMessage): Promise<Message>;
+  /** Replace a message's text. Null when the message is not in this chat. */
+  updateContent(chatId: string, id: string, content: string): Promise<Message | null>;
+  /** Delete the given messages of one chat. Returns how many were removed. */
+  deleteMany(chatId: string, ids: readonly string[]): Promise<number>;
   deleteByChat(chatId: string): Promise<number>;
 }
 
