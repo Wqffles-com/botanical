@@ -51,7 +51,10 @@ export interface CliMcpTarget {
 
 export interface CliSpawnPlan {
   args: string[];
-  /** Written to the child's stdin, then the stream is closed. Undefined for Grok. */
+  /**
+   * Written to the child's stdin. Undefined for Grok. For Claude Code it is one
+   * stream-json user message, and stdin may stay open for more (`claudeUserMessage`).
+   */
   stdin?: string;
   /** Overlay on the child environment. Never assigned onto `process.env`. */
   env: Record<string, string>;
@@ -94,7 +97,7 @@ export function prepareCliLaunch(input: {
     });
     return {
       args,
-      ...(input.cli === "grok" ? {} : { stdin: input.prompt }),
+      ...(input.cli === "grok" ? {} : { stdin: input.cli === "claude" ? claudeUserMessage(input.prompt) : input.prompt }),
       env: input.mcp
         ? {
             [CLI_MCP_TOKEN_ENV]: input.mcp.token,
@@ -110,6 +113,11 @@ export function prepareCliLaunch(input: {
     for (const fn of cleanups.reverse()) fn();
     throw error;
   }
+}
+
+/** One line of Claude Code `--input-format stream-json` input. */
+export function claudeUserMessage(text: string): string {
+  return `${JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text }] } })}\n`;
 }
 
 function writePromptFile(prompt: string, cleanups: Array<() => void>): string {

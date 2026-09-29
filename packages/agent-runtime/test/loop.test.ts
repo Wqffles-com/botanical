@@ -13,6 +13,8 @@ import {
   type ExecutableTool,
   type McpToolBridge,
   type RuntimeEvent,
+  type SteeringMessage,
+  type TurnSteering,
 } from "../src/index";
 
 const echoTool: ExecutableTool = {
@@ -57,6 +59,22 @@ async function harness(options: {
     toolSources: sources,
   };
   return { store, bus, agent, chat, provider, deps };
+}
+
+function steeringQueue(): TurnSteering & { push(id: string, content: string): void } {
+  const waiting: SteeringMessage[] = [];
+  const listeners = new Set<() => void>();
+  return {
+    push(id, content) {
+      waiting.push({ id, content });
+      for (const listener of listeners) listener();
+    },
+    take: () => waiting.splice(0),
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
 }
 
 async function collect(deps: RuntimeDeps, input: Parameters<typeof runAgentTurn>[1]) {
@@ -106,6 +124,77 @@ describe("agent tool loop", () => {
     ]);
     const sent = provider.requests[0]?.messages.filter((message) => message.role === "user");
     expect(sent?.map((message) => message.content)).toEqual(["first", "second"]);
+  });
+
+  test("a message sent during a tool step reaches the model before its next step", async () => {
+    const steering = steeringQueue();
+    const { deps, chat, store, provider } = await harness({
+      script: [
+        () => {
+          steering.push("q1", "use the other folder");
+          return [{ type: "tool-call", id: "call_1", name: "echo", arguments: { text: "pine" } }, { type: "done" }];
+        },
+        () => [{ type: "text-delta", text: "Switched" }, { type: "done" }],
+      ],
+    });
+    const events = await collect(deps, { chatId: chat.id, content: "Hi", profileId: "fast", steering });
+    const saved = await store.messages.listByChat(chat.id);
+    expect(saved.map((message) => [message.role, message.content])).toEqual([
+      ["user", "Hi"],
+      ["assistant", ""],
+      ["tool", "echo:pine"],
+      ["user", "use the other folder"],
+      ["assistant", "Switched"],
+    ]);
+    expect(provider.requests[1]?.messages.at(-1)).toMatchObject({ role: "user", content: "use the other folder" });
+    expect(events).toContainEqual({ type: "steer", messages: [{ id: "q1", messageId: saved[3]!.id }] });
+    expect(events.at(-1)).toEqual({ type: "done", finishReason: "stop" });
+  });
+
+  test("a message that arrives as the model finishes is answered in the same turn", async () => {
+    const steering = steeringQueue();
+    const { deps, chat, store } = await harness({
+      allow: [],
+      script: [
+        () => {
+          steering.push("q1", "and one more thing");
+          return [{ type: "text-delta", text: "First" }, { type: "done" }];
+        },
+        () => [{ type: "text-delta", text: "Second" }, { type: "done" }],
+      ],
+    });
+    const events = await collect(deps, { chatId: chat.id, content: "Hi", profileId: "fast", steering });
+    const saved = await store.messages.listByChat(chat.id);
+    expect(saved.map((message) => [message.role, message.content])).toEqual([
+      ["user", "Hi"],
+      ["assistant", "First"],
+      ["user", "and one more thing"],
+      ["assistant", "Second"],
+    ]);
+    expect(events.filter((event) => event.type === "done")).toEqual([{ type: "done", finishReason: "stop" }]);
+  });
+
+  test("a provider with live input takes steering messages while it runs", async () => {
+    const steering = steeringQueue();
+    const { deps, chat, store } = await harness({
+      allow: [],
+      script: [
+        (req) => {
+          steering.push("q1", "shorter please");
+          const taken = req.input?.take() ?? [];
+          return [{ type: "text-delta", text: `Got ${taken.join(",")}` }, { type: "done" }];
+        },
+      ],
+    });
+    const events = await collect(deps, { chatId: chat.id, content: "Hi", profileId: "fast", steering });
+    const saved = await store.messages.listByChat(chat.id);
+    expect(saved.map((message) => [message.role, message.content])).toEqual([
+      ["user", "Hi"],
+      ["user", "shorter please"],
+      ["assistant", "Got shorter please"],
+    ]);
+    expect(events.some((event) => event.type === "steer")).toBe(true);
+    expect(events.at(-1)).toEqual({ type: "done", finishReason: "stop" });
   });
 
   test("executes an allowed tool and feeds the result back", async () => {

@@ -28,6 +28,18 @@ export function parseCliLine(line: string): ParsedCliLine {
   return extracted ?? { kind: "ignore" };
 }
 
+/** Claude Code's end-of-turn event. With stream-json input, stdin can close after it. */
+export function isCliTurnResult(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("{")) return false;
+  try {
+    const value = JSON.parse(trimmed) as unknown;
+    return typeof value === "object" && value !== null && (value as { type?: unknown }).type === "result";
+  } catch {
+    return false;
+  }
+}
+
 function extractEvent(value: Record<string, unknown>): ParsedCliLine | null {
   const delta = textDelta(value);
   if (delta) return { kind: "delta", text: delta };

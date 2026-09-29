@@ -72,6 +72,7 @@ export {
   type CliSpawnPlan,
   type CliStreamEvent,
   type CliToolCallEvent,
+  type CliLiveInput,
   type CliToolEventSource,
   type RunCliInput,
 } from "./cli/index.ts";

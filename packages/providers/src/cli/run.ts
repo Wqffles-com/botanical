@@ -3,8 +3,8 @@ import { createInterface } from "node:readline";
 import type { Writable } from "node:stream";
 
 import { runCliChildEnv } from "./child-env.ts";
-import { prepareCliLaunch, type CliMcpTarget } from "./launch.ts";
-import { parseCliLine } from "./parse.ts";
+import { claudeUserMessage, prepareCliLaunch, type CliMcpTarget } from "./launch.ts";
+import { isCliTurnResult, parseCliLine } from "./parse.ts";
 import { renderCliPrompt, type CliPromptMessage } from "./prompt.ts";
 import type { CliName } from "./types.ts";
 
@@ -34,6 +34,12 @@ export interface CliToolEventSource {
   subscribe(listener: (event: CliToolCallEvent) => void): () => void;
 }
 
+/** User messages sent while the CLI runs. `take` removes and returns the waiting text. */
+export interface CliLiveInput {
+  take(): string[];
+  subscribe(listener: () => void): () => void;
+}
+
 export interface RunCliInput {
   cli: CliName;
   /** Executable path. Spawned directly — no shell. */
@@ -52,6 +58,12 @@ export interface RunCliInput {
   mcp?: CliMcpTarget;
   /** Tool calls the MCP handler pushes while this process is running. */
   toolEvents?: CliToolEventSource;
+  /**
+   * Messages to hand the CLI while it runs. Only Claude Code takes them: its
+   * stdin stays open until it reports a result. Other CLIs ignore this, and
+   * the agent loop answers the messages after the run.
+   */
+  input?: CliLiveInput;
 }
 
 const STDERR_LIMIT = 4_000;
@@ -59,6 +71,7 @@ const STDERR_LIMIT = 4_000;
 /**
  * Run a coding-agent CLI and yield text-delta / tool-call / error / done.
  * The prompt is a temp file (Grok) or stdin (Claude Code, Codex), never argv.
+ * Claude Code also gets `input` messages on stdin while it runs.
  * Cancellation and timeout kill the process group. Config files are removed
  * on every exit path, and a pre-existing Grok project config is restored.
  */
@@ -80,6 +93,7 @@ export async function* runCli(input: RunCliInput): AsyncGenerator<CliStreamEvent
   const stderr: string[] = [];
   let stderrChars = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let closeInput: (() => void) | undefined;
   const onAbort = () => {
     cancelled = true;
     if (child) killProcessTree(child);
@@ -93,7 +107,9 @@ export async function* runCli(input: RunCliInput): AsyncGenerator<CliStreamEvent
       detached: process.platform !== "win32",
     });
     const spawned = child;
-    writeStdin(spawned.stdin ?? null, plan.stdin);
+    const live = input.cli === "claude" ? input.input : undefined;
+    if (live && spawned.stdin) closeInput = openLiveInput(spawned.stdin, plan.stdin ?? "", live);
+    else writeStdin(spawned.stdin ?? null, plan.stdin);
 
     const kill = () => killProcessTree(spawned);
     if (input.signal?.aborted) {
@@ -131,7 +147,7 @@ export async function* runCli(input: RunCliInput): AsyncGenerator<CliStreamEvent
     const closeSink = () => {
       if (stdoutFinished && exitFinished) sink.close();
     };
-    const stdoutDone = readStdout(spawned, sink).then(
+    const stdoutDone = readStdout(spawned, sink, () => closeInput?.()).then(
       () => {
         stdoutFinished = true;
         closeSink();
@@ -187,6 +203,7 @@ export async function* runCli(input: RunCliInput): AsyncGenerator<CliStreamEvent
     }
     yield { type: "done" };
   } finally {
+    closeInput?.();
     unsubscribe?.();
     if (timer) clearTimeout(timer);
     input.signal?.removeEventListener("abort", onAbort);
@@ -194,13 +211,18 @@ export async function* runCli(input: RunCliInput): AsyncGenerator<CliStreamEvent
   }
 }
 
-async function readStdout(child: ChildProcess, sink: Sink<CliStreamEvent>): Promise<void> {
+async function readStdout(
+  child: ChildProcess,
+  sink: Sink<CliStreamEvent>,
+  onTurnResult: () => void,
+): Promise<void> {
   let sawDelta = false;
   let sawFinal = false;
   if (!child.stdout) return;
   const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
   try {
     for await (const line of lines) {
+      if (isCliTurnResult(line)) onTurnResult();
       const parsed = parseCliLine(line);
       if (parsed.kind === "ignore") continue;
       if (parsed.kind === "plain" || parsed.kind === "delta") {
@@ -215,6 +237,33 @@ async function readStdout(child: ChildProcess, sink: Sink<CliStreamEvent>): Prom
   } finally {
     lines.close();
   }
+}
+
+/**
+ * Claude Code stream-json input: write the prompt, then each message that
+ * arrives, and keep stdin open. Returns the close function, called once the
+ * CLI reports a result. Messages after that are left for the agent loop.
+ */
+function openLiveInput(stdin: Writable, first: string, live: CliLiveInput): () => void {
+  stdin.on("error", () => {
+    // The process group is killed on cancel. EPIPE is expected.
+  });
+  stdin.write(first);
+  let open = true;
+  const send = () => {
+    if (!open) return;
+    for (const text of live.take()) {
+      if (text.trim()) stdin.write(claudeUserMessage(text));
+    }
+  };
+  const unsubscribe = live.subscribe(send);
+  send();
+  return () => {
+    if (!open) return;
+    open = false;
+    unsubscribe();
+    stdin.end();
+  };
 }
 
 function writeStdin(stdin: Writable | null, text: string | undefined): void {

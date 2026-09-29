@@ -59,7 +59,7 @@ export { mergeCliProfiles, parseCliProfileShortcut, splitProfileDocument } from 
 export { CLI_MCP_SERVER_NAME, CLI_MCP_TOKEN_ENV, prepareCliLaunch, type CliMcpTarget, type CliSpawnPlan } from "./launch.ts";
 export { parseCliLine, type ParsedCliLine } from "./parse.ts";
 export { renderCliPrompt, type CliPromptMessage } from "./prompt.ts";
-export { runChildEnv, runCli, type CliStreamEvent, type CliToolCallEvent, type CliToolEventSource, type RunCliInput } from "./run.ts";
+export { runChildEnv, runCli, type CliStreamEvent, type CliToolCallEvent, type CliLiveInput, type CliToolEventSource, type RunCliInput } from "./run.ts";
 export {
   CLI_NAMES,
   CLI_PROFILE_PRESET_IDS,

@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import { bearer, createAgent, login, readJson, setup } from "./helpers.ts";
 
-/** OpenAI-style provider that holds each reply until the test releases it. */
-function gatedFetch() {
+/** OpenAI-style provider that holds each reply until the test releases it. `toolFirst` makes reply 1 a `file_list` call. */
+function gatedFetch(options: { toolFirst?: boolean } = {}) {
   const requests: Array<{ messages: Array<{ role: string; content: unknown }> }> = [];
   const gates: Array<() => void> = [];
   let arrived: (() => void) | null = null;
@@ -16,10 +16,15 @@ function gatedFetch() {
     return new Promise((resolve, reject) => {
       init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
       gates.push(() => {
-        const sse = [
-          `data: ${JSON.stringify({ choices: [{ delta: { content: `reply ${n}` } }] })}\n\n`,
-          "data: [DONE]\n\n",
-        ].join("");
+        const delta =
+          options.toolFirst && n === 1
+            ? {
+                tool_calls: [
+                  { index: 0, id: "call_files", type: "function", function: { name: "file_list", arguments: '{"path":"."}' } },
+                ],
+              }
+            : { content: `reply ${n}` };
+        const sse = [`data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`, "data: [DONE]\n\n"].join("");
         resolve(new Response(sse, { status: 200, headers: { "content-type": "text/event-stream" } }));
       });
     });
@@ -41,8 +46,8 @@ function gatedFetch() {
   };
 }
 
-async function openChat(app: ReturnType<typeof setup>["app"], token: string): Promise<string> {
-  const agent = await createAgent(app, token, { toolIds: [] });
+async function openChat(app: ReturnType<typeof setup>["app"], token: string, toolIds: string[] = []): Promise<string> {
+  const agent = await createAgent(app, token, { toolIds });
   const created = await app.fetch(
     new Request("http://localhost/api/chats", {
       method: "POST",
@@ -76,7 +81,7 @@ async function transcript(app: ReturnType<typeof setup>["app"], token: string, c
 }
 
 describe("async chat messages", () => {
-  test("returns 202 at once and answers messages sent mid-turn in one batch", async () => {
+  test("returns 202 at once and answers messages sent mid-turn before the turn ends", async () => {
     const provider = gatedFetch();
     const { app } = setup({}, { fetch: provider.fetch });
     const { token } = await login(app);
@@ -107,6 +112,36 @@ describe("async chat messages", () => {
       ["user", "three"],
       ["assistant", "reply 2"],
     ]);
+  });
+
+  test("a message sent during a tool step steers the model's next step", async () => {
+    const provider = gatedFetch({ toolFirst: true });
+    const { app } = setup({}, { fetch: provider.fetch });
+    const { token } = await login(app);
+    const chatId = await openChat(app, token, ["file_list"]);
+    const events: Array<{ event: string; data: unknown }> = [];
+    app.chatQueue.subscribe(chatId, (event) => events.push(event));
+
+    await queueMessage(app, token, chatId, { content: "list the files", clientId: "c1" });
+    await provider.waitForRequests(1);
+    await queueMessage(app, token, chatId, { content: "only the docs folder", clientId: "c2" });
+    provider.release();
+    await provider.waitForRequests(2);
+    provider.release();
+    await app.chatQueue.whenIdle();
+
+    expect(provider.requests).toHaveLength(2);
+    const roles = provider.requests[1]?.messages.map((message) => message.role);
+    expect(roles?.slice(-3)).toEqual(["assistant", "tool", "user"]);
+    expect(provider.requests[1]?.messages.at(-1)?.content).toBe("only the docs folder");
+    const rows = await transcript(app, token, chatId);
+    expect(rows.map((row) => row.role)).toEqual(["user", "assistant", "tool", "user", "assistant"]);
+    expect(rows.at(-1)?.content).toBe("reply 2");
+    const steered = events.find(
+      (event) => event.event === "message" && (event.data as { queuedId?: string }).queuedId === "c2",
+    );
+    expect(steered).toBeDefined();
+    expect(app.chatQueue.status(chatId)).toEqual({ running: false, queued: [] });
   });
 
   test("edits and deletes wait for the agent, and are broadcast", async () => {

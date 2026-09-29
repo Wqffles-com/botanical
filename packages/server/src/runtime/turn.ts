@@ -7,6 +7,7 @@ import {
   runAgentTurn,
   type RuntimeDeps,
   type RuntimeEvent,
+  type TurnSteering,
 } from "@botanical/agent-runtime";
 import { ProviderError } from "@botanical/providers";
 import { HttpError } from "../http.ts";
@@ -53,6 +54,8 @@ export interface ChatTurnInput {
   signal?: AbortSignal;
   /** False when the user messages were stored before the turn (a queued batch). */
   appendUserMessage?: boolean;
+  /** Messages sent while the turn runs (the async chat queue). */
+  steering?: TurnSteering;
 }
 
 export async function* streamChatTurn(
@@ -76,6 +79,7 @@ export async function* streamChatTurn(
       profileId: profile.id,
       ...(input.signal ? { signal: input.signal } : {}),
       ...(input.appendUserMessage === false ? { appendUserMessage: false } : {}),
+      ...(input.steering ? { steering: input.steering } : {}),
     })) {
       if (event.type === "step" || event.type === "inbox" || event.type === "a2a-sent") {
         yield* announce();
@@ -150,6 +154,8 @@ export async function collectChatTurn(
 
 function mapRuntimeEvent(event: RuntimeEvent): SseEvent | null {
   switch (event.type) {
+    case "steer":
+      return { event: "steer", data: { type: "steer", messages: event.messages } };
     case "text-delta":
       return { event: "text-delta", data: { type: "text-delta", text: event.text } };
     case "tool-call":

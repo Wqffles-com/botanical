@@ -39,9 +39,12 @@ export {
   type ChatMessage,
   type ChatRequest,
   type ContentPart,
+  type LiveInput,
   type LLMProvider,
   type ModelCapabilities,
+  type SteeringMessage,
   type ToolDefinition,
+  type TurnSteering,
 } from "./provider";
 export { type FinishReason, type RuntimeEvent } from "./events";
 export {

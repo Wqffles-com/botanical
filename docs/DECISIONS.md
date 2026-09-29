@@ -385,10 +385,26 @@ Short entries. Earlier entries still hold unless a status line here changes them
 
 - The web client posts with `async: true`. The server queues the message and answers `202` at once. It does not hold the request open for the turn.
 - Turns run on the server, detached from the request, one at a time per chat (the same per-chat lock as every other turn). Closing the tab does not stop the agent.
-- Everything queued while a turn runs is answered by the next turn together: the messages are stored as separate user rows and the agent gives one reply for the batch.
+- Everything queued while a turn runs is answered by the next turn together: the messages are stored as separate user rows and the agent gives one reply for the batch. Superseded for most messages by mid-turn steering (2026-09-29, below).
 - Queued messages are written to the transcript only when their turn starts, so a message sent mid-turn never lands between a tool call and its result.
 - `GET /api/chats/:id/events` pushes the queue status and each stored message whole. Text deltas are not sent. `POST /api/chats/:id/stop` aborts the running turn; messages queued after it still get their turn.
 - The queue lives in the API process, like the per-chat lock. A restart drops messages that were still waiting.
 - The streaming (`stream: true`) and blocking JSON forms of `POST /api/chats/:id/messages` stay for other clients.
 
 **Considered:** A visible agent that answers at once and hands the work to a hidden background agent on the same profile. Not built: the chat's own turn already runs in the background on that profile, and a second agent would need a hidden chat, a way to report back, and rules for two agents writing one transcript. It can be layered on later as a delegation tool if replies during long work matter.
+
+---
+
+## 2026-09-29: Steer a running turn
+
+**Status:** Accepted. Shipped for async chat (issue #77).
+**Effect:** A message sent while the agent works reaches the model during that turn, so the person can correct or redirect it without stopping it. Before, the message waited in the queue until the turn ended.
+
+- The agent loop takes waiting messages before each model step, after the step's tool results are stored. They go into the transcript as user rows and the model reads them on its next call. This works for every API provider.
+- If the model finishes while a message is waiting, the same turn continues and answers it, up to the step cap.
+- Claude Code runs with `--input-format stream-json`. Its stdin stays open while it runs, and each new message is written to it as a user message, so Claude Code reads it without a restart. stdin closes when the CLI reports its `result`.
+- Codex (`codex exec`) and Grok Build read one prompt and have no live input. For them the message is answered right after the CLI run, in the same turn, with the full transcript.
+- Only messages for the turn's profile steer it. A message sent with another profile, or one that arrives after the step cap, waits for the next turn as before.
+- Steered messages still go out on `GET /api/chats/:id/events` as `message` events with their `queuedId`, so the web client needs no change.
+
+**Considered:** Aborting the running model call when a message arrives and restarting with the new message. Not built: it throws away work in progress, and for CLIs it would kill the process and its working state.
