@@ -8,6 +8,9 @@ import {
   applyQueueStatus,
   markAccepted,
   mergeMessage,
+  promptFor,
+  removeMessages,
+  replaceMessage,
   settlePending,
   type PendingMessage,
 } from "@/lib/chat-queue";
@@ -92,6 +95,14 @@ export function useChatThread(chatId: string) {
         setError(event.error);
         return;
       }
+      if (event.type === "message-updated") {
+        setMessages((current) => replaceMessage(current, event.message));
+        return;
+      }
+      if (event.type === "messages-deleted") {
+        setMessages((current) => removeMessages(current, event.ids));
+        return;
+      }
       setPending((current) => applyQueueStatus(current, event));
       setWorking(event.running);
       if (workingRef.current && !event.running) {
@@ -145,40 +156,105 @@ export function useChatThread(chatId: string) {
     [profileId, profiles],
   );
 
-  const send = useCallback(async () => {
-    const content = draft.trim();
-    if (!content) return false;
+  /** True when the chat has a usable profile to send with. */
+  const canPost = useCallback(() => {
     if (unavailableProfileHint(profiles.find((item) => item.id === profileId) ?? null)) return false;
     if (!profileId) {
       setProfileError(profileRequiredMessage());
       return false;
     }
-    setError(null);
-    setProfileError(null);
-    const id = crypto.randomUUID();
-    setPending((current) => [...current, { id, content, createdAt: new Date().toISOString(), posting: true }]);
+    return true;
+  }, [profileId, profiles]);
+
+  /** Queue `content` as the next user message. `restore` puts it back in the composer when the post fails. */
+  const post = useCallback(
+    async (content: string, restore: boolean) => {
+      if (!profileId || !canPost()) return false;
+      setError(null);
+      setProfileError(null);
+      const id = crypto.randomUUID();
+      setPending((current) => [...current, { id, content, createdAt: new Date().toISOString(), posting: true }]);
+      try {
+        await api.queueMessage(chatId, { content, profileId, clientId: id });
+        setPending((current) => markAccepted(current, id));
+        return true;
+      } catch (err) {
+        setPending((current) => current.filter((row) => row.id !== id));
+        if (restore) setDraft((current) => (current.trim() ? current : content));
+        if (isProfileRequired(err)) {
+          setProfileError(profileRequiredMessage(err));
+          return false;
+        }
+        const unavailable = unavailableCopy(err);
+        if (unavailable) {
+          setProfileError(unavailable);
+          toast.error(unavailable);
+          return false;
+        }
+        setError(errorText(err));
+        return false;
+      }
+    },
+    [canPost, chatId, profileId, unavailableCopy],
+  );
+
+  const send = useCallback(async () => {
+    const content = draft.trim();
+    if (!content || !canPost()) return false;
     setDraft("");
-    try {
-      await api.queueMessage(chatId, { content, profileId, clientId: id });
-      setPending((current) => markAccepted(current, id));
-      return true;
-    } catch (err) {
-      setPending((current) => current.filter((row) => row.id !== id));
-      setDraft((current) => (current.trim() ? current : content));
-      if (isProfileRequired(err)) {
-        setProfileError(profileRequiredMessage(err));
+    return post(content, true);
+  }, [canPost, draft, post]);
+
+  /** Delete a message, or it and everything after it. */
+  const deleteMessage = useCallback(
+    async (messageId: string, following = false) => {
+      try {
+        const ids = await api.deleteMessage(chatId, messageId, { following });
+        setMessages((current) => removeMessages(current, ids));
+        return true;
+      } catch (err) {
+        toast.error(errorText(err));
         return false;
       }
-      const unavailable = unavailableCopy(err);
-      if (unavailable) {
-        setProfileError(unavailable);
-        toast.error(unavailable);
+    },
+    [chatId],
+  );
+
+  /** Save new text for a message in place. The agent is not asked again. */
+  const editMessage = useCallback(
+    async (messageId: string, content: string) => {
+      try {
+        const message = await api.updateMessage(chatId, messageId, content);
+        setMessages((current) => replaceMessage(current, message));
+        return true;
+      } catch (err) {
+        toast.error(errorText(err));
         return false;
       }
-      setError(errorText(err));
-      return false;
-    }
-  }, [chatId, draft, profileId, profiles, unavailableCopy]);
+    },
+    [chatId],
+  );
+
+  /** Rewind to a user message and send `content` in its place, so the agent answers again. */
+  const resend = useCallback(
+    async (messageId: string, content: string) => {
+      const text = content.trim();
+      if (!text || !canPost()) return false;
+      if (!(await deleteMessage(messageId, true))) return false;
+      return post(text, false);
+    },
+    [canPost, deleteMessage, post],
+  );
+
+  /** Ask again for a reply: resend the user message it answers. */
+  const retry = useCallback(
+    async (messageId: string) => {
+      const prompt = promptFor(messages, messageId);
+      if (!prompt) return false;
+      return resend(prompt.id, prompt.content);
+    },
+    [messages, resend],
+  );
 
   const stop = useCallback(() => {
     void api.stopChat(chatId).catch((err: unknown) => setError(errorText(err)));
@@ -203,5 +279,9 @@ export function useChatThread(chatId: string) {
     setProfile,
     send,
     stop,
+    editMessage,
+    deleteMessage,
+    resend,
+    retry,
   };
 }

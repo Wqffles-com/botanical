@@ -57,7 +57,7 @@ export {
   type SendAgentMessageInput,
 } from "./a2a";
 export { assertChatAgentBinding, rejectAgentRebind } from "./binding";
-export { buildSystemPrompt } from "./prompt";
+export { buildSystemPrompt, RESPONSE_STYLE } from "./prompt";
 export { renderMemorySection, selectMemories, type MemorySnippet } from "./memories";
 export {
   BUILTIN_ROLE_IDS,

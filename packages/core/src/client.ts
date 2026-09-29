@@ -499,6 +499,29 @@ export class BotanicalClient {
   }
 
   /** Stop the chat's running turn. False when nothing was running. */
+  /** Replace the text of a user or assistant message. */
+  async updateMessage(chatId: string, messageId: string, content: string): Promise<ChatMessage> {
+    const text = content.trim();
+    if (!text) throw new BotanicalApiError("A message cannot be empty.", { status: 400 });
+    const body = await this.requestJson(API.message(chatId, messageId), {
+      method: "PATCH",
+      body: JSON.stringify({ content: text }),
+    });
+    const row = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+    return normalizeMessage(row.message);
+  }
+
+  /**
+   * Delete a message. An assistant message takes its tool results with it.
+   * With `following`, every later message is deleted too. Returns the removed ids.
+   */
+  async deleteMessage(chatId: string, messageId: string, options: { following?: boolean } = {}): Promise<string[]> {
+    const path = API.message(chatId, messageId) + (options.following ? "?following=true" : "");
+    const body = await this.requestJson(path, { method: "DELETE" });
+    const row = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+    return Array.isArray(row.deleted) ? row.deleted.filter((id): id is string => typeof id === "string") : [];
+  }
+
   async stopChat(chatId: string): Promise<boolean> {
     const body = await this.requestJson(API.chatStop(chatId), { method: "POST", body: "{}" });
     const row = body && typeof body === "object" ? (body as Record<string, unknown>) : {};

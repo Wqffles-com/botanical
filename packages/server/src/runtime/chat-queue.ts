@@ -25,6 +25,8 @@ export interface QueuedMessage {
  * - `message` `{ message, queuedId? }` for each stored message. User messages carry the queue id they came from,
  *   including ones the running turn took mid-turn.
  * - `error` `{ error, code }` when a turn fails. A stopped turn does not report one.
+ * - `message-updated` `{ message }` after a message's text is edited.
+ * - `messages-deleted` `{ ids }` after messages are deleted.
  */
 export type ChatListener = (event: SseEvent) => void;
 
@@ -233,6 +235,12 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
     status(chatId: string): { running: boolean; queued: QueuedMessage[] } {
       const state = chats.get(chatId);
       return { running: state?.running ?? false, queued: state ? [...state.queue] : [] };
+    },
+
+    /** Send an event to every listener on a chat, such as an edit made outside a turn. */
+    broadcast(chatId: string, event: SseEvent): void {
+      const state = chats.get(chatId);
+      if (state) publish(state, event);
     },
 
     /** Listen to a chat. The current status is sent right away. Returns the unsubscribe function. */

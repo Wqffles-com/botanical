@@ -77,7 +77,7 @@ async function transcript(app: ReturnType<typeof setup>["app"], token: string, c
   const response = await app.fetch(
     new Request(`http://localhost/api/chats/${chatId}/messages`, { headers: bearer(token) }),
   );
-  return (await readJson<{ messages: Array<{ role: string; content: string }> }>(response)).messages;
+  return (await readJson<{ messages: Array<{ id: string; role: string; content: string }> }>(response)).messages;
 }
 
 describe("async chat messages", () => {
@@ -142,6 +142,46 @@ describe("async chat messages", () => {
     );
     expect(steered).toBeDefined();
     expect(app.chatQueue.status(chatId)).toEqual({ running: false, queued: [] });
+  });
+
+  test("edits and deletes wait for the agent, and are broadcast", async () => {
+    const provider = gatedFetch();
+    const { app } = setup({}, { fetch: provider.fetch });
+    const { token } = await login(app);
+    const chatId = await openChat(app, token);
+    await queueMessage(app, token, chatId, { content: "one" });
+    await provider.waitForRequests(1);
+
+    const [row] = await transcript(app, token, chatId);
+    const url = `http://localhost/api/chats/${chatId}/messages/${row!.id}`;
+    const busyPatch = await app.fetch(
+      new Request(url, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", ...bearer(token) },
+        body: JSON.stringify({ content: "edited" }),
+      }),
+    );
+    expect(busyPatch.status).toBe(409);
+    expect((await app.fetch(new Request(url, { method: "DELETE", headers: bearer(token) }))).status).toBe(409);
+
+    provider.release();
+    await app.chatQueue.whenIdle();
+
+    const events: Array<{ event: string; data: unknown }> = [];
+    const unsubscribe = app.chatQueue.subscribe(chatId, (event) => events.push(event));
+    const edited = await app.fetch(
+      new Request(url, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", ...bearer(token) },
+        body: JSON.stringify({ content: "edited" }),
+      }),
+    );
+    expect(edited.status).toBe(200);
+    expect((await app.fetch(new Request(`${url}?following=true`, { method: "DELETE", headers: bearer(token) }))).status).toBe(200);
+    unsubscribe();
+
+    expect(events.map((event) => event.event)).toEqual(["status", "message-updated", "messages-deleted"]);
+    expect(await transcript(app, token, chatId)).toEqual([]);
   });
 
   test("events stream status and whole messages, without deltas", async () => {

@@ -7,6 +7,7 @@ import { ChatAgentHeader } from "@/components/chat/chat-agent-header";
 import { Composer } from "@/components/chat/composer";
 import { EmptyState } from "@botanical/ui/components/empty-state";
 import { MessageBubble } from "@/components/chat/message-bubble";
+import type { MessageActionHandlers } from "@/components/chat/message-actions";
 import { ProfileRequiredBanner } from "@/components/chat/profile-required-banner";
 import { ChatThreadSkeleton } from "@/components/chat/skeletons";
 import { identityFromUnknown } from "@/lib/agent-identity";
@@ -31,6 +32,10 @@ export function ChatThread({
   onProfile,
   onSend,
   onStop,
+  onEditMessage,
+  onDeleteMessage,
+  onResendMessage,
+  onRetryMessage,
   creator,
 }: {
   chat: Chat | null;
@@ -50,6 +55,10 @@ export function ChatThread({
   onProfile: (profileId: string | null) => void;
   onSend: () => void;
   onStop: () => void;
+  onEditMessage?: (messageId: string, content: string) => Promise<boolean>;
+  onDeleteMessage?: (messageId: string, following: boolean) => Promise<boolean>;
+  onResendMessage?: (messageId: string, content: string) => Promise<boolean>;
+  onRetryMessage?: (messageId: string) => Promise<boolean>;
   creator?: Agent | null;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -75,6 +84,19 @@ export function ChatThread({
   }
 
   const rows = presentThread(messages);
+  // The transcript is locked while the agent works or messages wait to be answered.
+  const locked = working || pending.length > 0;
+  const actionsFor = (message: ChatMessage): MessageActionHandlers | undefined => {
+    if (!onDeleteMessage) return undefined;
+    const user = message.role === "user";
+    return {
+      disabled: locked,
+      onDelete: (following) => onDeleteMessage(message.id, following),
+      ...(onEditMessage && !user ? { onEdit: (content: string) => onEditMessage(message.id, content) } : {}),
+      ...(onResendMessage && user ? { onResend: (content: string) => onResendMessage(message.id, content) } : {}),
+      ...(onRetryMessage && !user ? { onRetry: () => onRetryMessage(message.id) } : {}),
+    };
+  };
   const unavailable = Boolean(profileError && /unavailable/i.test(profileError));
 
   return (
@@ -121,6 +143,7 @@ export function ChatThread({
                 message={row.message}
                 agent={agent}
                 toolCalls={row.tools.length > 0 ? row.tools : undefined}
+                actions={actionsFor(row.message)}
               />
             ))}
             {working ? (

@@ -7,7 +7,7 @@ import type { ChatQueue } from "../runtime/chat-queue.ts";
 import type { TurnCoordinator } from "../runtime/turns.ts";
 import { authed, type Router } from "../router.ts";
 import { sseStream, type SseEvent } from "../streaming.ts";
-import type { Chat } from "../types.ts";
+import type { Chat, Message } from "../types.ts";
 import { LIMITS, readBoundedString, requireParam } from "../validate.ts";
 
 export function registerMessages(
@@ -90,6 +90,51 @@ export function registerMessages(
   );
 
   router.add(
+    "PATCH",
+    "/api/chats/:id/messages/:messageId",
+    authed(async (ctx) => {
+      const chat = await loadChat(ctx.store, requireParam(ctx.params, "id"));
+      const messageId = requireParam(ctx.params, "messageId");
+      const body = await readJson(ctx.request, ctx.config);
+      if (!isRecord(body)) throw new HttpError(400, "invalid_body", "JSON object expected");
+      const content = readBoundedString(body.content, "content", { required: true, max: LIMITS.content });
+      if (!content) throw new HttpError(400, "invalid_body", "content is required");
+      assertIdle(queue, chat.id);
+      const message = await turns.exclusive(chat.id, async () => {
+        const current = (await ctx.store.messages.listByChat(chat.id)).find((row) => row.id === messageId);
+        if (!current) throw new HttpError(404, "not_found", "Message not found");
+        if (current.role !== "user" && current.role !== "assistant") {
+          throw new HttpError(400, "invalid_body", "Only user and assistant messages can be edited");
+        }
+        const updated = await ctx.store.messages.updateContent(chat.id, messageId, content);
+        if (!updated) throw new HttpError(404, "not_found", "Message not found");
+        return updated;
+      });
+      queue.broadcast(chat.id, { event: "message-updated", data: { message } });
+      return json(200, { message });
+    }),
+  );
+
+  router.add(
+    "DELETE",
+    "/api/chats/:id/messages/:messageId",
+    authed(async (ctx) => {
+      const chat = await loadChat(ctx.store, requireParam(ctx.params, "id"));
+      const messageId = requireParam(ctx.params, "messageId");
+      const following = readFlag(ctx.url.searchParams.get("following"), "following");
+      assertIdle(queue, chat.id);
+      const ids = await turns.exclusive(chat.id, async () => {
+        const doomed = messagesToDelete(await ctx.store.messages.listByChat(chat.id), messageId, following);
+        if (!doomed) throw new HttpError(404, "not_found", "Message not found");
+        await ctx.store.messages.deleteMany(chat.id, doomed);
+        return doomed;
+      });
+      queue.broadcast(chat.id, { event: "messages-deleted", data: { ids } });
+      return json(200, { deleted: ids });
+    }),
+  );
+
+  router.add(
     "GET",
     "/api/chats/:id/events",
     authed(async (ctx) => {
@@ -136,6 +181,37 @@ async function* chatEvents(queue: ChatQueue, chatId: string, signal: AbortSignal
     unsubscribe();
     signal.removeEventListener("abort", notify);
   }
+}
+
+/**
+ * Ids removed by deleting one message. An assistant message takes its tool results
+ * with it, so no result is left without its call. With `following`, every later
+ * message goes too. Null when the message is not in the transcript.
+ */
+export function messagesToDelete(messages: readonly Message[], id: string, following: boolean): string[] | null {
+  const index = messages.findIndex((message) => message.id === id);
+  if (index === -1) return null;
+  if (following) return messages.slice(index).map((message) => message.id);
+  const target = messages[index] as Message;
+  const calls = new Set((target.toolCalls ?? []).map((call) => call.id));
+  const results = messages.filter(
+    (message) => message.role === "tool" && message.toolCallId !== undefined && calls.has(message.toolCallId),
+  );
+  return [target.id, ...results.map((message) => message.id)];
+}
+
+/** Edits wait for the agent: a running turn is still reading and writing the transcript. */
+function assertIdle(queue: ChatQueue, chatId: string): void {
+  const status = queue.status(chatId);
+  if (status.running || status.queued.length > 0) {
+    throw new HttpError(409, "chat_busy", "Wait for the agent to finish before changing messages");
+  }
+}
+
+function readFlag(value: string | null, field: string): boolean {
+  if (value === null || value === "" || value === "false" || value === "0") return false;
+  if (value === "true" || value === "1") return true;
+  throw new HttpError(400, "invalid_query", `${field} must be true or false`);
 }
 
 async function loadChat(store: { chats: { get(id: string): Promise<Chat | null> } }, id: string): Promise<Chat> {
