@@ -47,6 +47,8 @@ export interface ModelProfile {
   unavailableReason?: string | null;
   /** Set on CLI profiles: `grok`, `claude`, or `codex`. */
   cli?: string | null;
+  /** True on a CLI profile that lets the CLI choose its own model. `model` then names the binary, not a model. */
+  defaultModel?: boolean;
 }
 
 export interface RolePermissions {

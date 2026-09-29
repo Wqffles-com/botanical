@@ -36,6 +36,8 @@ export async function presentProfile(profile: ModelProfile) {
     available,
     ...(available ? {} : { unavailableReason: unavailableReason ?? "CLI profile is unavailable" }),
     ...(profile.cli ? { cli: profile.cli } : {}),
+    // A CLI profile without a pinned model lets the CLI pick; `model` then only names the binary.
+    ...(kind === "cli" && !profile.passModel ? { defaultModel: true } : {}),
     ...(profile.baseUrl ? { baseUrl: profile.baseUrl } : {}),
     ...(profile.maxTokens !== undefined ? { maxTokens: profile.maxTokens } : {}),
   };

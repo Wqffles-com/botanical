@@ -168,7 +168,7 @@ export function NewChatForm({
       ) : null}
 
       <section className="space-y-2">
-        <Label htmlFor="new-chat-profile">Model profile</Label>
+        <Label htmlFor="new-chat-profile">Model</Label>
         {profiles.length === 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
             <p className="text-sm text-muted-foreground">No model profiles yet.</p>
@@ -182,7 +182,7 @@ export function NewChatForm({
         )}
         {agentDefault && profileId === agentDefault ? (
           <p data-testid="profile-default-hint" className="text-xs text-muted-foreground">
-            {agent?.name ?? "This agent"}&apos;s default. Pick another profile to override it for this chat.
+            {agent?.name ?? "This agent"}&apos;s default. Pick another model to override it for this chat.
           </p>
         ) : null}
       </section>

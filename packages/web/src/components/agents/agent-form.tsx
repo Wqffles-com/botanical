@@ -15,12 +15,12 @@ import { AgentColorPicker } from "@/components/agents/agent-color-picker";
 import { AgentIconPicker } from "@/components/agents/agent-icon-picker";
 import { AgentShapePicker } from "@/components/agents/agent-shape-picker";
 import { AgentToolAllowlist } from "@/components/agents/agent-tool-allowlist";
+import { ProfileSelect } from "@/components/chat/profile-select";
 import { useWorkspace } from "@/components/workspace-provider";
 import { Button } from "@botanical/ui/components/button";
 import { Input } from "@botanical/ui/components/input";
 import { Checkbox } from "@botanical/ui/components/checkbox";
 import { Label } from "@botanical/ui/components/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@botanical/ui/components/select";
 import { Textarea } from "@botanical/ui/components/textarea";
 import { previewEffective } from "@/lib/permissions";
 import { createAgent, deleteAgent, updateAgent } from "@/lib/agent-api";
@@ -39,8 +39,6 @@ import {
 } from "@/lib/agent-identity";
 import type { AgentShape } from "@botanical/core";
 import type { AgentIconName } from "@/lib/agent-icons";
-
-const NO_PROFILE = "__none__";
 
 export function AgentForm({
   agent,
@@ -340,36 +338,18 @@ export function AgentForm({
         <div className="grid gap-2">
           <Label htmlFor="agent-profile">Default model</Label>
           <p className="text-xs text-muted-foreground">
-            Pre-selected when you start a chat with this agent. You can pick a different profile for any chat.
+            Pre-selected when you start a chat with this agent. You can pick a different model for any chat.
           </p>
-          <Select
-            items={[
-              { value: NO_PROFILE, label: "None (pick per chat)" },
-              ...profiles.map((profile) => ({ value: profile.id, label: profile.name })),
-            ]}
-            value={draft.defaultProfileId ?? NO_PROFILE}
-            onValueChange={(next) =>
-              patch({ defaultProfileId: typeof next === "string" && next !== NO_PROFILE ? next : null })
-            }
-          >
-            <SelectTrigger id="agent-profile" className="w-full sm:w-80">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_PROFILE}>None (pick per chat)</SelectItem>
-              {profiles.map((profile) => (
-                <SelectItem key={profile.id} value={profile.id} disabled={!profile.available}>
-                  <span className="truncate">
-                    {profile.name}
-                    {profile.model ? <span className="text-muted-foreground"> · {profile.model}</span> : null}
-                    {profile.available ? null : (
-                      <span className="text-muted-foreground"> — {profile.unavailableReason ?? "Unavailable"}</span>
-                    )}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="w-full sm:max-w-xl">
+            <ProfileSelect
+              id="agent-profile"
+              profiles={profiles}
+              value={draft.defaultProfileId}
+              onChange={(next) => patch({ defaultProfileId: next })}
+              noneLabel="None (pick per chat)"
+              disabled={saving}
+            />
+          </div>
         </div>
       </div>
 
