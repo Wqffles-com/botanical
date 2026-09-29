@@ -248,7 +248,9 @@ export interface QueuedMessage {
 export type ChatEvent =
   | { type: "status"; running: boolean; queued: QueuedMessage[] }
   | { type: "message"; message: ChatMessage; queuedId?: string }
-  | { type: "error"; error: string; code: string };
+  | { type: "error"; error: string; code: string }
+  | { type: "message-updated"; message: ChatMessage }
+  | { type: "messages-deleted"; ids: string[] };
 
 /** Async agent-to-agent mail. Status moves pending → delivered → read, or failed. */
 export const AGENT_MESSAGE_STATUSES = ["pending", "delivered", "read", "failed"] as const;

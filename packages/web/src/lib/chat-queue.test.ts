@@ -1,6 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import type { ChatMessage } from "@botanical/core";
-import { applyQueueStatus, markAccepted, mergeMessage, settlePending, type PendingMessage } from "./chat-queue";
+import {
+  applyQueueStatus,
+  markAccepted,
+  mergeMessage,
+  promptFor,
+  removeMessages,
+  replaceMessage,
+  settlePending,
+  type PendingMessage,
+} from "./chat-queue";
 
 const at = "2026-09-28T00:00:00.000Z";
 
@@ -41,4 +50,28 @@ describe("chat queue state", () => {
     const busy = [row("a")];
     expect(applyQueueStatus(busy, { running: true, queued: [] })).toBe(busy);
   });
+
+  test("replaceMessage swaps an edited message in place", () => {
+    const rows = [stored("a", "user"), stored("b", "assistant")];
+    const next = replaceMessage(rows, { ...stored("b", "assistant"), content: "edited" });
+    expect(next.map((message) => message.content)).toEqual(["a", "edited"]);
+    expect(replaceMessage(rows, stored("z", "user"))).toBe(rows);
+  });
+
+  test("removeMessages drops the given ids", () => {
+    const rows = [stored("a", "user"), stored("b", "assistant"), stored("c", "user")];
+    expect(removeMessages(rows, ["b", "c"]).map((message) => message.id)).toEqual(["a"]);
+    expect(removeMessages(rows, ["z"])).toBe(rows);
+  });
+
+  test("promptFor finds the user message a reply answers", () => {
+    const rows = [stored("a", "user"), stored("b", "user"), stored("c", "assistant"), stored("d", "assistant")];
+    expect(promptFor(rows, "d")?.id).toBe("b");
+    expect(promptFor(rows, "a")).toBeNull();
+    expect(promptFor(rows, "z")).toBeNull();
+  });
 });
+
+function stored(id: string, role: ChatMessage["role"]): ChatMessage {
+  return { id, chatId: "chat", role, content: id, createdAt: "2026-01-01T00:00:00.000Z" };
+}
