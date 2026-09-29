@@ -53,7 +53,7 @@ describe('example agents', () => {
     await client.close();
   });
 
-  test('0007 adds platform tools only to example agents still on the original seed', async () => {
+  test('0008 adds platform tools only to example agents still on the original seed', async () => {
     const client = new PGlite();
     const db = drizzle(client, { schema });
     await migrate(db, { migrationsFolder: migrationsFolder() });
@@ -68,7 +68,7 @@ describe('example agents', () => {
       .where(eq(agents.id, builder as string));
     await db.update(agents).set({ tools: entries(['web_search']) }).where(eq(agents.id, scout as string));
 
-    await client.exec(readFileSync(join(migrationsFolder(), '0007_platform_tools.sql'), 'utf8'));
+    await client.exec(readFileSync(join(migrationsFolder(), '0008_platform_tools.sql'), 'utf8'));
 
     const rows = await db.select().from(agents);
     const tools = (id: string | undefined) => toolNames(rows.find((row) => row.id === id)?.tools);

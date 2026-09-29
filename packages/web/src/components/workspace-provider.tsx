@@ -27,6 +27,8 @@ type WorkspaceState = {
   renameChat: (id: string, title: string) => Promise<void>;
   deleteChat: (id: string) => Promise<void>;
   setChatProfile: (id: string, profileId: string) => Promise<void>;
+  /** Replace a chat's group members. Throws when the server refuses. */
+  setChatMembers: (id: string, memberIds: string[]) => Promise<Chat>;
 };
 
 const WorkspaceContext = createContext<WorkspaceState | null>(null);
@@ -142,6 +144,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [router],
   );
 
+  const setChatMembers = useCallback(async (id: string, memberIds: string[]) => {
+    const updated = await api.updateChat(id, { memberIds });
+    if (!updated) throw new Error("Could not update the chat's members");
+    setChats((current) => current.map((chat) => (chat.id === id ? updated : chat)));
+    return updated;
+  }, []);
+
   const value = useMemo<WorkspaceState>(
     () => ({
       ready,
@@ -155,8 +164,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       renameChat,
       deleteChat,
       setChatProfile,
+      setChatMembers,
     }),
-    [ready, me, agents, chats, profiles, error, refresh, createChat, renameChat, deleteChat, setChatProfile],
+    [ready, me, agents, chats, profiles, error, refresh, createChat, renameChat, deleteChat, setChatProfile, setChatMembers],
   );
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

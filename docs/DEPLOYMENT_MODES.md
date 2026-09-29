@@ -24,7 +24,7 @@ Unset `BOTANICAL_DEPLOYMENT_MODE` means `self-host`. A process does not become S
 **Product (both modes):** an always-on server plus a web client:
 
 - Streaming chat, tools, and MCP
-- Unlimited user-defined agents, one agent per chat, async agent-to-agent messaging
+- Unlimited user-defined agents, group chats with several agents, async agent-to-agent messaging
 - Built-ins: web search/fetch, shell/code exec, file read/write
 - Postgres; model API keys server-side only; no silent default model
 - TypeScript on Bun

@@ -80,6 +80,19 @@ BEGIN
   IF agent_owner IS DISTINCT FROM NEW.user_id THEN
     RAISE EXCEPTION 'chat and agent must belong to the same user';
   END IF;
+  -- Group members: the owner's own agents, never the owner itself, each once.
+  IF NEW.agent_id = ANY(NEW.member_ids) THEN
+    RAISE EXCEPTION 'the owning agent cannot also be a chat member';
+  END IF;
+  IF cardinality(NEW.member_ids) <> (SELECT count(DISTINCT m) FROM unnest(NEW.member_ids) AS m) THEN
+    RAISE EXCEPTION 'chat members must be distinct';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM unnest(NEW.member_ids) AS m
+    WHERE NOT EXISTS (SELECT 1 FROM agents a WHERE a.id = m AND a.user_id = NEW.user_id)
+  ) THEN
+    RAISE EXCEPTION 'chat members must be agents of the same user';
+  END IF;
   -- A null profile owner is an admin-global profile any user may attach.
   IF profile_owner IS NOT NULL AND profile_owner IS DISTINCT FROM NEW.user_id THEN
     RAISE EXCEPTION 'chat and model profile must belong to the same user';

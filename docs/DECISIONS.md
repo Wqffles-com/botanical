@@ -16,7 +16,7 @@ This log records the project's design decisions and why they were made. Later en
 6. **Passcode auth.** Superseded on 2026-09-28 by accounts. See the multi-user entry below.
 7. **Stack.** TypeScript on Bun (Bun was picked over Deno when the repo was scaffolded).
 8. **Unlimited custom agents.** Each agent is defined by a prompt/description and a set of tools.
-9. **One agent per chat.** Each thread is owned by one agent, which keeps context and permissions unambiguous.
+9. **One agent per chat.** Each thread is owned by one agent, which keeps context and permissions unambiguous. Refined on 2026-09-29: a chat can add group members (see Group chats below).
 10. **Async agent-to-agent messaging.** Agents can message each other asynchronously (an inbox model) without merging chats.
 11. **Core built-in tools.** Web search/fetch, shell/code execution, and file read/write. Anything heavier (browser or computer use) is opt-in, not core.
 12. **Server-side keys only.** Model API keys live in the server environment and are never supplied by or sent to the web client.
@@ -147,7 +147,7 @@ A CLI turn opens `POST /internal/mcp/runs/<runId>` on the same server process fo
 - Calls made through the endpoint stream as `tool-call` / `tool-result` events and are stored as tool messages, so they render as tool cards. The CLI's own native tools are not Botanical tool cards.
 - `botanicalTools: false` on a CLI profile skips the endpoint. Presets from `BOTANICAL_CLI_PROFILES` leave it on.
 - The prompt names the tools `tools/list` will serve for this agent (up to 40), not a fixed example. Before this it always named `memory_write`, so a CLI reported it missing on agents that did not allowlist it (issue #92).
-- Botanical's own tools (`PLATFORM_TOOLS` in `packages/core/src/agents.ts`: memory, `agent_list`, `agent_create`, `notify_user`, `send_agent_message`) are on the example agents' allowlists and on a new agent's draft. They are not granted implicitly: the allowlist and roles still decide, so the CLI list stays the same as an API turn's. Migration `0007_platform_tools` adds them to example agents whose tools were never edited.
+- Botanical's own tools (`PLATFORM_TOOLS` in `packages/core/src/agents.ts`: memory, `agent_list`, `agent_create`, `notify_user`, `send_agent_message`) are on the example agents' allowlists and on a new agent's draft. They are not granted implicitly: the allowlist and roles still decide, so the CLI list stays the same as an API turn's. Migration `0008_platform_tools` adds them to example agents whose tools were never edited.
 - An agent that can use no tools also gets no endpoint. Its prompt says Botanical tools such as memory and agent messages are not enabled, and asks the CLI to say so rather than look for a workaround. Before this, Grok found an empty `botanical` server and went searching the workspace instead (issue #87).
 - Chat SSE streams send a `: ping` comment after 5 seconds without an event. Bun closes idle connections after 10 seconds, and CLI turns are often silent while the CLI looks up or runs tools; without the ping that aborted the turn.
 
@@ -413,3 +413,20 @@ Short entries. Earlier entries still hold unless a status line here changes them
 - Steered messages still go out on `GET /api/chats/:id/events` as `message` events with their `queuedId`, so the web client needs no change.
 
 **Considered:** Aborting the running model call when a message arrives and restarting with the new message. Not built: it throws away work in progress, and for CLIs it would kill the process and its working state.
+
+---
+
+## 2026-09-29: Group chats
+
+**Status:** Accepted. Shipped (issue #91).
+**Effect:** Refines "One agent per chat" (2026-09-23, item 9). A chat keeps one owning agent and can add other agents as members, so several agents can work on one thread with the user.
+
+- The owner stays fixed. Members are a list on the chat (`memberIds`, at most 7), in speaking order, and can be changed at any time from the chat header. An agent in a chat, as owner or member, cannot be deleted.
+- Each agent answers as itself: its own prompt, tools, roles, memory, and workspace. Every assistant and tool row records the agent that wrote it.
+- A user message is answered by the members it `@mentions`. With no mention, every participant answers in turn, owner first, one after another, so each reads the replies before its own.
+- An agent's reply that `@mentions` a participant who has not answered this message yet hands it the floor. Each agent answers at most once per user message, so agents cannot loop.
+- To an agent, the other agents' replies read as user messages that start with `[Name]`. Their tool calls and results stay out of its context, since they used tools it may not have.
+- In a group chat a mention of a member picks who answers and sends no A2A mail. A mention of an agent outside the chat still mails it, as before.
+- All agents in a chat use the chat's model profile. Only the first agent's turn can be steered; messages sent later wait for the next round.
+
+**Considered:** Letting every agent reply at once, in parallel. Not built: replies would ignore each other and the transcript order would depend on timing. A model-picked "next speaker" was also left out; mentions keep the choice visible to the user.

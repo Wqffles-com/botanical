@@ -181,7 +181,10 @@ export interface UpdateAgentInput {
  */
 export interface Chat {
   id: string;
+  /** The owning agent. */
   agentId: string;
+  /** Other agents in a group chat, in speaking order. Empty for a one-agent chat. */
+  memberIds: string[];
   profileId: string | null;
   title: string;
   createdAt: string;
@@ -191,6 +194,8 @@ export interface Chat {
 export interface CreateChatInput {
   /** Exactly one owning agent. */
   agentId: string;
+  /** Other agents that answer in the same chat (a group chat). Omit or leave empty for one agent. */
+  memberIds?: string[];
   /** Required. There is no server or client default profile. */
   profileId: string;
   title?: string;
@@ -199,6 +204,8 @@ export interface CreateChatInput {
 export interface UpdateChatInput {
   title?: string;
   profileId?: string;
+  /** Replaces the group members. An empty list makes it a one-agent chat again. */
+  memberIds?: string[];
 }
 
 export interface ToolCall {
@@ -222,6 +229,8 @@ export interface ChatMessage {
   toolCallId?: string;
   name?: string;
   profileId?: string | null;
+  /** Agent that wrote an assistant or tool row. Unset on user rows and older rows (the chat's owner). */
+  agentId?: string | null;
   usage?: TokenUsage | null;
 }
 
@@ -246,7 +255,8 @@ export interface QueuedMessage {
 
 /** `GET /api/chats/:id/events`. Replies arrive as whole messages, never as deltas. */
 export type ChatEvent =
-  | { type: "status"; running: boolean; queued: QueuedMessage[] }
+  /** `agentId` is the agent answering right now; it changes as group members take turns. */
+  | { type: "status"; running: boolean; queued: QueuedMessage[]; agentId?: string }
   | { type: "message"; message: ChatMessage; queuedId?: string }
   | { type: "error"; error: string; code: string }
   | { type: "message-updated"; message: ChatMessage }

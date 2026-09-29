@@ -12,12 +12,15 @@ export function ChatAgentHeader({
   trailing,
   className,
   creator,
+  members,
 }: {
   agent: AgentIdentity | null | undefined;
   title?: string;
   trailing?: ReactNode;
   className?: string;
   creator?: Agent | null;
+  /** Names of the other agents in a group chat. */
+  members?: string[];
 }) {
   if (!agent) {
     return (
@@ -54,7 +57,7 @@ export function ChatAgentHeader({
             <RoleBadges roles={agent.roles} />
           </span>
           <span className="block truncate text-xs text-muted-foreground">
-            {agent.title || agent.description || "Agent"}
+            {members && members.length > 0 ? `With ${members.join(", ")}` : agent.title || agent.description || "Agent"}
             {title && title !== agent.name ? ` · ${title}` : ""}
             {agent.createdByAgentId ? (
               <>

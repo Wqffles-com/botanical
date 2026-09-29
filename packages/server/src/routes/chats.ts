@@ -1,6 +1,7 @@
 import { HttpError, isRecord, json, noContent, readJson } from "../http.ts";
 import { readRequestedProfileId, resolveProfile } from "../profiles.ts";
 import { authed, type Router } from "../router.ts";
+import type { Store } from "../types.ts";
 import { LIMITS, readBoundedString, readRequiredId, requireParam } from "../validate.ts";
 
 export function registerChats(router: Router): void {
@@ -14,7 +15,7 @@ export function registerChats(router: Router): void {
         if (agentId.trim() === "" || agentId.length > LIMITS.id) {
           throw new HttpError(400, "invalid_query", "agentId is invalid");
         }
-        chats = chats.filter((chat) => chat.agentId === agentId);
+        chats = chats.filter((chat) => chat.agentId === agentId || chat.memberIds.includes(agentId));
       }
       return json(200, { chats });
     }),
@@ -30,6 +31,8 @@ export function registerChats(router: Router): void {
       const agent = await ctx.store.agents.get(agentId);
       if (!agent) throw new HttpError(404, "not_found", "Agent not found");
       const profile = await resolveProfile(ctx.store, readRequestedProfileId(body.profileId, true), undefined);
+      const memberIds =
+        body.memberIds === undefined ? [] : await readMemberIds(ctx.store, body.memberIds, agent.id);
       const title =
         body.title === undefined
           ? "New chat"
@@ -37,6 +40,7 @@ export function registerChats(router: Router): void {
       if (!title) throw new HttpError(400, "invalid_body", "title is required");
       const chat = await ctx.store.chats.create({
         agentId: agent.id,
+        memberIds,
         profileId: profile.id,
         title,
       });
@@ -63,7 +67,7 @@ export function registerChats(router: Router): void {
       if (!existing) throw new HttpError(404, "not_found", "Chat not found");
       const body = await readJson(ctx.request, ctx.config);
       if (!isRecord(body)) throw new HttpError(400, "invalid_body", "JSON object expected");
-      const patch: { title?: string; profileId?: string } = {};
+      const patch: { title?: string; profileId?: string; memberIds?: string[] } = {};
       if (body.title !== undefined) {
         const title = readBoundedString(body.title, "title", { required: true, max: LIMITS.title });
         if (!title) throw new HttpError(400, "invalid_body", "title is required");
@@ -73,7 +77,10 @@ export function registerChats(router: Router): void {
         const profile = await resolveProfile(ctx.store, readRequestedProfileId(body.profileId, true), undefined);
         patch.profileId = profile.id;
       }
-      if (patch.title === undefined && patch.profileId === undefined) {
+      if (body.memberIds !== undefined) {
+        patch.memberIds = await readMemberIds(ctx.store, body.memberIds, existing.agentId);
+      }
+      if (patch.title === undefined && patch.profileId === undefined && patch.memberIds === undefined) {
         return json(200, { chat: existing });
       }
       const chat = await ctx.store.chats.update(id, patch);
@@ -95,4 +102,23 @@ export function registerChats(router: Router): void {
       return noContent();
     }),
   );
+}
+
+/**
+ * Group chat members: agent ids beside the owner, in speaking order. Duplicates collapse.
+ * The owner cannot be listed, and every id must be one of the user's agents.
+ */
+async function readMemberIds(store: Store, value: unknown, ownerId: string): Promise<string[]> {
+  if (!Array.isArray(value)) throw new HttpError(400, "invalid_body", "memberIds must be an array of agent ids");
+  const ids = [...new Set(value.map((item) => readRequiredId(item, "memberIds[]")))];
+  if (ids.length > LIMITS.chatMembers) {
+    throw new HttpError(400, "invalid_body", `A group chat can have at most ${LIMITS.chatMembers} members`);
+  }
+  if (ids.includes(ownerId)) {
+    throw new HttpError(400, "invalid_body", "The chat's own agent is not listed in memberIds");
+  }
+  for (const id of ids) {
+    if (!(await store.agents.get(id))) throw new HttpError(404, "not_found", `Agent ${id} not found`);
+  }
+  return ids;
 }

@@ -13,6 +13,7 @@ import { Input } from "@botanical/ui/components/input";
 import { Label } from "@botanical/ui/components/label";
 import { agentIdentity } from "@/lib/agent-identity";
 import { agentDefaultProfileId, canStartChat } from "@/lib/chat-groups";
+import { MAX_CHAT_MEMBERS, toggleMember } from "@/lib/chat-members";
 import { cn } from "@/lib/utils";
 
 export function NewChatForm({
@@ -28,10 +29,14 @@ export function NewChatForm({
   initialAgentId?: string | null;
   pending?: boolean;
   error?: string | null;
-  onSubmit: (input: { agentId: string; profileId: string; title: string }) => void;
+  onSubmit: (input: { agentId: string; memberIds: string[]; profileId: string; title: string }) => void;
 }) {
   const [query, setQuery] = useState("");
   const [agentId, setAgentId] = useState<string | null>(initialAgentId ?? null);
+  // Other agents that answer in the same chat. The owner is never one of them.
+  const [picked, setPicked] = useState<string[]>([]);
+  const memberIds = picked.filter((id) => id !== agentId);
+  const others = agents.filter((item) => item.id !== agentId);
   // Until the user picks a profile, the selection follows the chosen agent's default.
   const [pickedProfileId, setPickedProfileId] = useState<string | null | undefined>(undefined);
   const agent = agents.find((item) => item.id === agentId) ?? null;
@@ -60,7 +65,7 @@ export function NewChatForm({
     <div className={pageContainerVariants({ size: "narrow", className: "flex flex-col gap-6" })}>
       <PageHeader
         title="New chat"
-        description="Each chat belongs to one agent and runs on the model profile shown here. An agent's default is pre-selected and you can change it."
+        description="Each chat belongs to one agent and runs on the model profile shown here. Add more agents to make it a group chat. An agent's default is pre-selected and you can change it."
       />
 
       <section className="space-y-2">
@@ -123,6 +128,45 @@ export function NewChatForm({
         )}
       </section>
 
+      {agentId && others.length > 0 ? (
+        <section className="space-y-2" aria-labelledby="new-chat-members">
+          <Label id="new-chat-members">Also in this chat</Label>
+          <p className="text-xs text-muted-foreground">
+            Optional. Pick other agents for a group chat: each answers in turn, or only the ones you @mention.
+          </p>
+          <div className="flex flex-wrap gap-2" role="group" aria-labelledby="new-chat-members">
+            {others.map((other) => {
+              const selected = memberIds.includes(other.id);
+              const identity = agentIdentity(other);
+              return (
+                <button
+                  key={other.id}
+                  type="button"
+                  data-testid="member-option"
+                  aria-pressed={selected}
+                  disabled={!selected && memberIds.length >= MAX_CHAT_MEMBERS}
+                  onClick={() => setPicked(toggleMember(memberIds, other.id))}
+                  className={cn(
+                    "flex items-center gap-2 rounded-full border py-1 pr-3 pl-1 text-sm transition-colors disabled:opacity-50",
+                    selected ? "border-primary/55 bg-primary/8" : "border-border hover:bg-muted/60",
+                  )}
+                >
+                  <AgentAvatar
+                    name={identity.name}
+                    icon={identity.icon}
+                    color={identity.color}
+                    shape={identity.shape}
+                    picture={identity.picture}
+                    size="sm"
+                  />
+                  {identity.name}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
       <section className="space-y-2">
         <Label htmlFor="new-chat-profile">Model profile</Label>
         {profiles.length === 0 ? (
@@ -165,7 +209,7 @@ export function NewChatForm({
           disabled={!ready || pending}
           onClick={() => {
             if (!agentId || !profileId) return;
-            onSubmit({ agentId, profileId, title });
+            onSubmit({ agentId, memberIds, profileId, title });
           }}
         >
           {pending ? "Starting…" : "Start chat"}

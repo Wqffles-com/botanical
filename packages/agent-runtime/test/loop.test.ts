@@ -427,3 +427,62 @@ describe("agent tool loop", () => {
     expect(provider.requests[0]?.tools).toEqual([]);
   });
 });
+
+describe("group chats", () => {
+  async function group() {
+    const store = createMemoryStore();
+    const bus = createAgentMessageBus(store.agents, store.agentMessages);
+    const make = (name: string) =>
+      store.agents.create(createAgentSchema.parse({ name, prompt: `You are ${name}.`, toolAllowlist: ["echo"] }));
+    const ada = await make("Ada");
+    const bob = await make("Bob");
+    const outsider = await make("Cy");
+    const chat = await store.chats.create({ agentId: ada.id, memberIds: [bob.id] });
+    const provider = createScriptedProvider([
+      () => [{ type: "tool-call", id: "t1", name: "echo", arguments: { text: "x" } }, { type: "done" }],
+      () => [{ type: "text-delta", text: "Ada here." }, { type: "done" }],
+      () => [{ type: "text-delta", text: "Bob here." }, { type: "done" }],
+    ]);
+    const deps: RuntimeDeps = {
+      store,
+      bus,
+      profiles: staticProfileResolver({ fast: { provider, model: "test-model" } }),
+      toolSources: [createBuiltinToolSource([echoTool])],
+    };
+    return { deps, chat, ada, bob, outsider, provider };
+  }
+
+  test("a member takes a turn and sees the owner's reply as a named user message", async () => {
+    const { deps, chat, ada, bob, provider } = await group();
+    await collect(deps, { chatId: chat.id, content: "Hi both", profileId: "fast" });
+    await collect(deps, { chatId: chat.id, content: "Hi both", profileId: "fast", agentId: bob.id, appendUserMessage: false });
+
+    const rows = await deps.store.messages.listByChat(chat.id);
+    const replies = rows.filter((row) => row.role === "assistant");
+    expect(replies.map((row) => row.agentId)).toEqual([ada.id, ada.id, bob.id]);
+    expect(rows.find((row) => row.role === "tool")?.agentId).toBe(ada.id);
+
+    const bobRequest = provider.requests[2];
+    expect(bobRequest?.agentId).toBe(bob.id);
+    const messages = bobRequest?.messages ?? [];
+    expect(messages[0]?.content).toContain("You are Bob in a group chat");
+    expect(messages[0]?.content).toContain("Ada");
+    // Ada's tool call and its result are not shown to Bob. Her words are, attributed.
+    expect(messages.slice(1).map((message) => [message.role, message.content])).toEqual([
+      ["user", "Hi both"],
+      ["user", "[Ada] Ada here."],
+    ]);
+  });
+
+  test("an agent outside the chat cannot take a turn", async () => {
+    const { deps, chat, outsider } = await group();
+    await expect(
+      collect(deps, { chatId: chat.id, content: "Hi", profileId: "fast", agentId: outsider.id }),
+    ).rejects.toBeInstanceOf(AgentBindingError);
+  });
+
+  test("a member cannot be deleted while it is in a chat", async () => {
+    const { deps, bob } = await group();
+    await expect(deps.store.agents.delete(bob.id)).rejects.toThrow();
+  });
+});

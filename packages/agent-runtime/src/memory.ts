@@ -75,7 +75,7 @@ export function createMemoryStore(): Store {
     },
     async delete(id) {
       if (!agents.has(id)) throw new AgentNotFoundError(id);
-      const ownsChat = [...chats.values()].some((chat) => chat.agentId === id);
+      const ownsChat = [...chats.values()].some((chat) => chat.agentId === id || (chat.memberIds ?? []).includes(id));
       if (ownsChat) throw new AgentInUseError(id);
       agents.delete(id);
       for (let i = agentMessages.length - 1; i >= 0; i -= 1) {
@@ -99,7 +99,9 @@ export function createMemoryStore(): Store {
         .map(clone);
     },
     async listByAgent(agentId) {
-      return [...chats.values()].filter((chat) => chat.agentId === agentId).map(clone);
+      return [...chats.values()]
+        .filter((chat) => chat.agentId === agentId || (chat.memberIds ?? []).includes(agentId))
+        .map(clone);
     },
     async create(input) {
       if (!agents.has(input.agentId)) throw new AgentNotFoundError(input.agentId);
@@ -111,6 +113,10 @@ export function createMemoryStore(): Store {
         createdAt: ts,
         updatedAt: ts,
       };
+      if (input.memberIds && input.memberIds.length > 0) {
+        for (const id of input.memberIds) if (!agents.has(id)) throw new AgentNotFoundError(id);
+        row.memberIds = [...input.memberIds];
+      }
       chats.set(row.id, row);
       return clone(row);
     },
@@ -145,6 +151,7 @@ export function createMemoryStore(): Store {
       if (input.toolCallId) row.toolCallId = input.toolCallId;
       if (input.name) row.name = input.name;
       if (input.profileId) row.profileId = input.profileId;
+      if (input.agentId) row.agentId = input.agentId;
       messages.push(row);
       return clone(row);
     },

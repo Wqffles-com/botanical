@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 import { agents } from './agents.ts';
@@ -6,6 +7,8 @@ import { users } from './users.ts';
 
 /**
  * One owning agent per chat. `agent_id` is immutable (see sql/guards.sql).
+ * `member_ids` lists the other agents of a group chat, in speaking order. Empty for a one-agent chat.
+ * Members must belong to the chat's user and exclude the owner (sql/guards.sql).
  * `profile_id` is required: chats cannot be created without an explicit profile pick.
  */
 export const chats = pgTable(
@@ -18,6 +21,10 @@ export const chats = pgTable(
     agentId: uuid('agent_id')
       .notNull()
       .references(() => agents.id, { onDelete: 'restrict' }),
+    memberIds: uuid('member_ids')
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
     profileId: uuid('profile_id')
       .notNull()
       .references(() => modelProfiles.id, { onDelete: 'restrict' }),

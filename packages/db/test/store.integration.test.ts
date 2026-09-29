@@ -119,6 +119,33 @@ describe('postgres store', () => {
           store.messages.create({ chatId: chat.id, role: 'tool', content: 'no id' }),
         ).rejects.toThrow(/toolCallId/);
 
+        const group = await store.chats.create({
+          agentId: gardener.id,
+          memberIds: [archivist.id, archivist.id],
+          profileId: 'grok',
+          title: 'Team',
+        });
+        expect(group.memberIds).toEqual([archivist.id]);
+        expect((await store.chats.get(group.id))?.memberIds).toEqual([archivist.id]);
+        expect(await store.chats.countByAgent(archivist.id)).toBe(1);
+        const said = await store.messages.create({
+          chatId: group.id,
+          role: 'assistant',
+          content: 'Filed.',
+          profileId: 'grok',
+          agentId: archivist.id,
+        });
+        expect(said.agentId).toBe(archivist.id);
+        expect((await store.messages.listByChat(group.id))[0]?.agentId).toBe(archivist.id);
+        await expect(store.agents.delete(archivist.id)).rejects.toThrow(/owns chats/);
+        await expect(store.chats.update(group.id, { memberIds: [gardener.id] })).rejects.toThrow();
+        await expect(
+          store.chats.update(group.id, { memberIds: ['22222222-2222-4222-8222-222222222222'] }),
+        ).rejects.toThrow(/agent not found/);
+        expect((await store.chats.update(group.id, { memberIds: [] }))?.memberIds).toEqual([]);
+        expect(await store.chats.countByAgent(archivist.id)).toBe(0);
+        expect(await store.chats.delete(group.id)).toBe(true);
+
         const mail = await store.agentMessages.create({
           fromAgentId: gardener.id,
           toAgentId: archivist.id,
