@@ -20,7 +20,7 @@ Shared API types, response normalizers, and the HTTP client the web app uses. No
 | `packages/core/src/always.ts` | Normalizers for routines, listeners, notifications, and always-on settings |
 | `packages/core/src/sse.ts` | `readChatStream`, `parseSseFrame`, `readSseMessages` (named frames for the chat events feed) |
 | `packages/core/src/errors.ts` | `BotanicalApiError`, `requireProfileId` |
-| `packages/core/src/agents.ts` | Color, icon, shape, and picture checks, `EXAMPLE_AGENTS` |
+| `packages/core/src/agents.ts` | Color, icon, shape, and picture checks, `EXAMPLE_AGENTS`, `PLATFORM_TOOLS` |
 | `packages/core/src/appearance.ts` | Accent names and `appearance.accent` |
 | `packages/core/src/deployment` | Mode, passcode, and billing hook types (not wired as the live API auth) |
 | `packages/core/src/client.test.ts` | Client tests, colocated |
@@ -33,7 +33,7 @@ The browser singleton is `packages/web/src/lib/api.ts`. Server components use `p
 
 ## Exports
 
-`BotanicalClient`, `API`, `readChatStream`, `readSseMessages`, `normalizeAgent`, `normalizeChat`, `normalizeMessage`, `normalizeMemory`, `normalizeRoleRecord`, `EXAMPLE_AGENTS`, `CLIENT_CONTRACT_VERSION`. Deployment entry: `loadDeploymentConfig`, `readDeploymentMode`, `verifySingleTenantPasscode`, `createBillingHooks`.
+`BotanicalClient`, `API`, `readChatStream`, `readSseMessages`, `normalizeAgent`, `normalizeChat`, `normalizeMessage`, `normalizeMemory`, `normalizeRoleRecord`, `EXAMPLE_AGENTS`, `PLATFORM_TOOLS`, `CLIENT_CONTRACT_VERSION`. Deployment entry: `loadDeploymentConfig`, `readDeploymentMode`, `verifySingleTenantPasscode`, `createBillingHooks`.
 
 `API` in `packages/core/src/paths.ts` covers health, auth, profiles, tools, agents, roles, memories, chats, messages, agent-messages, routines, listeners, notifications, `/api/settings/always-on`, and `/api/settings/appearance`. `BotanicalClient.getAppearance` and `updateAppearance` read and write the signed-in user's accent. `queueMessage` posts with `async: true`, `chatEvents` reads `GET /api/chats/:id/events` as `ChatEvent`s, `stopChat` calls `POST /api/chats/:id/stop`, and `updateMessage` / `deleteMessage` call `PATCH` / `DELETE /api/chats/:id/messages/:messageId`. `streamMessage` still drives the streaming form. Agent create and update send `title`, `shape`, and `picture` when those fields are set. It does not list CLI, MCP, capabilities, transcription, or `POST /api/hooks/:listenerId` (the public webhook is not called by `BotanicalClient`). CLI and MCP fetches live in `packages/web/src/lib/mvp-api.ts` and `packages/web/src/lib/cli-api.ts`.
 

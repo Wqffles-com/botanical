@@ -13,6 +13,7 @@ import {
   parseCliLine,
   parseCliProfileShortcut,
   prepareCliLaunch,
+  renderCliPrompt,
   runCli,
   splitProfileDocument,
   type CliAvailabilityProbe,
@@ -278,6 +279,27 @@ describe("CLI profile config", () => {
 });
 
 describe("CLI prompt and MCP config", () => {
+  test("the prompt names only the tools the endpoint lists", () => {
+    const messages = [{ role: "user", content: "Hi" }];
+    const listed = renderCliPrompt(messages, { botanicalTools: true, toolNames: ["web_search", "agent_list"] });
+    expect(listed).toContain('has these Botanical tools: web_search, agent_list.');
+    expect(listed).toContain("mcp__botanical__web_search");
+    expect(listed).not.toContain("memory_write");
+
+    const unnamed = renderCliPrompt(messages, { botanicalTools: true });
+    expect(unnamed).toContain('MCP server named "botanical"');
+    expect(unnamed).not.toContain("memory_write");
+
+    const many = Array.from({ length: 45 }, (_, index) => `tool_${index}`);
+    const capped = renderCliPrompt(messages, { botanicalTools: true, toolNames: many });
+    expect(capped).toContain("tool_39, and 5 more.");
+    expect(capped).not.toContain("tool_40");
+
+    const off = renderCliPrompt(messages, { botanicalTools: false, toolNames: ["memory_write"] });
+    expect(off).toContain("are not enabled for you");
+    expect(off).not.toContain("memory_write");
+  });
+
   const marker = "PROMPT_MARKER_XYZ_NOT_IN_ARGV";
 
   test("argv never contains the prompt and carries each CLI's MCP flags", () => {
@@ -418,6 +440,7 @@ describe("CLI prompt and MCP config", () => {
         expect(text).toContain("MCP_ENVREF:yes");
         expect(text).toContain("MCP_LEAK:no");
         expect(text).toContain("MCP_MODE:600");
+        expect(text).toContain("MCP_ALWAYS_LOAD:yes");
         const args = text.split("\n");
         const configArg = args[args.findIndex((line) => line === "ARG:--mcp-config") + 1]?.replace(/^ARG:/, "");
         expect(configArg && exists(configArg)).toBe(false);

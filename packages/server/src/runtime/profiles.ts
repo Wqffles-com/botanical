@@ -15,9 +15,10 @@ import {
   type Env,
   type ProviderType,
 } from "@botanical/providers";
+import { currentUserId } from "@botanical/db";
 
 import { userCliAvailability } from "../cli-install/service.ts";
-import type { CliToolHost } from "../cli-mcp.ts";
+import { cliToolNames, type CliToolHost } from "../cli-mcp.ts";
 import type { ServerConfig } from "../config.ts";
 import type { ProviderFetch } from "../provider-host.ts";
 import { providerKeyEnv } from "../provider-keys.ts";
@@ -120,6 +121,8 @@ export function createServerProfileResolver(
  * Subscription CLIs run in the agent workspace. When `botanicalTools` is on
  * and the agent can use at least one tool, the same turn exposes Botanical's
  * tool catalog over a per-run MCP server.
+ * The run is bound to the user who started the turn. A turn with tools and no
+ * acting user fails rather than reaching an unscoped store (issue #92).
  * Tool calls from that server are already dispatched; they arrive as settled
  * tool-call events so the loop records them and does not run them twice.
  * Claude Code also takes messages sent mid-turn on stdin (`request.input`).
@@ -138,6 +141,8 @@ function cliProvider(profile: ModelProfile, cliTools: CliToolHost | undefined, e
       };
     },
     async *complete(request) {
+      // Read before any await, inside the turn's user scope: the run acts as this user.
+      const userId = currentUserId();
       if (!profile.cli) {
         yield { type: "error", error: new Error(`Profile ${profile.id} is missing a CLI name`) };
         return;
@@ -157,13 +162,16 @@ function cliProvider(profile: ModelProfile, cliTools: CliToolHost | undefined, e
       // `request.tools` is the agent's visible catalog, the same list the MCP
       // endpoint would serve. With none, the CLI is not told about Botanical
       // tools, so it does not go looking for them (issue #87).
+      const tools = request.tools ?? [];
+      const { agentId, chatId } = request;
+      const wantsTools = exposeTools && cliTools != null && agentId && chatId && tools.length > 0;
+      if (wantsTools && !userId) {
+        yield { type: "error", error: new Error("CLI turn has no acting user, so Botanical tools cannot be scoped") };
+        return;
+      }
       const session =
-        exposeTools && cliTools && request.agentId && request.chatId && (request.tools?.length ?? 0) > 0
-          ? cliTools.open({
-              agentId: request.agentId,
-              chatId: request.chatId,
-              ...(request.signal ? { signal: request.signal } : {}),
-            })
+        wantsTools && userId
+          ? cliTools.open({ agentId, chatId, userId, ...(request.signal ? { signal: request.signal } : {}) })
           : undefined;
       try {
         for await (const event of runCli({
@@ -178,7 +186,12 @@ function cliProvider(profile: ModelProfile, cliTools: CliToolHost | undefined, e
           timeoutMs: profile.timeoutMs ?? 600_000,
           ...(profile.passModel && profile.model ? { model: profile.model } : {}),
           ...(request.signal ? { signal: request.signal } : {}),
-          ...(session ? { mcp: { url: session.url, token: session.token }, toolEvents: session.events } : {}),
+          ...(session
+            ? {
+                mcp: { url: session.url, token: session.token, tools: cliToolNames(tools) },
+                toolEvents: session.events,
+              }
+            : {}),
           ...(request.input ? { input: request.input } : {}),
           env: cliEnv,
         })) {

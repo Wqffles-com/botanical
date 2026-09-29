@@ -42,7 +42,7 @@ BEGIN
       'Gardener',
       'Tends the plots and keeps everyday work in order.',
       'You are Gardener. Help with plans, notes, and everyday tasks. Be precise and calm. Use tools when they add facts. The user picks the model profile for each chat.',
-      '[{"name":"web_search","enabled":true},{"name":"web_fetch","enabled":true}]'::jsonb,
+      '[{"name":"web_search","enabled":true},{"name":"web_fetch","enabled":true},{"name":"memory_write","enabled":true},{"name":"memory_search","enabled":true},{"name":"memory_list","enabled":true},{"name":"memory_delete","enabled":true},{"name":"agent_list","enabled":true},{"name":"agent_create","enabled":true},{"name":"notify_user","enabled":true},{"name":"send_agent_message","enabled":true}]'::jsonb,
       'Sprout',
       'green',
       NULL
@@ -53,7 +53,7 @@ BEGIN
       'Builder',
       'Writes and repairs code.',
       'You are Builder, a software agent. Prefer working code over essays. Read files before editing them. Ask before destructive commands.',
-      '[{"name":"shell","enabled":true},{"name":"code_exec","enabled":true},{"name":"file_read","enabled":true},{"name":"file_write","enabled":true},{"name":"file_list","enabled":true}]'::jsonb,
+      '[{"name":"shell","enabled":true},{"name":"code_exec","enabled":true},{"name":"file_read","enabled":true},{"name":"file_write","enabled":true},{"name":"file_list","enabled":true},{"name":"memory_write","enabled":true},{"name":"memory_search","enabled":true},{"name":"memory_list","enabled":true},{"name":"memory_delete","enabled":true},{"name":"agent_list","enabled":true},{"name":"agent_create","enabled":true},{"name":"notify_user","enabled":true},{"name":"send_agent_message","enabled":true}]'::jsonb,
       'Code',
       'blue',
       NULL
@@ -64,7 +64,7 @@ BEGIN
       'Scout',
       'Searches, fetches, and cites.',
       'You are Scout. Search and fetch before answering. Cite what you found and say what is still unknown.',
-      '[{"name":"web_search","enabled":true},{"name":"web_fetch","enabled":true}]'::jsonb,
+      '[{"name":"web_search","enabled":true},{"name":"web_fetch","enabled":true},{"name":"memory_write","enabled":true},{"name":"memory_search","enabled":true},{"name":"memory_list","enabled":true},{"name":"memory_delete","enabled":true},{"name":"agent_list","enabled":true},{"name":"agent_create","enabled":true},{"name":"notify_user","enabled":true},{"name":"send_agent_message","enabled":true}]'::jsonb,
       'Search',
       'amber',
       NULL

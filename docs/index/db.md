@@ -54,6 +54,7 @@ Enums in `packages/db/src/schema/enums.ts`: `message_role`, `a2a_status`, `agent
 | `packages/db/migrations/0004_routines.sql` | `routines`, `routine_runs`, `listeners`, `listener_deliveries`, `notifications` |
 | `packages/db/migrations/0005_accounts.sql` | user role, session owner, invites, encrypted secrets, user settings, global profiles |
 | `packages/db/migrations/0006_agent_customization.sql` | agent `title`, `shape`, and optional `picture` |
+| `packages/db/migrations/0007_platform_tools.sql` | adds `PLATFORM_TOOLS` to example agents still on the original seed |
 | `packages/db/migrations/meta/_journal.json` | Apply order (tags match the SQL filenames) |
 | `packages/db/migrations/meta/0000_snapshot.json` | Drizzle snapshot for `0000` |
 | `packages/db/migrations/meta/0001_snapshot.json` | Drizzle snapshot for `0001` |

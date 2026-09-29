@@ -3,6 +3,7 @@ import {
   DEFAULT_AGENT_SHAPE,
   isAgentPicture,
   isAgentShape,
+  PLATFORM_TOOLS,
   type AgentShape,
 } from "@botanical/core";
 import { DEFAULT_AGENT_COLOR, resolveAgentColor, type AgentColor } from "./agent-colors";
@@ -111,7 +112,7 @@ export const EMPTY_AGENT_DRAFT: AgentDraft = {
   shape: DEFAULT_AGENT_SHAPE,
   picture: null,
   color: DEFAULT_AGENT_COLOR,
-  tools: [],
+  tools: [...PLATFORM_TOOLS],
   defaultProfileId: null,
   roleIds: [],
 };

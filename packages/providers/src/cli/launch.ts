@@ -47,6 +47,8 @@ export const CLAUDE_TOOL_SEARCH_ENV = { ENABLE_TOOL_SEARCH: "false" } as const;
 export interface CliMcpTarget {
   url: string;
   token: string;
+  /** Names the endpoint's `tools/list` serves. The prompt names only these. */
+  tools?: readonly string[];
 }
 
 export interface CliSpawnPlan {
@@ -137,6 +139,8 @@ function writeClaudeConfig(mcp: CliMcpTarget, cleanups: Array<() => void>): stri
           type: "http",
           url: mcp.url,
           headers: { Authorization: `Bearer \${${CLI_MCP_TOKEN_ENV}}` },
+          // Per-server form of ENABLE_TOOL_SEARCH=false: never defer these tools (issue #92).
+          alwaysLoad: true,
         },
       },
     },
