@@ -1,4 +1,4 @@
-import type { Agent, Chat } from "@botanical/core";
+import { isAgentChat, type Agent, type Chat } from "@botanical/core";
 
 export interface ChatGroup {
   agent: Agent | null;
@@ -57,4 +57,20 @@ export function agentDefaultProfileId(
   if (!id) return null;
   const profile = profiles.find((item) => item.id === id);
   return profile && profile.available !== false ? profile.id : null;
+}
+
+/** The agent's own chat, when the workspace has it. One chat per agent; group chats are extra. */
+export function ownChat(agentId: string, chats: readonly Chat[]): Chat | null {
+  return chats.find((chat) => chat.agentId === agentId && isAgentChat(chat)) ?? null;
+}
+
+/** Where talking to an agent happens: its chat, or the page that opens it the first time. */
+export function agentChatHref(agentId: string, chats: readonly Chat[]): string {
+  const chat = ownChat(agentId, chats);
+  return chat ? `/chats/${encodeURIComponent(chat.id)}` : `/agents/${encodeURIComponent(agentId)}/chat`;
+}
+
+/** Group chats, most recent first. */
+export function groupChats(chats: readonly Chat[]): Chat[] {
+  return sortChats(chats.filter((chat) => !isAgentChat(chat)));
 }

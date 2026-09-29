@@ -1,5 +1,6 @@
 "use client";
 
+import { isAgentChat } from "@botanical/core";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Fragment } from "react";
@@ -78,7 +79,9 @@ function useCrumbs(): Crumb[] {
     if (!id || id === "new") return [{ label: "New chat" }];
     const chat = chats.find((item) => item.id === id);
     const agent = chat ? agents.find((item) => item.id === chat.agentId) : undefined;
-    const trail: Crumb[] = [];
+    // An agent's own chat is the agent; a group chat goes by its title.
+    if (chat && agent && isAgentChat(chat)) return [{ label: "Agents", href: "/agents" }, { label: agent.name }];
+    const trail: Crumb[] = [{ label: "Group chats" }];
     if (agent) trail.push({ label: agent.name, href: `/agents/${agent.id}` });
     trail.push({ label: chat?.title || "Chat" });
     return trail;

@@ -1,7 +1,7 @@
 "use client";
 
 import type { Agent, Chat } from "@botanical/core";
-import { CalendarClock, Inbox, Plus, Webhook } from "lucide-react";
+import { CalendarClock, Inbox, Plus, Users, Webhook } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
@@ -27,6 +27,7 @@ import {
   SidebarMenuSkeleton,
 } from "@botanical/ui/components/sidebar";
 import { agentIdentity } from "@/lib/agent-identity";
+import { agentChatHref, groupChats, ownChat } from "@/lib/chat-groups";
 import { relativeTime } from "@/lib/format";
 
 const NAV = [
@@ -40,18 +41,17 @@ export function AppSidebar() {
   const { ready, me, agents, chats, error } = useWorkspace();
 
   const activeChatId = pathname.startsWith("/chats/") ? pathname.split("/")[2] : undefined;
+  // An agent is active on its chat, the page that opens it, and its settings.
   const activeAgentId = useMemo(() => {
     if (pathname.startsWith("/agents/")) {
       const id = pathname.split("/")[2];
       if (id && id !== "new") return id;
     }
-    return undefined;
-  }, [pathname]);
+    const chat = activeChatId ? chats.find((item) => item.id === activeChatId) : undefined;
+    return chat && ownChat(chat.agentId, chats)?.id === chat.id ? chat.agentId : undefined;
+  }, [pathname, activeChatId, chats]);
 
-  const recent = useMemo(
-    () => [...chats].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 20),
-    [chats],
-  );
+  const groups = useMemo(() => groupChats(chats).slice(0, 20), [chats]);
 
   return (
     <Sidebar collapsible="offcanvas">
@@ -119,7 +119,12 @@ export function AppSidebar() {
                 <p className="px-2 py-1.5 text-xs text-muted-foreground">No agents yet.</p>
               ) : (
                 agents.map((agent) => (
-                  <AgentItem key={agent.id} agent={agent} active={agent.id === activeAgentId} />
+                  <AgentItem
+                    key={agent.id}
+                    agent={agent}
+                    href={agentChatHref(agent.id, chats)}
+                    active={agent.id === activeAgentId}
+                  />
                 ))
               )}
             </SidebarMenu>
@@ -127,14 +132,17 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Recent</SidebarGroupLabel>
+          <SidebarGroupLabel>Group chats</SidebarGroupLabel>
+          <SidebarGroupAction render={<Link href="/chats/new" />} title="New group chat" aria-label="New group chat">
+            <Plus />
+          </SidebarGroupAction>
           <SidebarGroupContent>
             <SidebarMenu>
-              {ready && recent.length === 0 ? (
-                <p className="px-2 py-1.5 text-xs text-muted-foreground">No chats yet.</p>
+              {ready && groups.length === 0 ? (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground">No group chats yet.</p>
               ) : (
-                recent.map((chat) => (
-                  <RecentItem
+                groups.map((chat) => (
+                  <GroupItem
                     key={chat.id}
                     chat={chat}
                     agent={agents.find((item) => item.id === chat.agentId) ?? null}
@@ -155,7 +163,7 @@ export function AppSidebar() {
   );
 }
 
-function AgentItem({ agent, active }: { agent: Agent; active: boolean }) {
+function AgentItem({ agent, href, active }: { agent: Agent; href: string; active: boolean }) {
   const identity = agentIdentity(agent);
   const line =
     identity.title ||
@@ -164,7 +172,7 @@ function AgentItem({ agent, active }: { agent: Agent; active: boolean }) {
     <SidebarMenuItem>
       <SidebarMenuButton
         size="lg"
-        render={<Link href={`/agents/${agent.id}`} />}
+        render={<Link href={href} />}
         isActive={active}
         title={identity.description ? `${identity.name} — ${identity.description}` : identity.name}
         className="h-11"
@@ -186,7 +194,7 @@ function AgentItem({ agent, active }: { agent: Agent; active: boolean }) {
   );
 }
 
-function RecentItem({ chat, agent, active }: { chat: Chat; agent: Agent | null; active: boolean }) {
+function GroupItem({ chat, agent, active }: { chat: Chat; agent: Agent | null; active: boolean }) {
   const title = chat.title || "Untitled chat";
   return (
     <SidebarMenuItem>
@@ -196,6 +204,7 @@ function RecentItem({ chat, agent, active }: { chat: Chat; agent: Agent | null; 
         title={agent ? `${title} · ${agent.name}` : title}
         className="pr-12"
       >
+        <Users />
         <span>{title}</span>
       </SidebarMenuButton>
       <SidebarMenuBadge className="font-normal text-muted-foreground tabular-nums">

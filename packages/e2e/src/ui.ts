@@ -209,7 +209,8 @@ function onNewChatForm(page: Page): boolean {
 }
 
 function startChatButton(page: Page): Locator {
-  return main(page).getByRole("button", { name: /^(start chat|starting…)$/i }).first();
+  // One chat per agent: the form opens the agent's chat, or starts a group chat when members are picked.
+  return main(page).getByRole("button", { name: /^(open chat|start chat|start group chat|starting…)$/i }).first();
 }
 
 export async function startChat(page: Page, agentName: string): Promise<void> {
@@ -220,7 +221,7 @@ export async function startChat(page: Page, agentName: string): Promise<void> {
   );
 
   // Since MVP2, "New chat" opens /chats/new: pick the agent here, then the
-  // model profile (see selectMockProfile), then "Start chat" creates the chat.
+  // model profile (see selectMockProfile), then "Open chat" opens the agent's one chat.
   const target = await Promise.race([
     page.waitForURL(CHAT_URL, { timeout: 20_000 }).then(() => "chat" as const),
     page.waitForURL(NEW_CHAT_URL, { timeout: 20_000 }).then(() => "form" as const),

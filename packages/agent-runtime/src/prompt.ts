@@ -1,4 +1,5 @@
 import type { AgentRecord } from "./agent";
+import { renderCompactionSection } from "./compaction";
 import { renderMemorySection, type MemorySnippet } from "./memories";
 
 /** Default chat style: agents talk like a teammate, not a report writer. */
@@ -14,6 +15,8 @@ export function buildSystemPrompt(
   agent: AgentRecord,
   memories?: readonly MemorySnippet[],
   group?: GroupContext,
+  /** Summary of compacted messages, which the model no longer reads one by one. */
+  summary?: string,
 ): string {
   const lines = [agent.prompt.trim()];
   if (agent.description.trim()) {
@@ -34,5 +37,6 @@ export function buildSystemPrompt(
   lines.push("", RESPONSE_STYLE);
   const memorySection = renderMemorySection(memories ?? []);
   if (memorySection) lines.push("", memorySection);
+  if (summary?.trim()) lines.push("", renderCompactionSection(summary));
   return lines.join("\n");
 }

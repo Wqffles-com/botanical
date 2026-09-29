@@ -47,10 +47,11 @@ export {
   normalizeProfile,
 } from "./normalize";
 export { activeMentionQuery, findMentions, mentionedAgents } from "./mentions";
+export { COMPACTION_MESSAGE_NAME, isAgentChat, isCompactionMessage } from "./chats";
 export type { Mention, Mentionable } from "./mentions";
 export { API } from "./paths";
 export { parseNdjsonLine, parseSseFrame, readChatStream, readSseMessages } from "./sse";
-export { AGENT_MESSAGE_STATUSES, CLIENT_CONTRACT_VERSION, INBOX_CHAT_TITLE } from "./types";
+export { AGENT_MESSAGE_STATUSES, CLIENT_CONTRACT_VERSION } from "./types";
 export type {
   Agent,
   Appearance,

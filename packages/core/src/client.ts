@@ -349,6 +349,13 @@ export class BotanicalClient {
     return normalizeChat(await this.requestJson(API.chat(chatId)));
   }
 
+  /** The agent's own chat (one chat per agent), or null before its first conversation. */
+  async getAgentChat(agentId: string): Promise<Chat | null> {
+    const body = await this.requestJson(API.agentChat(requireAgentId(agentId)));
+    const chat = body && typeof body === "object" ? (body as Record<string, unknown>).chat : null;
+    return chat ? normalizeChat(chat) : null;
+  }
+
   async deleteChat(id: string): Promise<void> {
     const chatId = id.trim();
     if (!chatId) throw new BotanicalApiError("Chat is missing an id.", { status: 400 });
@@ -522,6 +529,26 @@ export class BotanicalClient {
     const body = await this.requestJson(path, { method: "DELETE" });
     const row = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
     return Array.isArray(row.deleted) ? row.deleted.filter((id): id is string => typeof id === "string") : [];
+  }
+
+  /** Delete every message in the chat. Returns the removed ids. */
+  async clearChat(chatId: string): Promise<string[]> {
+    const body = await this.requestJson(API.messages(chatId), { method: "DELETE" });
+    const row = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+    return Array.isArray(row.deleted) ? row.deleted.filter((id): id is string => typeof id === "string") : [];
+  }
+
+  /**
+   * Summarize the chat so far into one compaction message. The model reads that summary
+   * instead of the older messages from then on. Uses the chat's profile unless one is given.
+   */
+  async compactChat(chatId: string, options: { profileId?: string } = {}): Promise<ChatMessage> {
+    const body = await this.requestJson(API.chatCompact(chatId), {
+      method: "POST",
+      body: JSON.stringify(options.profileId ? { profileId: requireProfileId(options.profileId) } : {}),
+    });
+    const row = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+    return normalizeMessage(row.message);
   }
 
   async stopChat(chatId: string): Promise<boolean> {

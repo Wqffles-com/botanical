@@ -302,7 +302,17 @@ describe("agents, chats, messages, profiles", () => {
       .chat;
     expect(chat.agentId).toBe(agent.id);
     expect(chat.profileId).toBe("grok");
-    expect(chat.title).toBe("Plot notes");
+    // An agent's own chat is named after the agent. A title is for group chats.
+    expect(chat.title).toBe(agent.name);
+
+    // One chat per agent: posting again opens the same chat.
+    const again = await postJson(app, "/api/chats", { agentId: agent.id, profileId: "fast" }, bearer(token));
+    expect(again.status).toBe(200);
+    const reopened = (await readJson<{ chat: { id: string; profileId: string } }>(again)).chat;
+    expect(reopened.id).toBe(chat.id);
+    expect(reopened.profileId).toBe("grok");
+    const found = await app.fetch(new Request(`http://localhost/api/agents/${agent.id}/chat`, { headers: bearer(token) }));
+    expect((await readJson<{ chat: { id: string } | null }>(found)).chat?.id).toBe(chat.id);
 
     const empty = setup({
       BOTANICAL_PROFILES: "",
@@ -422,7 +432,7 @@ describe("agents, chats, messages, profiles", () => {
     const titled = await readJson<{ chat: { title: string; agentId: string } }>(
       await app.fetch(new Request(`http://localhost/api/chats/${chatId}`, { headers: bearer(token) })),
     );
-    expect(titled.chat.title).toBe("Hello from the garden");
+    expect(titled.chat.title).toBe(agent.name);
     expect(titled.chat.agentId).toBe(agent.id);
 
     const streamed = await app.fetch(
@@ -453,7 +463,7 @@ describe("agents, chats, messages, profiles", () => {
       await app.fetch(new Request(`http://localhost/api/chats/${otherId}`, { headers: bearer(token) })),
     );
     expect(switched.chat.profileId).toBe("grok");
-    expect(switched.chat.title).toBe("Kept");
+    expect(switched.chat.title).toBe("Other");
 
     const missing = await postJson(
       app,
@@ -479,17 +489,24 @@ describe("agents, chats, messages, profiles", () => {
     expect(JSON.stringify(body)).not.toContain("sk-");
   });
 
-  test("an agent that owns a chat cannot be deleted until the chat is", async () => {
+  test("an agent's own chat goes with it; a group chat blocks the delete until it is gone", async () => {
     const { app } = setup();
     const { token } = await login(app);
     const agent = await createAgent(app, token);
+    const helper = await createAgent(app, token, { name: "Helper" });
+    const own = await postJson(app, "/api/chats", { agentId: helper.id, profileId: "fast" }, bearer(token));
+    const ownId = (await readJson<{ chat: { id: string } }>(own)).chat.id;
     const created = await postJson(
       app,
       "/api/chats",
-      { agentId: agent.id, profileId: "fast" },
+      { agentId: agent.id, memberIds: [helper.id], profileId: "fast" },
       bearer(token),
     );
     const chatId = (await readJson<{ chat: { id: string } }>(created)).chat.id;
+    const helperBlocked = await app.fetch(
+      new Request(`http://localhost/api/agents/${helper.id}`, { method: "DELETE", headers: bearer(token) }),
+    );
+    expect(helperBlocked.status).toBe(409);
     const blocked = await app.fetch(
       new Request(`http://localhost/api/agents/${agent.id}`, { method: "DELETE", headers: bearer(token) }),
     );
@@ -508,6 +525,12 @@ describe("agents, chats, messages, profiles", () => {
       new Request(`http://localhost/api/agents/${agent.id}`, { method: "DELETE", headers: bearer(token) }),
     );
     expect(deleted.status).toBe(204);
+    const helperDeleted = await app.fetch(
+      new Request(`http://localhost/api/agents/${helper.id}`, { method: "DELETE", headers: bearer(token) }),
+    );
+    expect(helperDeleted.status).toBe(204);
+    const ownGone = await app.fetch(new Request(`http://localhost/api/chats/${ownId}`, { headers: bearer(token) }));
+    expect(ownGone.status).toBe(404);
   });
 
   test("unexpected store errors do not leak the message", async () => {

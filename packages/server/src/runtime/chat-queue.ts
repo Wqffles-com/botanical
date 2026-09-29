@@ -7,8 +7,8 @@ import { HttpError } from "../http.ts";
 import { resolveProfile } from "../profiles.ts";
 import { assertCliProfileReady } from "../routes/profiles.ts";
 import type { SseEvent } from "../streaming.ts";
-import type { Store } from "../types.ts";
-import { streamChatReplies } from "./turn.ts";
+import type { ModelProfile, Store } from "../types.ts";
+import { streamChatReplies, type TurnErrorBody } from "./turn.ts";
 import type { TurnCoordinator } from "./turns.ts";
 
 /** A user message accepted by `POST /api/chats/:id/messages` with `async: true`, not yet in the transcript. */
@@ -22,6 +22,7 @@ export interface QueuedMessage {
 /**
  * Events on `GET /api/chats/:id/events`:
  * - `status` `{ running, queued, agentId? }` on connect and whenever the queue or run state changes.
+ *   `running` also covers background turns (`runTurn`: routines, webhooks) waiting for or holding the chat.
  *   `agentId` is the agent answering right now (it changes as group members take turns).
  * - `message` `{ message, queuedId? }` for each stored message. User messages carry the queue id they came from,
  *   including ones the running turn took mid-turn.
@@ -33,7 +34,10 @@ export type ChatListener = (event: SseEvent) => void;
 
 interface ChatState {
   queue: QueuedMessage[];
+  /** A drain is answering queued messages. */
   running: boolean;
+  /** Turns started by `runTurn` (routines, webhooks) that are waiting or running. */
+  background: number;
   /** The agent whose turn is running. */
   agentId: string | null;
   controller: AbortController | null;
@@ -67,14 +71,14 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
   function stateFor(chatId: string): ChatState {
     let state = chats.get(chatId);
     if (!state) {
-      state = { queue: [], running: false, agentId: null, controller: null, listeners: new Set(), steerers: new Set() };
+      state = { queue: [], running: false, background: 0, agentId: null, controller: null, listeners: new Set(), steerers: new Set() };
       chats.set(chatId, state);
     }
     return state;
   }
 
   function prune(chatId: string, state: ChatState): void {
-    if (!state.running && state.queue.length === 0 && state.listeners.size === 0) chats.delete(chatId);
+    if (!busy(state) && state.queue.length === 0 && state.listeners.size === 0) chats.delete(chatId);
   }
 
   function publish(state: ChatState, event: SseEvent): void {
@@ -87,15 +91,68 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
     }
   }
 
+  function busy(state: ChatState): boolean {
+    return state.running || state.background > 0;
+  }
+
   function statusEvent(state: ChatState): SseEvent {
     return {
       event: "status",
       data: {
-        running: state.running,
+        running: busy(state),
         queued: [...state.queue],
-        ...(state.running && state.agentId ? { agentId: state.agentId } : {}),
+        ...(busy(state) && state.agentId ? { agentId: state.agentId } : {}),
       },
     };
+  }
+
+  /**
+   * Run one turn's events against the chat's listeners: each stored message goes out whole
+   * (user messages the turn took mid-run carry their queue id), the answering agent goes out
+   * in `status`, and a failure goes out as `error`. Returns the turn's error, if any.
+   */
+  async function pump(
+    chatId: string,
+    state: ChatState,
+    seen: Set<string>,
+    turn: AsyncGenerator<SseEvent>,
+    fail: (error: unknown) => void,
+  ): Promise<TurnErrorBody | undefined> {
+    // Stored row id -> queue id, for messages the turn took mid-run.
+    const steered = new Map<string, string>();
+    let failure: TurnErrorBody | undefined;
+    const flush = async () => {
+      const messages = await deps.store.messages.listByChat(chatId);
+      for (const message of messages) {
+        if (seen.has(message.id)) continue;
+        seen.add(message.id);
+        const queuedId = steered.get(message.id);
+        publish(state, { event: "message", data: queuedId ? { message, queuedId } : { message } });
+      }
+    };
+    for await (const event of turn) {
+      // Replies go out whole. Deltas and usage stay on the server.
+      if (event.event === "text-delta" || event.event === "usage") continue;
+      if (event.event === "agent") {
+        const agentId = (event.data as { agentId?: unknown }).agentId;
+        if (typeof agentId === "string" && agentId !== state.agentId) {
+          state.agentId = agentId;
+          publish(state, statusEvent(state));
+        }
+        continue;
+      }
+      if (event.event === "steer") {
+        for (const item of steerMessages(event.data)) steered.set(item.messageId, item.id);
+      }
+      if (event.event === "error") {
+        const error = new TurnError(event.data);
+        failure ??= { code: error.code, message: error.message };
+        fail(error);
+      }
+      await flush();
+    }
+    await flush();
+    return failure;
   }
 
   async function runBatch(chatId: string, state: ChatState): Promise<void> {
@@ -127,17 +184,6 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
       const last = batch[batch.length - 1] as QueuedMessage;
       const profile = await resolveProfile(deps.store, last.profileId, chat.profileId);
       await assertCliProfileReady(profile);
-      // Stored row id -> queue id, for messages the turn took mid-run.
-      const steered = new Map<string, string>();
-      const flush = async () => {
-        const messages = await deps.store.messages.listByChat(chatId);
-        for (const message of messages) {
-          if (seen.has(message.id)) continue;
-          seen.add(message.id);
-          const queuedId = steered.get(message.id);
-          publish(state, { event: "message", data: queuedId ? { message, queuedId } : { message } });
-        }
-      };
       const steering: TurnSteering = {
         take() {
           // Only messages for this turn's profile. A switch waits for its own turn.
@@ -168,24 +214,7 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
         appendUserMessage: false,
         steering,
       });
-      for await (const event of turn) {
-        // Replies go out whole. Deltas and usage stay on the server.
-        if (event.event === "text-delta" || event.event === "usage") continue;
-        if (event.event === "agent") {
-          const agentId = (event.data as { agentId?: unknown }).agentId;
-          if (typeof agentId === "string" && agentId !== state.agentId) {
-            state.agentId = agentId;
-            publish(state, statusEvent(state));
-          }
-          continue;
-        }
-        if (event.event === "steer") {
-          for (const item of steerMessages(event.data)) steered.set(item.messageId, item.id);
-        }
-        if (event.event === "error") fail(new TurnError(event.data));
-        await flush();
-      }
-      await flush();
+      await pump(chatId, state, seen, turn, fail);
     } catch (error) {
       fail(error);
     } finally {
@@ -248,6 +277,52 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
       return item;
     },
 
+    /**
+     * Run a turn that did not come from the composer (a routine run, a webhook delivery) in the
+     * chat, after any turn already running there. Listeners see it like a queued turn: `status`,
+     * the stored messages, and `error`. Stop aborts it. Queued messages wait for it and are not
+     * steered into it. Resolves with the turn's error; throws when the turn cannot start.
+     */
+    async runTurn(input: { chatId: string; content: string; profile: ModelProfile }): Promise<{ error?: TurnErrorBody }> {
+      const { chatId } = input;
+      const state = stateFor(chatId);
+      state.background += 1;
+      publish(state, statusEvent(state));
+      try {
+        return await deps.turns.exclusive(chatId, async () => {
+          const controller = new AbortController();
+          state.controller = controller;
+          try {
+            const chat = await deps.store.chats.get(chatId);
+            if (!chat) throw new HttpError(404, "not_found", "Chat not found");
+            const seen = new Set((await deps.store.messages.listByChat(chatId)).map((message) => message.id));
+            if (chat.memberIds.length === 0) {
+              state.agentId = chat.agentId;
+              publish(state, statusEvent(state));
+            }
+            const turn = streamChatReplies(deps.store, deps.runtime, {
+              chat,
+              content: input.content,
+              profile: input.profile,
+              signal: controller.signal,
+            });
+            const error = await pump(chatId, state, seen, turn, (cause) => {
+              if (!controller.signal.aborted) publish(state, { event: "error", data: errorBody(cause) });
+            });
+            if (controller.signal.aborted) return { error: { code: "aborted", message: "Stopped before it finished" } };
+            return error ? { error } : {};
+          } finally {
+            state.controller = null;
+            state.agentId = null;
+          }
+        });
+      } finally {
+        state.background -= 1;
+        publish(state, statusEvent(state));
+        prune(chatId, state);
+      }
+    },
+
     /** Abort the chat's running turn. Messages queued after it still get their turn. */
     stop(chatId: string): boolean {
       const controller = chats.get(chatId)?.controller;
@@ -258,7 +333,7 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
 
     status(chatId: string): { running: boolean; queued: QueuedMessage[] } {
       const state = chats.get(chatId);
-      return { running: state?.running ?? false, queued: state ? [...state.queue] : [] };
+      return { running: state ? busy(state) : false, queued: state ? [...state.queue] : [] };
     },
 
     /** Send an event to every listener on a chat, such as an edit made outside a turn. */

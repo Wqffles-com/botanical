@@ -84,7 +84,7 @@ export interface ServerConfig {
   maxBodyBytes: number;
   /**
    * When true, delivering an agent message starts a background turn in the
-   * recipient's dedicated "Inbox" chat. Default false.
+   * recipient's own chat. Default false.
    */
   a2aAutorun: boolean;
   /**

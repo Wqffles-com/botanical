@@ -11,5 +11,6 @@ export default async function HomePage() {
   } catch {
     // Middleware already gated auth. Fall through to the new-agent flow.
   }
-  redirect(firstAgentId ? `/agents/${firstAgentId}` : "/agents/new");
+  // One chat per agent: home is the first agent's chat.
+  redirect(firstAgentId ? `/agents/${firstAgentId}/chat` : "/agents/new");
 }

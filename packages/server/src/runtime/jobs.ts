@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 
-import type { RuntimeDeps } from "@botanical/agent-runtime";
 import { RUN_LEASE_MS, RUN_LEASE_RENEW_MS, runAsUser } from "@botanical/db";
 
 import type { ServerConfig } from "../config.ts";
@@ -9,24 +8,32 @@ import { listenerHandler } from "../listeners/kinds.ts";
 import { resolveProfile } from "../profiles.ts";
 import { assertCliProfileReady } from "../routes/profiles.ts";
 import { nextFutureSlot, routineChatTitle } from "../routines/cron.ts";
-import { collectChatTurn } from "./turn.ts";
+import { ensureAgentChat } from "./agent-chat.ts";
+import type { ChatQueue } from "./chat-queue.ts";
 import type { TurnCoordinator } from "./turns.ts";
-import type { Store } from "../types.ts";
+import type { Chat, Store } from "../types.ts";
 
 const ERROR_MAX = 2_000;
 const PROCESS_ID = randomUUID();
 
 /**
- * Runs a full agent turn for a routine slot or a listener delivery.
- * Each run opens a new chat so the transcript stays bounded to that event
- * and the run row can link to it.
+ * Runs a full agent turn for a routine slot or a listener delivery in the agent's own chat
+ * (one chat per agent), through the chat queue so an open thread sees it live. The user
+ * message starts with a `[Routine · …]` or `[Webhook · …]` line naming where it came from,
+ * and the run row links to the chat.
  */
 export function createBackgroundJobs(deps: {
   store: Store;
-  runtime: RuntimeDeps;
   config: ServerConfig;
   turns: TurnCoordinator;
+  chatQueue: Pick<ChatQueue, "runTurn">;
 }) {
+  async function agentChat(agentId: string, profileId: string): Promise<Chat> {
+    const agent = await deps.store.agents.get(agentId);
+    if (!agent) throw new Error("Agent no longer exists");
+    return (await ensureAgentChat(deps.store, agent, profileId)).chat;
+  }
+
   async function executeRoutineRun(runId: string): Promise<void> {
     await deps.turns.runInBackground(async () => {
       const run = await deps.store.routineRuns.get(runId);
@@ -48,20 +55,17 @@ export function createBackgroundJobs(deps: {
       try {
         const profile = await resolveProfile(deps.store, routine.profileId, undefined);
         await assertCliProfileReady(profile);
-        if (!chatId) {
-          const chat = await deps.store.chats.create({
-            agentId: routine.agentId,
-            profileId: profile.id,
-            title: routineChatTitle(routine.name, new Date(run.scheduledFor), routine.timezone),
-          });
+        const chat = await agentChat(routine.agentId, profile.id);
+        if (chatId !== chat.id) {
           chatId = chat.id;
           await deps.store.routineRuns.update(runId, { chatId });
         }
-        const chat = await deps.store.chats.get(chatId);
-        if (!chat) throw new Error("Chat not found");
-        const result = await deps.turns.exclusive(chat.id, () =>
-          collectChatTurn(deps.store, deps.runtime, { chat, content: routine.prompt, profile }),
-        );
+        const label = routineChatTitle(routine.name, new Date(run.scheduledFor), routine.timezone);
+        const result = await deps.chatQueue.runTurn({
+          chatId: chat.id,
+          content: `[Routine · ${label}]\n\n${routine.prompt}`,
+          profile,
+        });
         const finishedAt = new Date().toISOString();
         if (result.error) {
           await finishRoutine(runId, routine.id, routine.agentId, chatId, "failed", result.error.message, finishedAt, routine.name);
@@ -139,22 +143,21 @@ export function createBackgroundJobs(deps: {
         if (!handler) throw new Error(`No handler for listener kind ${listener.kind}`);
         const profile = await resolveProfile(deps.store, listener.profileId, undefined);
         await assertCliProfileReady(profile);
-        const chat = await deps.store.chats.create({
-          agentId: listener.agentId,
-          profileId: profile.id,
-          title: routineChatTitle(listener.name, new Date(delivery.receivedAt), "UTC"),
-        });
+        const chat = await agentChat(listener.agentId, profile.id);
         chatId = chat.id;
         await deps.store.listenerDeliveries.update(deliveryId, { chatId });
-        const content = handler.buildPrompt({
+        const prompt = handler.buildPrompt({
           template: listener.promptTemplate,
           listenerName: listener.name,
           receivedAt: delivery.receivedAt,
           payload,
         });
-        const result = await deps.turns.exclusive(chat.id, () =>
-          collectChatTurn(deps.store, deps.runtime, { chat, content, profile }),
-        );
+        const label = routineChatTitle(listener.name, new Date(delivery.receivedAt), "UTC");
+        const result = await deps.chatQueue.runTurn({
+          chatId: chat.id,
+          content: `[Webhook · ${label}]\n\n${prompt}`,
+          profile,
+        });
         if (result.error) {
           await finishDelivery(deliveryId, listener.agentId, chatId, listener.name, result.error.message);
           return;

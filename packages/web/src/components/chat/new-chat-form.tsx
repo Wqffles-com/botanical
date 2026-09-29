@@ -65,7 +65,7 @@ export function NewChatForm({
     <div className={pageContainerVariants({ size: "narrow", className: "flex flex-col gap-6" })}>
       <PageHeader
         title="New chat"
-        description="Each chat belongs to one agent and runs on the model profile shown here. Add more agents to make it a group chat. An agent's default is pre-selected and you can change it."
+        description="Each agent has one chat: pick an agent to open it. Add more agents to start a group chat instead. The chat runs on the model profile shown here; an agent's default is pre-selected and you can change it."
       />
 
       <section className="space-y-2">
@@ -130,9 +130,9 @@ export function NewChatForm({
 
       {agentId && others.length > 0 ? (
         <section className="space-y-2" aria-labelledby="new-chat-members">
-          <Label id="new-chat-members">Also in this chat</Label>
+          <Label id="new-chat-members">Start a group chat with</Label>
           <p className="text-xs text-muted-foreground">
-            Optional. Pick other agents for a group chat: each answers in turn, or only the ones you @mention.
+            Optional. Pick other agents for a new group chat: each answers in turn, or only the ones you @mention.
           </p>
           <div className="flex flex-wrap gap-2" role="group" aria-labelledby="new-chat-members">
             {others.map((other) => {
@@ -187,15 +187,17 @@ export function NewChatForm({
         ) : null}
       </section>
 
-      <section className="space-y-2">
-        <Label htmlFor="new-chat-title">Title</Label>
-        <Input
-          id="new-chat-title"
-          value={title}
-          placeholder="Optional"
-          onChange={(event) => setTitle(event.target.value)}
-        />
-      </section>
+      {memberIds.length > 0 ? (
+        <section className="space-y-2">
+          <Label htmlFor="new-chat-title">Title</Label>
+          <Input
+            id="new-chat-title"
+            value={title}
+            placeholder="Optional"
+            onChange={(event) => setTitle(event.target.value)}
+          />
+        </section>
+      ) : null}
 
       {error ? (
         <p role="alert" className="text-sm text-destructive">
@@ -209,10 +211,10 @@ export function NewChatForm({
           disabled={!ready || pending}
           onClick={() => {
             if (!agentId || !profileId) return;
-            onSubmit({ agentId, memberIds, profileId, title });
+            onSubmit({ agentId, memberIds, profileId, title: memberIds.length > 0 ? title : "" });
           }}
         >
-          {pending ? "Starting…" : "Start chat"}
+          {pending ? "Starting…" : memberIds.length > 0 ? "Start group chat" : "Open chat"}
         </Button>
         {missing ? <p className="text-xs text-muted-foreground">{missing}</p> : null}
       </div>

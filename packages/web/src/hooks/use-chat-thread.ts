@@ -273,6 +273,32 @@ export function useChatThread(chatId: string) {
     [chatId, setChatMembers],
   );
 
+  /** Remove every message. The agent starts fresh; its memories and files stay. */
+  const clear = useCallback(async () => {
+    try {
+      const ids = await api.clearChat(chatId);
+      setMessages((current) => removeMessages(current, ids));
+      setError(null);
+      return true;
+    } catch (err) {
+      toast.error(errorText(err));
+      return false;
+    }
+  }, [chatId]);
+
+  /** Summarize the chat so far. The agent reads the summary instead of the older messages. */
+  const compact = useCallback(async () => {
+    try {
+      const summary = await api.compactChat(chatId, profileId ? { profileId } : {});
+      setMessages((current) => mergeMessage(current, summary));
+      toast.success("Conversation compacted");
+      return true;
+    } catch (err) {
+      toast.error(errorText(err));
+      return false;
+    }
+  }, [chatId, profileId]);
+
   const stop = useCallback(() => {
     void api.stopChat(chatId).catch((err: unknown) => setError(errorText(err)));
   }, [chatId]);
@@ -298,6 +324,8 @@ export function useChatThread(chatId: string) {
     setMembers,
     send,
     stop,
+    clear,
+    compact,
     editMessage,
     deleteMessage,
     resend,

@@ -30,6 +30,7 @@ import {
   CommandShortcut,
 } from "@botanical/ui/components/command";
 import { SidebarMenuButton } from "@botanical/ui/components/sidebar";
+import { agentChatHref, groupChats } from "@/lib/chat-groups";
 import { agentIdentity } from "@/lib/agent-identity";
 import { relativeTime } from "@/lib/format";
 
@@ -59,10 +60,7 @@ export function CommandMenu({ trigger }: { trigger?: (open: () => void) => React
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const recent = useMemo(
-    () => [...chats].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 12),
-    [chats],
-  );
+  const recent = useMemo(() => groupChats(chats).slice(0, 12), [chats]);
   const agentName = useMemo(() => new Map(agents.map((agent) => [agent.id, agent.name])), [agents]);
 
   function go(href: string) {
@@ -101,7 +99,7 @@ export function CommandMenu({ trigger }: { trigger?: (open: () => void) => React
                     <CommandItem
                       key={agent.id}
                       value={`agent ${identity.name} ${identity.title}`}
-                      onSelect={() => go(`/agents/${agent.id}`)}
+                      onSelect={() => go(agentChatHref(agent.id, chats))}
                     >
                       <AgentAvatar
                         icon={identity.icon}
@@ -122,7 +120,7 @@ export function CommandMenu({ trigger }: { trigger?: (open: () => void) => React
               </CommandGroup>
             ) : null}
             {recent.length > 0 ? (
-              <CommandGroup heading="Recent chats">
+              <CommandGroup heading="Group chats">
                 {recent.map((chat) => (
                   <CommandItem
                     key={chat.id}

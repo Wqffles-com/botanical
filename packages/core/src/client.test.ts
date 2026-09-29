@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { BotanicalClient } from "./client";
+import { isAgentChat, isCompactionMessage } from "./chats";
 import { AgentRequiredError, ProfileRequiredError } from "./errors";
 import { normalizeAgent, normalizeProfile } from "./normalize";
 
@@ -319,6 +320,64 @@ describe("BotanicalClient", () => {
       expect(events).toEqual([
         { type: "message-updated", message: expect.objectContaining({ id: "m1", content: "Fixed" }) },
         { type: "messages-deleted", ids: ["m1", "m2"] },
+      ]);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("opens an agent's own chat, clears it, and compacts it", async () => {
+    const calls: Array<{ method: string; path: string; body?: unknown }> = [];
+    const chat = {
+      id: "c1",
+      agentId: "a1",
+      memberIds: [],
+      profileId: "grok",
+      title: "Ada",
+      createdAt: "2026-09-29T00:00:00.000Z",
+    };
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const url = new URL(request.url);
+        const body = request.method === "POST" ? await request.json() : undefined;
+        calls.push({ method: request.method, path: url.pathname, ...(body !== undefined ? { body } : {}) });
+        if (url.pathname === "/api/agents/a1/chat") return Response.json({ chat });
+        if (url.pathname === "/api/agents/a2/chat") return Response.json({ chat: null });
+        if (request.method === "DELETE" && url.pathname === "/api/chats/c1/messages") {
+          return Response.json({ deleted: ["m1", 7, "m2"] });
+        }
+        if (url.pathname === "/api/chats/c1/compact") {
+          return Response.json(
+            {
+              message: {
+                id: "s1",
+                chatId: "c1",
+                role: "system",
+                name: "compaction",
+                content: "Summary",
+                createdAt: "2026-09-29T00:00:00.000Z",
+              },
+            },
+            { status: 201 },
+          );
+        }
+        return Response.json({ error: "missing" }, { status: 404 });
+      },
+    });
+    try {
+      const client = new BotanicalClient({ baseUrl: `http://127.0.0.1:${server.port}` });
+      const own = await client.getAgentChat("a1");
+      expect(own).toMatchObject({ id: "c1", memberIds: [] });
+      expect(own && isAgentChat(own)).toBe(true);
+      expect(await client.getAgentChat("a2")).toBeNull();
+      expect(await client.clearChat("c1")).toEqual(["m1", "m2"]);
+      const summary = await client.compactChat("c1");
+      expect(isCompactionMessage(summary)).toBe(true);
+      await client.compactChat("c1", { profileId: "fast" });
+      expect(calls.filter((call) => call.path === "/api/chats/c1/compact").map((call) => call.body)).toEqual([
+        {},
+        { profileId: "fast" },
       ]);
     } finally {
       server.stop(true);

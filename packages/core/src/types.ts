@@ -183,7 +183,10 @@ export interface Chat {
   id: string;
   /** The owning agent. */
   agentId: string;
-  /** Other agents in a group chat, in speaking order. Empty for a one-agent chat. */
+  /**
+   * Other agents in a group chat, in speaking order. Empty for the agent's own chat: each agent
+   * has one (`isAgentChat`), and a chat never switches between the two kinds.
+   */
   memberIds: string[];
   profileId: string | null;
   title: string;
@@ -191,6 +194,10 @@ export interface Chat {
   updatedAt: string;
 }
 
+/**
+ * Without `memberIds` this opens the agent's own chat: the server returns the existing one,
+ * or creates it on `profileId` the first time. With members it starts a new group chat.
+ */
 export interface CreateChatInput {
   /** Exactly one owning agent. */
   agentId: string;
@@ -265,12 +272,6 @@ export type ChatEvent =
 /** Async agent-to-agent mail. Status moves pending → delivered → read, or failed. */
 export const AGENT_MESSAGE_STATUSES = ["pending", "delivered", "read", "failed"] as const;
 export type AgentMessageStatus = (typeof AGENT_MESSAGE_STATUSES)[number];
-
-/**
- * Title of the recipient's dedicated inbox thread.
- * Autorun (`BOTANICAL_A2A_AUTORUN`) appends received mail there and takes one turn.
- */
-export const INBOX_CHAT_TITLE = "Inbox";
 
 export interface AgentMessage {
   id: string;

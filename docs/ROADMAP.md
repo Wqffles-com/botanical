@@ -10,8 +10,9 @@ Botanical is in early alpha. This page separates what already ships from what is
 - Monochrome shadcn/ui, with a light/dark toggle.
 - Model profiles for OpenAI-compatible APIs (the start script offers DeepSeek first) and for OpenAI, Anthropic, xAI, and OpenRouter. No silent default model.
 - Coding-agent CLI profiles (Grok Build, Claude Code, Codex) run headless on the server. Enabled with `BOTANICAL_CLI_PROFILES`. Installed and signed in inside the container from Settings. Each turn exposes Botanical tools through one MCP server named `botanical`.
-- Custom agents with name, description, Lucide icon, color, prompt, and tool allowlist. Each chat has one owning agent.
-- **Group chats**: add other agents to a chat. Each answers in turn and reads the others' replies, or only the agents you `@mention` answer. An agent can hand off by mentioning another.
+- Custom agents with name, description, Lucide icon, color, prompt, and tool allowlist.
+- **One chat per agent**: each agent has a single chat, opened from the sidebar. Routine runs, webhook deliveries, and agent mail land there too. Long chats stay usable: a context window, automatic and manual compaction into a summary, and a clear action.
+- **Group chats**: start a separate chat with several agents. Each answers in turn and reads the others' replies, or only the agents you `@mention` answer. An agent can hand off by mentioning another.
 - Async agent-to-agent messaging with an inbox. `@Name` in a chat mails the mentioned agent, with composer autocomplete. Optional autorun (`BOTANICAL_A2A_AUTORUN=true`) starts a background turn for the recipient.
 - Shared and per-agent memory.
 - Agents that create agents, limited to their own permissions.
@@ -20,9 +21,9 @@ Botanical is in early alpha. This page separates what already ships from what is
 - Opt-in MCP servers (stdio / HTTP).
 - Postgres persistence with automatic migrations.
 - Docker Compose deploy, one-command `start.sh` / `start.ps1`, and a prebuilt release zip from CI.
-- A rough API context trim (`maxContext`, about four characters per token). Proper context-limit handling is still planned.
+- A rough API context trim (`maxContext`, about four characters per token), plus compaction: a chat that passes 75% of the model's context is summarized, and the model reads the summary instead of older messages.
 - Dictation in the composer. Speech becomes editable text before send. Server providers: OpenAI-compatible, OpenRouter, xAI, and Qwen. The browser's speech recognition is used when no server provider is set.
-- **Routines**: cron schedules that run an agent on the server. Each run opens a new chat.
+- **Routines**: cron schedules that run an agent on the server. Each run posts into the agent's chat.
 - **Listeners**: generic inbound webhooks (`POST /api/hooks/:id`) that start an agent turn. Typed forge listeners are still planned.
 - **Notifications** when a background run finishes or fails, plus a `notify_user` tool when an agent needs attention.
 - **Message actions**: copy, edit, retry, and delete chat messages. Editing a user message resends it and drops what came after; editing a reply corrects it in place. Deleting can also drop everything after a message. Actions lock while the agent works.
@@ -56,7 +57,7 @@ Botanical is in early alpha. This page separates what already ships from what is
 ### CLI sessions and API context limits
 - Start a coding CLI session when a chat needs it. Shut it down after 15 to 30 minutes idle. Save the session id and resume it on the next turn.
 - Today each CLI turn is a new process with a rendered transcript. It does not save or resume a session id.
-- API chats need proper context-limit handling. The current trim is a rough character estimate.
+- API chats need exact token counts. The trim and the compaction threshold use a rough character estimate.
 
 ### Bot tools match the app
 - Bots get tools for anything a person can do in the app: customize bots, create routines and listeners, change settings, and the rest of the product.

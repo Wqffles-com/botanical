@@ -2,6 +2,7 @@ import { effectivePermissions, isCapability } from "@botanical/agent-runtime";
 
 import { HttpError, json, noContent, readJson } from "../http.ts";
 import { authed, type Router } from "../router.ts";
+import { findAgentChat } from "../runtime/agent-chat.ts";
 import type { Agent } from "../types.ts";
 import { parseCreateAgent, parseUpdateAgent, requireParam } from "../validate.ts";
 import { resolveRoleIds } from "./roles.ts";
@@ -59,13 +60,19 @@ export function registerAgents(router: Router): void {
       const id = requireParam(ctx.params, "id");
       const existing = await ctx.store.agents.get(id);
       if (!existing) throw new HttpError(404, "not_found", "Agent not found");
+      // The agent's own chat goes with it. Group chats it owns or answers in block the delete.
+      const own = await findAgentChat(ctx.store, id);
       const owned = await ctx.store.chats.countByAgent(id);
-      if (owned > 0) {
+      if (owned > (own ? 1 : 0)) {
         throw new HttpError(
           409,
           "agent_in_use",
-          "This agent still owns or is a member of chats. Delete those chats or remove it from them first.",
+          "This agent is in group chats. Delete those chats or remove it from them first.",
         );
+      }
+      if (own) {
+        await ctx.store.messages.deleteByChat(own.id);
+        await ctx.store.chats.delete(own.id);
       }
       await ctx.store.agents.delete(id);
       return noContent();

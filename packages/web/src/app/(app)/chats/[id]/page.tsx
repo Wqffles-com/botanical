@@ -30,6 +30,8 @@ export default function ChatPage() {
       onMembers={thread.setMembers}
       onSend={() => void thread.send()}
       onStop={thread.stop}
+      onClear={thread.clear}
+      onCompact={thread.compact}
       onEditMessage={thread.editMessage}
       onDeleteMessage={thread.deleteMessage}
       onResendMessage={thread.resend}
