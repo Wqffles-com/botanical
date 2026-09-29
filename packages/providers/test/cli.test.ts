@@ -563,4 +563,11 @@ describe("expandCliModels", () => {
       ["codex", undefined],
     ]);
   });
+
+  test("gives each sibling a distinct label so global profile names stay unique", () => {
+    const [spec] = parseCliProfileShortcut("grok-build");
+    const labels = expandCliModels([spec!]).map((s) => s.label);
+    expect(labels[0]).toBe("Grok Build");
+    expect(new Set(labels).size).toBe(labels.length);
+  });
 });
