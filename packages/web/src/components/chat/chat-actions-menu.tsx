@@ -54,10 +54,10 @@ export function ChatActionsMenu({
           render={
             <Button
               variant="ghost"
-              size="icon-sm"
+              size="icon"
               aria-label="Chat actions"
               data-testid="chat-actions"
-              className="text-muted-foreground"
+              className="rounded-full text-muted-foreground hover:text-foreground"
             />
           }
         >

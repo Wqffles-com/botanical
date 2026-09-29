@@ -1,9 +1,9 @@
 "use client";
 
+import { useAppDialogs } from "@/components/app-dialogs";
 import { pageContainerVariants } from "@botanical/ui/components/page-container";
 import { PageHeader } from "@botanical/ui/components/page-header";
 import type { Agent, ModelProfile } from "@botanical/core";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AgentAvatar } from "@/components/agent-avatar";
 import { ProfileSelect } from "@/components/chat/profile-select";
@@ -31,6 +31,7 @@ export function NewChatForm({
   error?: string | null;
   onSubmit: (input: { agentId: string; memberIds: string[]; profileId: string; title: string }) => void;
 }) {
+  const { openAgent, openSettings } = useAppDialogs();
   const [query, setQuery] = useState("");
   const [agentId, setAgentId] = useState<string | null>(initialAgentId ?? null);
   // Other agents that answer in the same chat. The owner is never one of them.
@@ -73,9 +74,9 @@ export function NewChatForm({
         {agents.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Create an agent first, then come back.{" "}
-            <Link href="/agents/new" className="text-primary underline-offset-2 hover:underline">
+            <button type="button" onClick={() => openAgent(null)} className="text-primary underline-offset-2 hover:underline">
               New agent
-            </Link>
+            </button>
           </p>
         ) : (
           <>
@@ -172,7 +173,7 @@ export function NewChatForm({
         {profiles.length === 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
             <p className="text-sm text-muted-foreground">No model profiles yet.</p>
-            <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/settings?tab=profiles" />}>
+            <Button variant="outline" size="sm" onClick={() => openSettings("profiles")}>
               Create one
             </Button>
           </div>

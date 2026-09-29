@@ -47,6 +47,7 @@ Blocks built on them:
 | `--chart-1` … `--chart-5` | Chart ramp |
 | `--swatch-blue`, `--swatch-red`, `--swatch-green`, `--swatch-orange`, `--swatch-violet` | Accent hues, light and dark. The settings picker paints with them |
 | `--agent-<color>`, `--agent-<color>-ink` | Agent identity marks (`packages/web/src/lib/agent-colors.ts`), light and dark |
+| `--bubble`, `--bubble-user` | Chat bubble fills: an agent's reply and the viewer's own message (`bg-bubble`, `bg-bubble-user`). The composer uses `--bubble` too |
 | `--text-2xs` | 11px step below `text-xs` for timestamps and counts |
 
 Text selection is tinted with `--primary`.

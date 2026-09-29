@@ -1,8 +1,8 @@
 "use client";
 
+import { useAppDialogs } from "@/components/app-dialogs";
 import type { Agent, Chat, ChatMessage, MemoryRecord, ModelProfile, WorkspaceFile, WorkspaceListing } from "@botanical/core";
 import { ArrowLeft, Brain, File, Folder, FolderOpen, Link2, RefreshCw } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Badge } from "@botanical/ui/components/badge";
 import { Button } from "@botanical/ui/components/button";
@@ -217,6 +217,7 @@ function sortEntries<T extends { type: string; name: string }>(entries: T[]): T[
 }
 
 function MemoryTab({ agent, revision }: { agent: Agent; revision: number }) {
+  const { openSettings } = useAppDialogs();
   const [shared, setShared] = useState<MemoryRecord[] | null>(null);
   const [own, setOwn] = useState<MemoryRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -256,9 +257,13 @@ function MemoryTab({ agent, revision }: { agent: Agent; revision: number }) {
       <MemorySection title="Global memory" rows={shared} empty="No shared memories. Every agent can read these." />
       <p className="px-3 text-xs text-muted-foreground">
         Edit memories in{" "}
-        <Link href="/settings?tab=memory" className="underline underline-offset-2 hover:text-foreground">
+        <button
+          type="button"
+          onClick={() => openSettings("memory")}
+          className="underline underline-offset-2 hover:text-foreground"
+        >
           Settings
-        </Link>
+        </button>
         .
       </p>
     </div>

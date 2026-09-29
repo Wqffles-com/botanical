@@ -1,7 +1,7 @@
 "use client";
 
+import { useAppDialogs } from "@/components/app-dialogs";
 import { Bot } from "lucide-react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { EmptyState } from "@botanical/ui/components/empty-state";
@@ -25,6 +25,7 @@ export default function AgentChatPage() {
   const agentId = params.id;
   const router = useRouter();
   const { ready, agents, chats, profiles, createChat, refresh } = useWorkspace();
+  const { openSettings } = useAppDialogs();
   const agent = agents.find((item) => item.id === agentId) ?? null;
   const [asking, setAsking] = useState(false);
   const [profileId, setProfileId] = useState<string | null>(null);
@@ -101,7 +102,7 @@ export default function AgentChatPage() {
         {profiles.length === 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
             <p className="text-sm text-muted-foreground">No model profiles yet.</p>
-            <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/settings?tab=profiles" />}>
+            <Button variant="outline" size="sm" onClick={() => openSettings("profiles")}>
               Create one
             </Button>
           </div>

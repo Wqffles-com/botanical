@@ -10,7 +10,15 @@ import { api } from "@/lib/api";
 import { listProfiles, listTools } from "@/lib/agent-api";
 import { identityFromUnknown, type ProfileInfo, type ToolInfo } from "@/lib/agent-identity";
 
-export function AgentEditorPage({ agentId }: { agentId?: string }) {
+export function AgentEditorPage({
+  agentId,
+  layout = "page",
+  onDone,
+}: {
+  agentId?: string;
+  layout?: "page" | "dialog";
+  onDone?: (next?: string) => void;
+}) {
   const { ready, agents, error } = useWorkspace();
   const [tools, setTools] = useState<ToolInfo[]>([]);
   const [profiles, setProfiles] = useState<ProfileInfo[]>([]);
@@ -51,7 +59,11 @@ export function AgentEditorPage({ agentId }: { agentId?: string }) {
 
   if (!ready || (agentId && !agent && agents.length === 0)) {
     return (
-      <div className={pageContainerVariants({ size: "narrow", className: "space-y-4" })}>
+      <div
+        className={
+          layout === "dialog" ? "space-y-4 p-8" : pageContainerVariants({ size: "narrow", className: "space-y-4" })
+        }
+      >
         <Skeleton className="size-14 rounded-xl" />
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-10 w-full" />
@@ -76,6 +88,8 @@ export function AgentEditorPage({ agentId }: { agentId?: string }) {
       roles={roles}
       agents={agents}
       toolsLoading={toolsLoading}
+      layout={layout}
+      onDone={onDone}
     />
   );
 }

@@ -4,11 +4,14 @@ import { MessageSquareOff } from "lucide-react";
 import { isCompactionMessage, type Agent, type Chat, type ChatMessage, type ModelProfile } from "@botanical/core";
 import { useEffect, useRef, type ReactNode } from "react";
 import { ChatActionsMenu } from "@/components/chat/chat-actions-menu";
+import { ShellHeader } from "@/components/app-shell";
 import { ChatAgentHeader } from "@/components/chat/chat-agent-header";
 import { ChatMembersMenu } from "@/components/chat/chat-members-menu";
 import { CompactionDivider } from "@/components/chat/compaction-divider";
 import { Composer } from "@/components/chat/composer";
 import { EmptyState } from "@botanical/ui/components/empty-state";
+import { AgentAvatar } from "@/components/agent-avatar";
+import { AgentStack } from "@/components/agent-stack";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import type { MessageActionHandlers } from "@/components/chat/message-actions";
 import { ProfileRequiredBanner } from "@/components/chat/profile-required-banner";
@@ -130,13 +133,10 @@ export function ChatThread({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ChatAgentHeader
-        agent={identity}
-        title={chat.title}
-        creator={creator}
-        members={members.map((member) => member.name)}
-        trailing={
-          <div className="flex items-center gap-1">
+      <ShellHeader
+        center={<ChatAgentHeader agent={identity} title={chat.title} creator={creator} members={members} />}
+        actions={
+          <>
             {/* An agent's own chat stays one-on-one. Group chats are started from New chat. */}
             {agent && onMembers && group ? (
               <ChatMembersMenu
@@ -151,7 +151,7 @@ export function ChatThread({
               <ChatActionsMenu disabled={locked} empty={messages.length === 0} onClear={onClear} onCompact={onCompact} />
             ) : null}
             {headerActions}
-          </div>
+          </>
         }
       />
 
@@ -181,8 +181,21 @@ export function ChatThread({
         className="min-h-0 flex-1 overflow-y-auto"
       >
         {messages.length === 0 && pending.length === 0 ? (
-          <div className="mx-auto flex h-full max-w-3xl flex-col items-center justify-center px-6 text-center">
-            <h2 className="text-2xl font-semibold tracking-tight">
+          <div className="mx-auto flex h-full max-w-3xl flex-col items-center justify-center px-6 pb-16 text-center">
+            {group && agent ? (
+              <AgentStack agents={[agent, ...members]} size="xl" ring="ring-background" className="mb-4" />
+            ) : identity ? (
+              <AgentAvatar
+                name={identity.name}
+                icon={identity.icon}
+                color={identity.color}
+                shape={identity.shape}
+                picture={identity.picture}
+                size="xl"
+                className="mb-4"
+              />
+            ) : null}
+            <h2 className="text-3xl font-semibold tracking-tight">
               {group ? [identity?.name ?? "Agent", ...members.map((member) => member.name)].join(", ") : (identity?.name ?? "New chat")}
             </h2>
             <p className="mt-2 max-w-md text-sm text-muted-foreground">
@@ -193,24 +206,28 @@ export function ChatThread({
             </p>
           </div>
         ) : (
-          <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-end gap-5 px-4 py-6">
-            {rows.map((row) =>
-              isCompactionMessage(row.message) ? (
-                <CompactionDivider key={row.key} message={row.message} />
-              ) : row.message.role === "system" ? null : (
+          <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-end gap-6 px-4 pt-2 pb-6">
+            {rows.map((row, index) => {
+              if (isCompactionMessage(row.message)) return <CompactionDivider key={row.key} message={row.message} />;
+              if (row.message.role === "system") return null;
+              const author = messageAuthor(row.message, chat, agents) ?? agent;
+              return (
                 <MessageBubble
                   key={row.key}
                   message={row.message}
-                  agent={messageAuthor(row.message, chat, agents) ?? agent}
+                  agent={author}
+                  showName={group}
+                  continued={continuesRun(rows, index, author?.id ?? null, chat, agents)}
                   toolCalls={row.tools.length > 0 ? row.tools : undefined}
                   actions={actionsFor(row.message)}
                 />
-              ),
-            )}
+              );
+            })}
             {working ? (
               <MessageBubble
                 message={{ id: "working", chatId: chat.id, role: "assistant", content: "", createdAt: "" }}
                 agent={workingAgent}
+                showName={group}
                 working
               />
             ) : null}
@@ -246,4 +263,21 @@ export function ChatThread({
       />
     </div>
   );
+}
+
+/** A reply that follows another reply from the same agent drops its avatar and sits closer. */
+function continuesRun(
+  rows: ReturnType<typeof presentThread>,
+  index: number,
+  authorId: string | null,
+  chat: Chat,
+  agents: Agent[],
+): boolean {
+  const current = rows[index]?.message;
+  const previous = rows[index - 1]?.message;
+  if (!current || !previous || current.role === "user" || previous.role === "user") return false;
+  if (previous.role === "system" || isCompactionMessage(previous)) return false;
+  if (isInboxMessage(current) || isInboxMessage(previous)) return false;
+  const previousAuthor = messageAuthor(previous, chat, agents)?.id ?? chat.agentId;
+  return previousAuthor === (authorId ?? chat.agentId);
 }

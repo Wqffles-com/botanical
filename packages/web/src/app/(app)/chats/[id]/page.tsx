@@ -16,13 +16,13 @@ const panelListeners = new Set<() => void>();
 /** Last choice this visit, so the toggle works when storage throws (private mode). */
 let panelChoice: boolean | null = null;
 
-/** Side panel open on wide screens unless the viewer closed it. Remembered per browser. */
+/** Side panel closed until the viewer opens it, so the chat gets the full width. Remembered per browser. */
 function readPanelPref(): boolean {
   if (panelChoice !== null) return panelChoice;
   try {
-    return window.localStorage.getItem(PANEL_KEY) !== "0";
+    return window.localStorage.getItem(PANEL_KEY) === "1";
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -101,7 +101,8 @@ export default function ChatPage() {
             panel ? (
               <Button
                 variant="ghost"
-                size="icon-sm"
+                size="icon"
+                className="rounded-full text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-foreground"
                 aria-label={expanded ? "Hide side panel" : "Show side panel"}
                 aria-pressed={expanded}
                 data-testid="chat-panel-toggle"
@@ -113,7 +114,7 @@ export default function ChatPage() {
           }
         />
       </div>
-      {panel && !mobile && panelOpen ? <aside className="w-80 shrink-0 border-l">{panel}</aside> : null}
+      {panel && !mobile && panelOpen ? <aside className="w-80 shrink-0 border-l bg-sidebar">{panel}</aside> : null}
       {panel && mobile ? (
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetContent side="right" className="w-[85vw] gap-0 p-0 pt-10" showCloseButton>
