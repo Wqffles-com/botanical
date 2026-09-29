@@ -15,6 +15,7 @@ import { identityFromUnknown } from "@/lib/agent-identity";
 import { isGroupChat, messageAuthor } from "@/lib/chat-members";
 import { pendingToMessage, type PendingMessage } from "@/lib/chat-queue";
 import { presentThread } from "@/lib/chat-stream";
+import { isInboxMessage } from "@/lib/inbox-message";
 import { useWorkspace } from "@/components/workspace-provider";
 
 export function ChatThread({
@@ -104,11 +105,13 @@ export function ChatThread({
   const actionsFor = (message: ChatMessage): MessageActionHandlers | undefined => {
     if (!onDeleteMessage) return undefined;
     const user = message.role === "user";
+    // Agent mail is not the human's to rewrite. It can still be copied or deleted.
+    const mail = isInboxMessage(message);
     return {
       disabled: locked,
       onDelete: (following) => onDeleteMessage(message.id, following),
       ...(onEditMessage && !user ? { onEdit: (content: string) => onEditMessage(message.id, content) } : {}),
-      ...(onResendMessage && user ? { onResend: (content: string) => onResendMessage(message.id, content) } : {}),
+      ...(onResendMessage && user && !mail ? { onResend: (content: string) => onResendMessage(message.id, content) } : {}),
       ...(onRetryMessage && !user ? { onRetry: () => onRetryMessage(message.id) } : {}),
     };
   };

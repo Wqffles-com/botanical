@@ -47,6 +47,7 @@ export async function claimInbox(
   };
 }
 
+/** The web chat view parses this format (`packages/web/src/lib/inbox-message.ts`). Change both together. */
 export function renderInbox(
   messages: readonly AgentMessageRecord[],
   names: ReadonlyMap<string, string>,
