@@ -4,7 +4,7 @@ import type { A2AService } from "../a2a/service.ts";
 import { HttpError, isRecord, json, readJson } from "../http.ts";
 import { readRequestedProfileId, resolveProfile } from "../profiles.ts";
 import { assertCliProfileReady } from "./profiles.ts";
-import { collectChatTurn, streamChatTurn, turnFailure } from "../runtime/turn.ts";
+import { collectChatTurn, streamChatReplies, turnFailure } from "../runtime/turn.ts";
 import type { ChatQueue } from "../runtime/chat-queue.ts";
 import type { TurnCoordinator } from "../runtime/turns.ts";
 import { authed, type Router } from "../router.ts";
@@ -84,6 +84,7 @@ export function registerMessages(
         return json(201, {
           userMessage: result.userMessage,
           assistantMessage: result.assistantMessage,
+          ...(result.replies ? { replies: result.replies } : {}),
           profileId: result.profileId,
           mentions,
           ...(result.toolCall ? { toolCall: result.toolCall } : {}),
@@ -91,7 +92,7 @@ export function registerMessages(
           ...(result.error ? { error: result.error } : {}),
         });
       }
-      return sseStream(turns.stream(chat.id, () => streamChatTurn(ctx.store, runtime, turn)));
+      return sseStream(turns.stream(chat.id, () => streamChatReplies(ctx.store, runtime, turn)));
     }),
   );
 

@@ -73,7 +73,9 @@ export function adaptServerStore(store: Store): RuntimeStore {
       },
       async listByAgent(agentId) {
         const chats = await store.chats.list();
-        return chats.filter((chat) => chat.agentId === agentId).map(toChat);
+        return chats
+          .filter((chat) => chat.agentId === agentId || chat.memberIds.includes(agentId))
+          .map(toChat);
       },
       async create() {
         throw new ValidationError("Create chats through POST /api/chats so a profile is explicit");
@@ -102,6 +104,7 @@ export function adaptServerStore(store: Store): RuntimeStore {
           ...(input.toolCallId ? { toolCallId: input.toolCallId } : {}),
           ...(input.name ? { name: input.name } : {}),
           ...(input.profileId ? { profileId: input.profileId } : {}),
+          ...(input.agentId ? { agentId: input.agentId } : {}),
         });
         return toMessage(created);
       },
@@ -136,6 +139,7 @@ function toChat(chat: Chat): ChatRecord {
   return {
     id: chat.id,
     agentId: chat.agentId,
+    memberIds: [...chat.memberIds],
     title: chat.title,
     createdAt: chat.createdAt,
     updatedAt: chat.updatedAt,
@@ -154,6 +158,7 @@ function toMessage(message: Message): MessageRecord {
   if (message.toolCallId) row.toolCallId = message.toolCallId;
   if (message.name) row.name = message.name;
   if (message.profileId) row.profileId = message.profileId;
+  if (message.agentId) row.agentId = message.agentId;
   return row;
 }
 

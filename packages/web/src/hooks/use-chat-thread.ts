@@ -19,7 +19,7 @@ import { unavailableProfileHint } from "@/lib/format";
 import { toast } from "sonner";
 
 export function useChatThread(chatId: string) {
-  const { chats, profiles, agents, setChatProfile, refresh } = useWorkspace();
+  const { chats, profiles, agents, setChatProfile, setChatMembers, refresh } = useWorkspace();
   const [remoteChat, setRemoteChat] = useState<Chat | null>(null);
   const chat = chats.find((item) => item.id === chatId) ?? remoteChat;
   const agent = chat ? (agents.find((item) => item.id === chat.agentId) ?? null) : null;
@@ -32,6 +32,8 @@ export function useChatThread(chatId: string) {
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<PendingMessage[]>([]);
   const [working, setWorking] = useState(false);
+  // The agent answering right now. Group members take turns.
+  const [workingAgentId, setWorkingAgentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const workingRef = useRef(false);
@@ -49,6 +51,7 @@ export function useChatThread(chatId: string) {
     setMessages([]);
     setPending([]);
     setWorking(false);
+    setWorkingAgentId(null);
     setDraft("");
   }
 
@@ -105,6 +108,7 @@ export function useChatThread(chatId: string) {
       }
       setPending((current) => applyQueueStatus(current, event));
       setWorking(event.running);
+      setWorkingAgentId(event.running ? (event.agentId ?? null) : null);
       if (workingRef.current && !event.running) {
         void resync();
         void refresh();
@@ -256,6 +260,19 @@ export function useChatThread(chatId: string) {
     [messages, resend],
   );
 
+  /** Replace the chat's group members, and keep the page's copy in step. */
+  const setMembers = useCallback(
+    async (memberIds: string[]) => {
+      try {
+        const updated = await setChatMembers(chatId, memberIds);
+        setRemoteChat(updated);
+      } catch (err) {
+        toast.error(errorText(err));
+      }
+    },
+    [chatId, setChatMembers],
+  );
+
   const stop = useCallback(() => {
     void api.stopChat(chatId).catch((err: unknown) => setError(errorText(err)));
   }, [chatId]);
@@ -274,9 +291,11 @@ export function useChatThread(chatId: string) {
     setDraft,
     pending,
     working,
+    workingAgentId,
     error,
     profileError,
     setProfile,
+    setMembers,
     send,
     stop,
     editMessage,

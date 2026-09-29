@@ -17,7 +17,7 @@ export interface ChatRepository {
   get(id: string): Promise<ChatRecord | null>;
   list(limit?: number): Promise<ChatRecord[]>;
   listByAgent(agentId: string): Promise<ChatRecord[]>;
-  create(input: { id?: string; agentId: string; title?: string }): Promise<ChatRecord>;
+  create(input: { id?: string; agentId: string; memberIds?: string[]; title?: string }): Promise<ChatRecord>;
   updateTitle(id: string, title: string): Promise<ChatRecord>;
   touch(id: string): Promise<void>;
 }

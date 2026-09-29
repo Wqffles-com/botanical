@@ -13,6 +13,7 @@ import { ProviderError } from "@botanical/providers";
 import { HttpError } from "../http.ts";
 import type { SseEvent } from "../streaming.ts";
 import type { Chat, Message, ModelProfile, Store } from "../types.ts";
+import { handoffs, isGroupChat, respondersFor } from "./group.ts";
 
 export interface TurnErrorBody {
   code: string;
@@ -22,6 +23,8 @@ export interface TurnErrorBody {
 export interface TurnResult {
   userMessage: Message;
   assistantMessage: Message | null;
+  /** Group chats: the last reply of each agent that answered, in speaking order. */
+  replies?: Message[];
   profileId: string;
   toolCall?: { id: string; name: string; arguments: unknown };
   toolResult?: string;
@@ -56,6 +59,62 @@ export interface ChatTurnInput {
   appendUserMessage?: boolean;
   /** Messages sent while the turn runs (the async chat queue). */
   steering?: TurnSteering;
+  /** The agent that answers: the owner (default) or a group member. */
+  agentId?: string;
+}
+
+/**
+ * Answer a user message. A one-agent chat runs one turn. A group chat runs one turn per
+ * responder, one after another, so each agent reads the replies before its own
+ * (`respondersFor`). A reply that @mentions another participant who has not answered
+ * yet hands it the floor next. Each turn starts with an `agent` event `{ agentId }`.
+ * Only the last `done` is forwarded. An error or a stop ends the round.
+ */
+export async function* streamChatReplies(
+  store: Store,
+  runtime: RuntimeDeps,
+  input: ChatTurnInput,
+): AsyncGenerator<SseEvent> {
+  const { chat } = input;
+  if (!isGroupChat(chat)) {
+    yield* streamChatTurn(store, runtime, input);
+    return;
+  }
+  const agents = await store.agents.list();
+  const waiting = respondersFor(chat, agents, input.content);
+  const answered = new Set<string>();
+  let first = true;
+  while (waiting.length > 0) {
+    const agentId = waiting.shift() as string;
+    answered.add(agentId);
+    yield { event: "agent", data: { type: "agent", agentId } };
+    let done: SseEvent | null = null;
+    let reply: Message | null = null;
+    for await (const event of streamChatTurn(store, runtime, {
+      ...input,
+      agentId,
+      // Later speakers answer the same stored message. Only the first can be steered.
+      ...(first ? {} : { appendUserMessage: false, steering: undefined }),
+    })) {
+      if (event.event === "done") {
+        done = event;
+        continue;
+      }
+      if (!first && event.event === "message.created") continue;
+      if (event.event === "message.completed") reply = readMessage(event);
+      yield event;
+    }
+    first = false;
+    const finish = isRecord(done?.data) ? done.data.finishReason : undefined;
+    if (input.signal?.aborted || finish === "error" || finish === "aborted") {
+      if (done) yield done;
+      return;
+    }
+    if (reply?.agentId === agentId && reply.content.includes("@")) {
+      waiting.push(...handoffs(chat, agents, reply.content, new Set([...answered, ...waiting])));
+    }
+    if (waiting.length === 0 && done) yield done;
+  }
 }
 
 export async function* streamChatTurn(
@@ -77,6 +136,7 @@ export async function* streamChatTurn(
       chatId: chat.id,
       content,
       profileId: profile.id,
+      ...(input.agentId ? { agentId: input.agentId } : {}),
       ...(input.signal ? { signal: input.signal } : {}),
       ...(input.appendUserMessage === false ? { appendUserMessage: false } : {}),
       ...(input.steering ? { steering: input.steering } : {}),
@@ -129,7 +189,12 @@ export async function collectChatTurn(
   let toolCall: TurnResult["toolCall"];
   let toolResult: string | undefined;
   let error: TurnErrorBody | undefined;
-  for await (const event of streamChatTurn(store, runtime, input)) {
+  const replies: Message[] = [];
+  for await (const event of streamChatReplies(store, runtime, input)) {
+    if (event.event === "message.completed") {
+      const reply = readMessage(event);
+      if (reply) replies.push(reply);
+    }
     if (!toolCall) {
       const call = readToolCall(event);
       if (call) toolCall = call;
@@ -145,6 +210,7 @@ export async function collectChatTurn(
   return {
     userMessage,
     assistantMessage,
+    ...(isGroupChat(input.chat) ? { replies } : {}),
     profileId: input.profile.id,
     ...(toolCall ? { toolCall } : {}),
     ...(toolResult !== undefined ? { toolResult } : {}),
@@ -212,6 +278,11 @@ function titleFromContent(content: string): string {
   const oneLine = content.trim().replace(/\s+/g, " ");
   if (oneLine.length <= 80) return oneLine;
   return `${oneLine.slice(0, 77)}...`;
+}
+
+function readMessage(event: SseEvent): Message | null {
+  if (!isRecord(event.data) || !isRecord(event.data.message)) return null;
+  return event.data.message as unknown as Message;
 }
 
 function readToolCall(event: SseEvent): TurnResult["toolCall"] | null {

@@ -211,10 +211,14 @@ export interface RoleRepository {
   setForAgent(agentId: string, roleIds: readonly string[]): Promise<RoleRecord[]>;
 }
 
-/** One chat is owned by exactly one agent. agentId is immutable after create. */
+/**
+ * One chat is owned by exactly one agent. agentId is immutable after create.
+ * A group chat also has members: other agents that answer in the same thread, in this order.
+ */
 export interface Chat {
   id: string;
   agentId: string;
+  memberIds: string[];
   profileId: string;
   title: string;
   createdAt: string;
@@ -223,6 +227,7 @@ export interface Chat {
 
 export interface NewChat {
   agentId: string;
+  memberIds?: string[];
   profileId: string;
   title: string;
 }
@@ -230,6 +235,7 @@ export interface NewChat {
 export interface ChatPatch {
   title?: string;
   profileId?: string;
+  memberIds?: string[];
 }
 
 export type MessageRole = "system" | "user" | "assistant" | "tool";
@@ -253,6 +259,8 @@ export interface Message {
   name?: string;
   /** Profile used for this row. Null when the row has no profile. */
   profileId?: string | null;
+  /** Agent that wrote an assistant or tool row. Unset on user rows and rows written before group chats. */
+  agentId?: string | null;
 }
 
 export interface NewMessage {
@@ -263,6 +271,7 @@ export interface NewMessage {
   toolCallId?: string;
   name?: string;
   profileId?: string | null;
+  agentId?: string | null;
 }
 
 export const AGENT_MESSAGE_STATUSES = ["pending", "delivered", "read", "failed"] as const;
@@ -353,6 +362,7 @@ export interface ChatRepository {
   create(input: NewChat): Promise<Chat>;
   update(id: string, patch: ChatPatch): Promise<Chat | null>;
   delete(id: string): Promise<boolean>;
+  /** Chats the agent owns or is a member of. */
   countByAgent(agentId: string): Promise<number>;
 }
 

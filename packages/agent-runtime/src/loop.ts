@@ -1,6 +1,6 @@
 import type { AgentRecord } from "./agent";
 import type { ChatRecord } from "./chat";
-import { assertChatAgentBinding } from "./binding";
+import { assertChatAgentBinding, chatParticipants } from "./binding";
 import {
   AgentNotFoundError,
   ChatNotFoundError,
@@ -16,7 +16,7 @@ import type { MemorySnippet } from "./memories";
 import { selectMemories } from "./memories";
 import { toolAccess } from "./permissions";
 import { trimToBudget } from "./context";
-import { buildSystemPrompt } from "./prompt";
+import { buildSystemPrompt, type GroupContext } from "./prompt";
 import type { ChatMessage, LiveInput, SteeringMessage, TurnSteering } from "./provider";
 import type { AgentMessageBus } from "./bus";
 import type { MessageRepository } from "./store";
@@ -55,6 +55,7 @@ export interface RunTurnInput {
   chatId: string;
   content: string;
   profileId: string;
+  /** The agent that takes this turn: the chat's owner (the default) or one of its group members. */
   agentId?: string;
   signal?: AbortSignal;
   maxSteps?: number;
@@ -83,8 +84,9 @@ export async function prepareTurn(deps: RuntimeDeps, input: RunTurnInput): Promi
   const chat = await deps.store.chats.get(input.chatId);
   if (!chat) throw new ChatNotFoundError(input.chatId);
   assertChatAgentBinding(chat, input.agentId);
-  const agent = await deps.store.agents.get(chat.agentId);
-  if (!agent) throw new AgentNotFoundError(chat.agentId);
+  const agentId = input.agentId || chat.agentId;
+  const agent = await deps.store.agents.get(agentId);
+  if (!agent) throw new AgentNotFoundError(agentId);
   const profile = await deps.profiles.resolve(profileId);
   return { chat, agent, profile };
 }
@@ -142,6 +144,7 @@ export async function* runAgentTurn(
 
   const transcript = await deps.store.messages.listByChat(chat.id);
   const recalled = await recallMemories(deps, agent.id, input.content);
+  const group = groupContext(chat, agent.id, names);
   const cwd = deps.workspaceFor?.(agent.id);
 
   const steering = input.steering;
@@ -182,7 +185,7 @@ export async function* runAgentTurn(
     const catalog = await collectTools(deps.toolSources);
     const visibleTools = catalog.filter((tool) => toolAccess(agent, tool).ok);
     const budget = profile.provider.capabilities(profile.model).maxContext;
-    const requestMessages = trimToBudget(toProviderMessages(agent, transcript, recalled), budget);
+    const requestMessages = trimToBudget(toProviderMessages(agent, transcript, recalled, chat, group, names), budget);
     let text = "";
     const toolCalls: ToolCall[] = [];
     let errorMessage: string | null = null;
@@ -248,6 +251,7 @@ export async function* runAgentTurn(
       content: text,
       ...(toolCalls.length > 0 ? { toolCalls } : {}),
       profileId,
+      agentId: agent.id,
     });
     transcript.push(assistant);
 
@@ -265,6 +269,7 @@ export async function* runAgentTurn(
         toolCallId: call.id,
         content: toolResultToContent(result),
         profileId,
+        agentId: agent.id,
       });
       transcript.push(toolMessage);
     }
@@ -314,6 +319,7 @@ export async function* runAgentTurn(
         toolCallId: call.id,
         content: toolResultToContent(executed.result),
         profileId,
+        agentId: agent.id,
       });
       transcript.push(toolMessage);
     }
@@ -336,13 +342,34 @@ async function recallMemories(deps: RuntimeDeps, agentId: string, query: string)
   return selectMemories(visible, query);
 }
 
+/** The other participants' names when the chat has group members. */
+function groupContext(chat: ChatRecord, agentId: string, names: ReadonlyMap<string, string>): GroupContext | undefined {
+  if (!chat.memberIds || chat.memberIds.length === 0) return undefined;
+  const others = chatParticipants(chat)
+    .filter((id) => id !== agentId)
+    .map((id) => names.get(id) ?? "another agent");
+  return { others };
+}
+
 function toProviderMessages(
   agent: AgentRecord,
   records: readonly MessageRecord[],
   memories: readonly MemorySnippet[],
+  chat: ChatRecord,
+  group: GroupContext | undefined,
+  names: ReadonlyMap<string, string>,
 ): ChatMessage[] {
-  const messages: ChatMessage[] = [{ role: "system", content: buildSystemPrompt(agent, memories) }];
+  const messages: ChatMessage[] = [{ role: "system", content: buildSystemPrompt(agent, memories, group) }];
   for (const record of records) {
+    // In a group chat, another agent's reply is something said to this agent, not its own words.
+    // Its tool calls and results are its own business and stay out.
+    const author = record.role === "assistant" || record.role === "tool" ? (record.agentId ?? chat.agentId) : null;
+    if (group && author && author !== agent.id) {
+      if (record.role === "assistant" && record.content.trim()) {
+        messages.push({ role: "user", content: `[${names.get(author) ?? "Another agent"}] ${record.content}` });
+      }
+      continue;
+    }
     const message: ChatMessage = { role: record.role, content: record.content };
     if (record.toolCallId) message.toolCallId = record.toolCallId;
     if (record.toolCalls) message.toolCalls = record.toolCalls;

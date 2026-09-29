@@ -21,7 +21,10 @@ export type UpdateChatInput = z.infer<typeof updateChatSchema>;
 
 export interface ChatRecord {
   id: string;
+  /** The owning agent. */
   agentId: string;
+  /** Other agents in a group chat, in speaking order. Empty or absent for a one-agent chat. */
+  memberIds?: string[];
   title: string;
   createdAt: string;
   updatedAt: string;
