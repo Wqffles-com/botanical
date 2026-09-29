@@ -1,4 +1,5 @@
 import { EncryptionKeyMissing } from "@botanical/db";
+import { ANTHROPIC_DEFAULT_MAX_TOKENS, retiredModelReplacement } from "@botanical/providers";
 import type { ServerConfig } from "../config.ts";
 import type { Store } from "../types.ts";
 import { attachAgentMessages } from "./agent-messages.ts";
@@ -41,20 +42,39 @@ export async function seedInstance(
   env: Record<string, string | undefined>,
 ): Promise<void> {
   const globals = await store.globalProfiles.list();
+  const seeded = new Set(readSeededIds(await store.prefs.getGlobal(SEEDED_PROFILES_PREF)));
   if (globals.length === 0) {
     for (const profile of config.profiles) {
       await store.globalProfiles.upsert({ ...profile });
+      seeded.add(profile.id);
     }
   } else {
-    // CLI profiles enabled after first boot (BOTANICAL_CLI_PROFILES) show in the
-    // CLI settings panel, so they must also reach the chat profile list.
+    // Profiles added to the configured list after first boot (new built-in
+    // models, BOTANICAL_CLI_PROFILES) must reach the chat profile list too.
+    // Each id is seeded once, so a profile an admin deletes stays deleted.
     const known = new Set(globals.map((profile) => profile.id));
+    const names = new Set(globals.map((profile) => profile.name));
     for (const profile of config.profiles) {
+      if (known.has(profile.id) || names.has(profile.name)) continue;
       const kind = profile.kind ?? (profile.provider === "cli" ? "cli" : "api");
-      if (kind !== "cli" || known.has(profile.id)) continue;
+      if (kind !== "cli" && seeded.has(profile.id)) continue;
       await store.globalProfiles.upsert({ ...profile });
+      seeded.add(profile.id);
+    }
+    // A vendor that removes a model breaks every profile still pinned to it,
+    // and an Anthropic profile without maxTokens cannot run at all.
+    for (const profile of globals) {
+      const replacement = retiredModelReplacement(profile.provider, profile.model);
+      const missingMaxTokens = profile.provider === "anthropic" && profile.maxTokens === undefined;
+      if (!replacement && !missingMaxTokens) continue;
+      await store.globalProfiles.upsert({
+        ...profile,
+        ...(replacement ? { model: replacement } : {}),
+        ...(missingMaxTokens ? { maxTokens: ANTHROPIC_DEFAULT_MAX_TOKENS } : {}),
+      });
     }
   }
+  await store.prefs.setGlobal(SEEDED_PROFILES_PREF, [...seeded]);
   if (config.encryptionKey) {
     const seeded: Array<[string, string | undefined]> = [
       ["openai", env.OPENAI_API_KEY],
@@ -92,4 +112,11 @@ export async function seedInstance(
     await store.prefs.setGlobal("stt.max_bytes", dictation.maxBytes);
     await store.prefs.setGlobal("stt.max_seconds", dictation.maxSeconds);
   }
+}
+
+/** Profile ids already copied from the configured list, so deleted ones are not re-added. */
+const SEEDED_PROFILES_PREF = "profiles.seeded";
+
+function readSeededIds(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }

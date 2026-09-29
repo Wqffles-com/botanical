@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { CANONICAL_API_KEY_ENVS, isApiKeyConfigured, readEnv, type Env } from "./env.ts";
 import { ProviderError } from "./errors.ts";
 import { assertHttpUrl } from "./http.ts";
+import { API_KNOWN_MODELS, HOSTED_PROVIDERS, modelProfileId, type HostedProvider } from "./models.ts";
 import { createRegistry, type RegistryOptions } from "./registry.ts";
 import {
   PROVIDER_TYPES,
@@ -41,44 +42,40 @@ export interface ListedProfile {
   temperature?: number;
 }
 
-const DEFAULT_MODELS: readonly ListedProfile[] = [
-  {
-    id: "openai",
-    name: "OpenAI",
-    provider: "openai",
-    model: "gpt-4.1",
-    description: "OpenAI. Replace the model list in profiles.json.",
-  },
-  {
-    id: "anthropic",
-    name: "Anthropic",
-    provider: "anthropic",
-    model: "claude-sonnet-4-5",
-    description: "Anthropic Claude. Replace the model list in profiles.json.",
-    maxTokens: ANTHROPIC_DEFAULT_MAX_TOKENS,
-  },
-  {
-    id: "xai",
-    name: "xAI",
-    provider: "xai",
-    model: "grok-4",
-    description: "xAI Grok. Replace the model list in profiles.json.",
-  },
-  {
-    id: "deepseek",
-    name: "DeepSeek",
-    provider: "deepseek",
-    model: "deepseek-chat",
-    description: "DeepSeek. Replace the model list in profiles.json.",
-  },
-  {
-    id: "openrouter",
-    name: "OpenRouter",
-    provider: "openrouter",
-    model: "openrouter/auto",
-    description: "OpenRouter. Replace the model list in profiles.json.",
-  },
-];
+const PROVIDER_NAMES: Record<HostedProvider, string> = {
+  openai: "OpenAI",
+  anthropic: "Anthropic",
+  xai: "xAI",
+  deepseek: "DeepSeek",
+  openrouter: "OpenRouter",
+};
+
+/**
+ * One base profile per hosted provider on its first known model, plus a
+ * sibling profile for each other known model so the picker offers a choice.
+ */
+export function builtinApiProfiles(): ListedProfile[] {
+  const profiles: ListedProfile[] = [];
+  for (const provider of HOSTED_PROVIDERS) {
+    const name = PROVIDER_NAMES[provider];
+    const [first, ...rest] = API_KNOWN_MODELS[provider];
+    if (!first) continue;
+    const base: ListedProfile = {
+      id: provider,
+      name,
+      provider,
+      model: first,
+      description: `${name}. Replace the model list in profiles.json.`,
+    };
+    if (provider === "anthropic") base.maxTokens = ANTHROPIC_DEFAULT_MAX_TOKENS;
+    profiles.push(base);
+    for (const model of rest) {
+      // Global profile names are unique, so each sibling needs its own label.
+      profiles.push({ ...base, id: modelProfileId(provider, model), name: `${name} (${model})`, model });
+    }
+  }
+  return profiles;
+}
 
 export function defaultMockProfile(): ListedProfile {
   return {
@@ -269,7 +266,7 @@ export function createConfiguredRegistry(
 }
 
 function autoProfiles(env: Env): ListedProfile[] {
-  const profiles: ListedProfile[] = DEFAULT_MODELS.map((profile) => ({ ...profile }));
+  const profiles = builtinApiProfiles();
   if (providerConfigured("openai-compat", env)) {
     const base = compatBaseUrl(env);
     if (base) {

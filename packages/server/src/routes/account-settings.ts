@@ -3,6 +3,7 @@ import { HttpError, isRecord, json, readJson } from "../http.ts";
 import { adminOnly, authed, type Router } from "../router.ts";
 import { MODEL_PROVIDERS, type ModelProfile, type ModelProvider } from "../types.ts";
 import { SIGNUP_MODES, type SignupMode } from "@botanical/db";
+import { ANTHROPIC_DEFAULT_MAX_TOKENS, API_KNOWN_MODELS, retiredModelReplacement } from "@botanical/providers";
 
 const SECRET_NAME = /^[a-z][a-z0-9_-]{0,63}$/;
 
@@ -71,7 +72,9 @@ export function registerAccountSettings(router: Router): void {
   router.add(
     "GET",
     "/api/admin/profiles",
-    adminOnly(async (ctx) => json(200, { profiles: await ctx.store.globalProfiles.list() })),
+    adminOnly(async (ctx) =>
+      json(200, { profiles: await ctx.store.globalProfiles.list(), knownModels: API_KNOWN_MODELS }),
+    ),
   );
 
   router.add(
@@ -88,7 +91,15 @@ export function registerAccountSettings(router: Router): void {
     "DELETE",
     "/api/admin/profiles/:id",
     adminOnly(async (ctx) => {
-      const removed = await ctx.store.globalProfiles.delete(ctx.params.id ?? "");
+      let removed: boolean;
+      try {
+        removed = await ctx.store.globalProfiles.delete(ctx.params.id ?? "");
+      } catch (error) {
+        if (isForeignKeyViolation(error)) {
+          throw new HttpError(409, "profile_in_use", "Chats still use this model, so it cannot be removed");
+        }
+        throw error;
+      }
       if (!removed) throw new HttpError(404, "not_found", "Profile not found");
       return new Response(null, { status: 204 });
     }),
@@ -194,6 +205,15 @@ export function registerAccountSettings(router: Router): void {
   );
 }
 
+/** Postgres 23503: a chat still references the row. Drivers may wrap it in `cause`. */
+function isForeignKeyViolation(error: unknown): boolean {
+  for (let current = error, depth = 0; isRecord(current) && depth < 3; current = current.cause, depth += 1) {
+    if (current.code === "23503") return true;
+    if (typeof current.message === "string" && /foreign key/i.test(current.message)) return true;
+  }
+  return false;
+}
+
 function secretName(value: string | undefined): string {
   const name = (value ?? "").trim().toLowerCase();
   if (!SECRET_NAME.test(name)) throw new HttpError(400, "invalid_body", "Invalid secret name");
@@ -228,7 +248,20 @@ function readProfile(body: unknown): ModelProfile {
   if (!(MODEL_PROVIDERS as readonly string[]).includes(provider) && provider !== "cli") {
     throw new HttpError(400, "invalid_body", "Unknown provider");
   }
+  const replacement = retiredModelReplacement(provider, model);
+  if (replacement) {
+    throw new HttpError(400, "invalid_body", `${model} was retired by the provider. Use ${replacement}.`);
+  }
   const profile: ModelProfile = { id, name, provider: provider as ModelProvider | "cli", model };
+  if (body.maxTokens !== undefined) {
+    if (typeof body.maxTokens !== "number" || !Number.isInteger(body.maxTokens) || body.maxTokens < 1) {
+      throw new HttpError(400, "invalid_body", "maxTokens must be a positive integer");
+    }
+    profile.maxTokens = body.maxTokens;
+  } else if (provider === "anthropic") {
+    // The Messages API requires max_tokens.
+    profile.maxTokens = ANTHROPIC_DEFAULT_MAX_TOKENS;
+  }
   if (typeof body.baseUrl === "string" && body.baseUrl.trim()) profile.baseUrl = body.baseUrl.trim();
   if (typeof body.kind === "string") profile.kind = body.kind === "cli" ? "cli" : "api";
   if (body.cli === "grok" || body.cli === "claude" || body.cli === "codex") profile.cli = body.cli;

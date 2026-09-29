@@ -16,9 +16,9 @@ import { builtinProviderConfigs, createRegistry } from "@botanical/providers";
 const providers = createRegistry({
   providers: builtinProviderConfigs(),
   profiles: [
-    { id: "fast", provider: "deepseek", model: "deepseek-chat" },
-    { id: "reason", provider: "anthropic", model: "claude-sonnet-4-5", maxTokens: 4096 },
-    { id: "grok", provider: "xai", model: "grok-4" },
+    { id: "fast", provider: "deepseek", model: "deepseek-flash" },
+    { id: "reason", provider: "anthropic", model: "claude-sonnet-5-5", maxTokens: 4096 },
+    { id: "grok", provider: "xai", model: "grok-4.7" },
     { id: "router", provider: "openrouter", model: "openrouter/auto" },
   ],
 });
@@ -52,7 +52,7 @@ Model ids live on profiles. The samples above are examples, not a built-in choic
 
 - **OpenAI.** `POST /chat/completions` with `stream: true` and `stream_options.include_usage`. Output limit is sent as `max_completion_tokens` (`max_tokens` is deprecated and rejected by o-series models).
 - **xAI.** Same chat-completions client at `https://api.x.ai/v1/chat/completions`. Bearer `XAI_API_KEY`. Output limit stays `max_tokens`. `reasoning_content` deltas become `reasoning-delta`. The Responses API is not used.
-- **DeepSeek.** `https://api.deepseek.com/chat/completions` (the `/v1` alias also works if you set `baseURL`). `reasoning_content` on reasoner models becomes `reasoning-delta`.
+- **DeepSeek.** `https://api.deepseek.com/chat/completions` (the `/v1` alias also works if you set `baseURL`). Current ids are `deepseek-flash` and `deepseek-v4-pro`; `deepseek-chat` and `deepseek-reasoner` were removed. `reasoning_content` becomes `reasoning-delta`.
 - **OpenRouter.** OpenAI-compatible, plus optional `HTTP-Referer`, `X-Title`, and `routing` (`order`, `allowFallbacks`, `only`, `ignore`) sent as the `provider` body field. `reasoning_details[].text` becomes `reasoning-delta`.
 - **Anthropic.** `POST /v1/messages` with `x-api-key` and `anthropic-version: 2023-06-01`. System messages are lifted to top-level `system`. Tool results are `tool_result` blocks and consecutive tool turns are merged. `thinking_delta` becomes `reasoning-delta`. `maxTokens` is required on the profile or the request because the API rejects a missing `max_tokens`. The base URL is the origin (`https://api.anthropic.com`), not a `/v1` prefix.
 - **openai-compat.** Set `baseURL` to a local or proxied `/v1` origin. Omit `apiKeyEnv` to send no `Authorization` header. Set `includeUsage: false` if the host rejects `stream_options`.
@@ -82,7 +82,8 @@ const providers = createRegistry({
 `selectProfiles(override, env)` builds the list behind `GET /api/profiles`.
 
 - `mock` is always included.
-- With no override, one profile is added for each configured key: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`.
+- With no override, each configured key (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`) adds a profile per model in `API_KNOWN_MODELS` (`src/models.ts`): the provider id on the first model, `<provider>--<model>` on the rest.
+- `RETIRED_MODELS` maps model ids a vendor removed (DeepSeek `deepseek-chat`, `deepseek-reasoner`) to their replacement. The server moves stored profiles off them on boot and refuses them on `POST /api/admin/profiles`.
 - `openai-compat` is added only when both `OPENAI_COMPAT_BASE_URL` and `OPENAI_COMPAT_API_KEY` are set. `OPENAI_COMPAT_MODEL` sets that profile's model id. `CUSTOM_OPENAI_BASE_URL` and `CUSTOM_OPENAI_API_KEY` are legacy aliases used when the canonical name is unset.
 - `BOTANICAL_PROFILES_FILE` (a `profiles.json` document) replaces that built-in list. `BOTANICAL_PROFILES` is the inline form and is ignored when the file is set. Profiles whose provider key is missing are omitted. `defaultProfile` is rejected.
 - The document may be a profile array, `{ "profiles": [...] }`, or `{ "models": { "openai": ["gpt-4.1", "gpt-4.1-mini"] } }`.

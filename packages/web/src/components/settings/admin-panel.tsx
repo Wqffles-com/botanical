@@ -10,14 +10,15 @@ import { Label } from "@botanical/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@botanical/ui/components/select";
 
 const PROVIDERS = [
-  { name: "deepseek", label: "DeepSeek", model: "deepseek-chat" },
-  { name: "openai", label: "OpenAI", model: "gpt-4.1" },
-  { name: "anthropic", label: "Anthropic", model: "claude-sonnet-4-5" },
-  { name: "xai", label: "xAI", model: "grok-4" },
-  { name: "openrouter", label: "OpenRouter", model: "openai/gpt-4.1" },
+  { name: "deepseek", label: "DeepSeek" },
+  { name: "openai", label: "OpenAI" },
+  { name: "anthropic", label: "Anthropic" },
+  { name: "xai", label: "xAI" },
+  { name: "openrouter", label: "OpenRouter" },
 ] as const;
 
 type SecretMeta = { name: string; last4: string };
+type GlobalProfile = { id: string; name: string; provider: string; model: string; kind?: string };
 type SignupMode = "open" | "invite" | "closed";
 
 async function request(path: string, init?: RequestInit): Promise<Response> {
@@ -44,17 +45,28 @@ export function AdminPanel() {
   const [secrets, setSecrets] = useState<SecretMeta[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<GlobalProfile[]>([]);
+  const [knownModels, setKnownModels] = useState<Record<string, string[]>>({});
 
   async function load() {
-    const response = await request("/api/admin/settings");
-    const body = (await response.json()) as {
+    const [settingsResponse, profilesResponse] = await Promise.all([
+      request("/api/admin/settings"),
+      request("/api/admin/profiles"),
+    ]);
+    const body = (await settingsResponse.json()) as {
       signupMode: SignupMode;
       allowGlobalKeys: boolean;
       secrets: SecretMeta[];
     };
+    const listed = (await profilesResponse.json()) as {
+      profiles: GlobalProfile[];
+      knownModels?: Record<string, string[]>;
+    };
     setSignupMode(body.signupMode);
     setAllowGlobalKeys(body.allowGlobalKeys);
     setSecrets(body.secrets);
+    setProfiles(listed.profiles);
+    setKnownModels(listed.knownModels ?? {});
   }
 
   useEffect(() => {
@@ -71,22 +83,32 @@ export function AdminPanel() {
     toast.success("Saved");
   }
 
-  async function saveKey(name: string, model: string) {
+  async function saveKey(name: string) {
     const value = drafts[name]?.trim() ?? "";
     if (!value) return;
     await request(`/api/admin/secrets/${name}`, { method: "PUT", body: JSON.stringify({ value }) });
-    await request("/api/admin/profiles", {
-      method: "POST",
-      body: JSON.stringify({
-        id: name,
-        name: PROVIDERS.find((item) => item.name === name)?.label ?? name,
-        provider: name,
-        model,
-      }),
-    });
+    // A provider with no models yet gets every known one, so the picker has a choice.
+    if (!profiles.some((profile) => profile.provider === name)) {
+      const added = [...profiles];
+      for (const model of knownModels[name] ?? []) {
+        added.push(await postModel(name, model, added));
+      }
+    }
     setDrafts((current) => ({ ...current, [name]: "" }));
     await load();
     toast.success("Key saved");
+  }
+
+  async function addModel(provider: string, model: string) {
+    await postModel(provider, model, profiles);
+    await load();
+    toast.success(`${model} added`);
+  }
+
+  async function removeModel(id: string) {
+    await request(`/api/admin/profiles/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await load();
+    toast.success("Model removed");
   }
 
   async function createInvite() {
@@ -161,12 +183,41 @@ export function AdminPanel() {
                   value={drafts[provider.name] ?? ""}
                   onChange={(event) => setDrafts((current) => ({ ...current, [provider.name]: event.target.value }))}
                 />
-                <Button type="button" data-testid={`save-secret-${provider.name}`} onClick={() => void saveKey(provider.name, provider.model)}>
+                <Button type="button" data-testid={`save-secret-${provider.name}`} onClick={() => void saveKey(provider.name)}>
                   Save key
                 </Button>
               </div>
             );
           })}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Models</CardTitle>
+          <CardDescription>
+            The models everyone can pick for each provider. Choose a current model or type any model id the provider serves.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {PROVIDERS.map((provider) => (
+            <ProviderModels
+              key={provider.name}
+              provider={provider.name}
+              label={provider.label}
+              profiles={profiles.filter((profile) => profile.provider === provider.name && profile.kind !== "cli")}
+              known={knownModels[provider.name] ?? []}
+              onAdd={(model) =>
+                addModel(provider.name, model).catch((error: unknown) => {
+                  toast.error(error instanceof Error ? error.message : "Could not add the model");
+                })
+              }
+              onRemove={(id) =>
+                removeModel(id).catch((error: unknown) => {
+                  toast.error(error instanceof Error ? error.message : "Could not remove the model");
+                })
+              }
+            />
+          ))}
         </CardContent>
       </Card>
       <Card>
@@ -185,6 +236,123 @@ export function AdminPanel() {
           ) : null}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+const CUSTOM_MODEL = "__custom__";
+
+/** The provider's first model takes the provider id; later ones are `<provider>--<model>`. */
+async function postModel(provider: string, model: string, existing: readonly GlobalProfile[]): Promise<GlobalProfile> {
+  const label = PROVIDERS.find((item) => item.name === provider)?.label ?? provider;
+  const first = !existing.some((profile) => profile.id === provider || profile.provider === provider);
+  const profile = {
+    id: first ? provider : modelProfileId(provider, model),
+    name: first ? label : `${label} (${model})`,
+    provider,
+    model,
+  };
+  await request("/api/admin/profiles", { method: "POST", body: JSON.stringify(profile) });
+  return profile;
+}
+
+/** Same shape as the server's built-in sibling ids (`modelProfileId` in @botanical/providers). */
+function modelProfileId(provider: string, model: string): string {
+  return `${provider}--${model.replace(/[^A-Za-z0-9_-]/g, "-")}`.slice(0, 64);
+}
+
+function ProviderModels({
+  provider,
+  label,
+  profiles,
+  known,
+  onAdd,
+  onRemove,
+}: {
+  provider: string;
+  label: string;
+  profiles: GlobalProfile[];
+  known: string[];
+  onAdd: (model: string) => Promise<void>;
+  onRemove: (id: string) => Promise<void>;
+}) {
+  const listed = new Set(profiles.map((profile) => profile.model));
+  const choices = [
+    ...known.filter((model) => !listed.has(model)).map((model) => ({ value: model, label: model })),
+    { value: CUSTOM_MODEL, label: "Custom model…" },
+  ];
+  const [choice, setChoice] = useState<string>(choices[0]?.value ?? CUSTOM_MODEL);
+  const [custom, setCustom] = useState("");
+  const selected = choices.some((item) => item.value === choice) ? choice : (choices[0]?.value ?? CUSTOM_MODEL);
+  const model = selected === CUSTOM_MODEL ? custom.trim() : selected;
+
+  async function add() {
+    if (!model) return;
+    await onAdd(model);
+    setCustom("");
+  }
+
+  return (
+    <div className="space-y-2" data-testid={`models-${provider}`}>
+      <p className="text-sm font-medium">{label}</p>
+      {profiles.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No models yet.</p>
+      ) : (
+        <ul className="space-y-1">
+          {profiles.map((profile) => (
+            <li key={profile.id} className="flex items-center justify-between gap-2 text-sm">
+              <span className="font-mono text-xs">{profile.model}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                data-testid={`remove-model-${profile.id}`}
+                onClick={() => void onRemove(profile.id)}
+              >
+                Remove
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex flex-wrap items-end gap-2">
+        <Select
+          items={choices}
+          value={selected}
+          onValueChange={(next) => {
+            if (next) setChoice(next as string);
+          }}
+        >
+          <SelectTrigger data-testid={`model-choice-${provider}`} className="w-56">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {choices.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {selected === CUSTOM_MODEL ? (
+          <Input
+            className="w-56"
+            data-testid={`custom-model-${provider}`}
+            placeholder="Model id"
+            value={custom}
+            onChange={(event) => setCustom(event.target.value)}
+          />
+        ) : null}
+        <Button
+          type="button"
+          variant="outline"
+          data-testid={`add-model-${provider}`}
+          disabled={!model}
+          onClick={() => void add()}
+        >
+          Add model
+        </Button>
+      </div>
     </div>
   );
 }

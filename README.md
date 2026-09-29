@@ -171,7 +171,7 @@ Profile example:
 
 ```json
 [
-  { "id": "reason", "name": "Claude Sonnet", "provider": "anthropic", "model": "claude-sonnet-4-5" },
+  { "id": "reason", "name": "Claude Sonnet", "provider": "anthropic", "model": "claude-sonnet-5-5" },
   { "id": "local", "name": "Local", "provider": "openai-compat", "model": "llama3.1", "baseUrl": "http://127.0.0.1:11434/v1" },
   { "id": "claude-code", "kind": "cli", "cli": "claude", "label": "Claude Code" }
 ]
