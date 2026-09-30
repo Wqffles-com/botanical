@@ -127,4 +127,37 @@ describe("accounts", () => {
     expect(listed.secrets.find((row) => row.name === "deepseek")?.last4).toBe("ride");
     expect(JSON.stringify(listed)).not.toContain("sk-user");
   });
+
+  test("admins add and remove models, and a retired model is refused", async () => {
+    const { app } = setup();
+    const { token } = await login(app);
+    const listed = await readJson<{ knownModels: Record<string, string[]> }>(
+      await app.fetch(new Request("http://localhost/api/admin/profiles", { headers: bearer(token) })),
+    );
+    expect(listed.knownModels.deepseek).toContain("deepseek-flash");
+    expect(listed.knownModels.deepseek).not.toContain("deepseek-chat");
+
+    const retired = await post(app, "/api/admin/profiles", { id: "ds", name: "DS", provider: "deepseek", model: "deepseek-chat" }, token);
+    expect(retired.status).toBe(400);
+
+    const custom = await post(
+      app,
+      "/api/admin/profiles",
+      { id: "anthropic--custom", name: "Anthropic (custom)", provider: "anthropic", model: "claude-custom-1" },
+      token,
+    );
+    expect(custom.status).toBe(201);
+    const saved = await readJson<{ profile: { model: string; maxTokens?: number } }>(custom);
+    expect(saved.profile).toMatchObject({ model: "claude-custom-1", maxTokens: 4096 });
+
+    const profiles = await readJson<{ profiles: { id: string }[] }>(
+      await app.fetch(new Request("http://localhost/api/profiles", { headers: bearer(token) })),
+    );
+    expect(profiles.profiles.some((profile) => profile.id === "anthropic--custom")).toBe(true);
+
+    const removed = await app.fetch(
+      new Request("http://localhost/api/admin/profiles/anthropic--custom", { method: "DELETE", headers: bearer(token) }),
+    );
+    expect(removed.status).toBe(204);
+  });
 });

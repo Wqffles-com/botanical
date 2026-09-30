@@ -60,7 +60,12 @@ describe("GET /api/profiles", () => {
     expect(body.profiles.map((profile) => profile.id)).toEqual([
       "mock",
       "openai",
+      "openai--gpt-5-4",
+      "openai--gpt-5-mini",
       "anthropic",
+      "anthropic--claude-opus-5-5",
+      "anthropic--claude-fable-5-1",
+      "anthropic--claude-haiku-4-5",
       "openai-compat",
     ]);
     expect(JSON.stringify(body)).not.toContain("sk-openai");

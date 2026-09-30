@@ -13,7 +13,8 @@ Streaming model adapters and headless coding-CLI profiles. This is the only pack
 |------|---------|
 | `packages/providers/src/types.ts` | `PROVIDER_TYPES`, chat and tool types |
 | `packages/providers/src/registry.ts` | `createRegistry`, `builtinProviderConfigs`, `PROVIDER_BASE_URLS` |
-| `packages/providers/src/catalog.ts` | Which profiles are listed from env and `BOTANICAL_PROFILES` |
+| `packages/providers/src/catalog.ts` | Which profiles are listed from env and `BOTANICAL_PROFILES`; `builtinApiProfiles` |
+| `packages/providers/src/models.ts` | `API_KNOWN_MODELS` (current model ids per hosted provider), `RETIRED_MODELS`, `modelProfileId` |
 | `packages/providers/src/env.ts` | `CANONICAL_API_KEY_ENVS`, `resolveApiKey` |
 | `packages/providers/src/openai-client.ts` | OpenAI-compatible chat-completions stream |
 | `packages/providers/src/anthropic.ts` | Messages stream for type `anthropic` |
@@ -26,6 +27,8 @@ Streaming model adapters and headless coding-CLI profiles. This is the only pack
 | `packages/providers/test` | `bun test` |
 
 Provider type ids: `openai`, `anthropic`, `xai`, `deepseek`, `openrouter`, `openai-compat`, `mock`. CLI names in `packages/providers/src/cli/types.ts`: `grok`, `claude`, `codex`. Preset profile ids: `grok-build`, `claude-code`, `codex`. `expandCliModels` (`packages/providers/src/cli/config.ts`) lists each CLI profile's `models` (default `CLI_KNOWN_MODELS` in `types.ts`) as sibling profiles `<id>--<model>` for the model picker.
+
+With no profiles override, each configured hosted provider lists every model in `API_KNOWN_MODELS` (`packages/providers/src/models.ts`): the provider id on the first, `<provider>--<model>` on the rest. `RETIRED_MODELS` maps removed vendor ids to replacements; `seedInstance` in `packages/server/src/db/store.ts` rewrites stored profiles on boot and `POST /api/admin/profiles` refuses them.
 
 `xai`, `deepseek`, `openrouter`, and `openai-compat` use `packages/providers/src/openai-client.ts`. `anthropic` uses `packages/providers/src/anthropic.ts`.
 
@@ -54,4 +57,5 @@ Provider type ids: `openai`, `anthropic`, `xai`, `deepseek`, `openrouter`, `open
 
 - **Add a hosted provider.** Extend `PROVIDER_TYPES` in `packages/providers/src/types.ts`. Add a base URL in `PROVIDER_BASE_URLS` / `defaultBaseURL` in `packages/providers/src/registry.ts`. Reuse `packages/providers/src/openai-client.ts` when the API is chat-completions; otherwise add a stream module next to `packages/providers/src/anthropic.ts` and branch in `buildProvider`. Add the key name to `packages/providers/src/env.ts` and a row in `builtinProviderConfigs`. Teach `packages/providers/src/catalog.ts` when the key should list profiles. Add a test under `packages/providers/test`.
 - **Add a CLI profile preset.** `packages/providers/src/cli/types.ts`, install/launch in `packages/providers/src/cli`, and the shortcut parser in `packages/providers/src/cli/config.ts`.
+- **Update a provider's models.** Edit `API_KNOWN_MODELS` in `packages/providers/src/models.ts`. When a vendor removes a model, add it to `RETIRED_MODELS` with its replacement.
 - **Change which profiles exist.** Operator JSON in `BOTANICAL_PROFILES` or `BOTANICAL_PROFILES_FILE`. Code path: `packages/providers/src/catalog.ts`.

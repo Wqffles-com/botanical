@@ -86,6 +86,7 @@ export {
   OPENAI_COMPAT_API_KEY_ENV,
   OPENAI_COMPAT_BASE_URL_ENV,
   OPENAI_COMPAT_MODEL_ENV,
+  builtinApiProfiles,
   compatApiKeyEnv,
   compatBaseUrl,
   createConfiguredRegistry,
@@ -108,6 +109,15 @@ export {
   type ProviderErrorCode,
 } from "./errors.ts";
 export { createMockProvider, type MockProvider } from "./mock.ts";
+export {
+  API_KNOWN_MODELS,
+  HOSTED_PROVIDERS,
+  RETIRED_MODELS,
+  isHostedProvider,
+  modelProfileId,
+  retiredModelReplacement,
+  type HostedProvider,
+} from "./models.ts";
 export {
   RuntimeProfileNotFoundError,
   RuntimeProfileRequiredError,

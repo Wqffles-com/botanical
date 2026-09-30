@@ -1,12 +1,16 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  API_KNOWN_MODELS,
   createConfiguredRegistry,
   createRuntimeBridge,
   parseProfilesDocument,
   ProviderError,
   readProfilesOverride,
+  modelProfileId,
+  retiredModelReplacement,
   selectProfiles,
+  type HostedProvider,
 } from "../src/index.ts";
 
 const KEYS = {
@@ -24,16 +28,34 @@ describe("profile catalog", () => {
     expect(profiles[0]?.provider).toBe("mock");
   });
 
-  test("adds one profile per configured provider and never a default", () => {
+  test("adds a profile per known model of each configured provider and never a default", () => {
     for (const [provider, envName] of Object.entries(KEYS)) {
       const profiles = selectProfiles(undefined, { [envName]: "secret" });
-      expect(profiles.map((profile) => profile.id)).toEqual(["mock", provider]);
-      expect(profiles.find((profile) => profile.id === provider)?.provider).toBe(
-        provider as "openai" | "anthropic" | "xai" | "deepseek" | "openrouter",
-      );
+      const known = API_KNOWN_MODELS[provider as HostedProvider];
+      expect(profiles.map((profile) => profile.id)).toEqual([
+        "mock",
+        provider,
+        ...known.slice(1).map((model) => modelProfileId(provider, model)),
+      ]);
+      expect(profiles.slice(1).map((profile) => profile.model)).toEqual([...known]);
+      expect(profiles.slice(1).every((profile) => profile.provider === provider)).toBe(true);
+      // Global profile names are unique.
+      expect(new Set(profiles.map((profile) => profile.name)).size).toBe(profiles.length);
     }
     const anthropic = selectProfiles(undefined, { ANTHROPIC_API_KEY: "secret" });
-    expect(anthropic.find((profile) => profile.id === "anthropic")?.maxTokens).toBe(4096);
+    expect(anthropic.filter((profile) => profile.provider === "anthropic").every((p) => p.maxTokens === 4096)).toBe(true);
+  });
+
+  test("never lists a retired DeepSeek model", () => {
+    const deepseek = selectProfiles(undefined, { DEEPSEEK_API_KEY: "secret" }).filter(
+      (profile) => profile.provider === "deepseek",
+    );
+    expect(deepseek.find((profile) => profile.id === "deepseek")?.model).toBe("deepseek-flash");
+    for (const profile of deepseek) {
+      expect(retiredModelReplacement("deepseek", profile.model)).toBeUndefined();
+    }
+    expect(retiredModelReplacement("deepseek", "deepseek-chat")).toBe("deepseek-flash");
+    expect(retiredModelReplacement("openai", "deepseek-chat")).toBeUndefined();
   });
 
   test("ignores blank keys and lists openai-compat only when base URL and key are both set", () => {
@@ -141,7 +163,7 @@ describe("profile catalog", () => {
     const profiles = selectProfiles(undefined, { XAI_API_KEY: "xk" });
     const registry = createConfiguredRegistry(profiles, { env: { XAI_API_KEY: "xk" } });
     const bridge = createRuntimeBridge(registry);
-    expect((await bridge.list()).map((profile) => profile.id)).toEqual(["mock", "xai"]);
+    expect((await bridge.list()).map((profile) => profile.id)).toEqual(["mock", "xai", "xai--grok-code-fast-1"]);
     await expect(bridge.resolve("")).rejects.toMatchObject({ code: "PROFILE_REQUIRED" });
     await expect(bridge.resolve("missing")).rejects.toMatchObject({ code: "PROFILE_NOT_FOUND" });
   });

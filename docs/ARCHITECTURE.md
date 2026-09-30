@@ -241,7 +241,7 @@ providers:
 profiles:
   fast:
     provider: deepseek
-    model: deepseek-chat
+    model: deepseek-flash
   reason:
     provider: anthropic
     model: claude-sonnet-4-20250514

@@ -23,7 +23,7 @@ docker build -t botanical-server .
 docker run --rm -p 8787:8787 \
   -e BOTANICAL_ENCRYPTION_KEY=change-me-encryption-key \
   -e BOTANICAL_COOKIE_SECURE=false \
-  -e BOTANICAL_PROFILES='[{"id":"grok","name":"Grok","provider":"xai","model":"grok-4"}]' \
+  -e BOTANICAL_PROFILES='[{"id":"grok","name":"Grok","provider":"xai","model":"grok-4.7"}]' \
   botanical-server
 ```
 
@@ -155,7 +155,7 @@ Session rows store a SHA-256 of the token, not the token itself. Model API keys 
 `GET /api/profiles` returns `defaultProfileId: null` and:
 
 - `mock` always
-- one profile per configured key: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`
+- for each configured key (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`), one profile per current model (`API_KNOWN_MODELS` in `@botanical/providers`). Built-in models added in a later release are seeded on the next boot; one an admin removes stays removed. Admins add any other model id in Settings, Admin, Models
 - `openai-compat` when both `OPENAI_COMPAT_BASE_URL` and `OPENAI_COMPAT_API_KEY` are set (`CUSTOM_OPENAI_*` are legacy aliases)
 
 Providers: `openai`, `anthropic`, `xai`, `deepseek`, `openrouter`, `openai-compat`, `mock`.

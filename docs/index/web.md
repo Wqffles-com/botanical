@@ -57,7 +57,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/components/listeners` | Listener list and editor |
 | `packages/web/src/components/notifications/notification-bell.tsx` | Unread badge in `packages/web/src/components/app-shell.tsx` |
 | `packages/web/src/components/settings/settings-view.tsx` | `SettingsPanels` (every section; `layout` `dialog` puts the tabs in a left rail, `page` on top; a select below `sm`) and `SettingsView` (the `/settings` page) |
-| `packages/web/src/components/settings/admin-panel.tsx` | Admin signup mode, global keys, and invites |
+| `packages/web/src/components/settings/admin-panel.tsx` | Admin signup mode, global keys, models per provider (known models from `GET /api/admin/profiles` `knownModels`, or a custom model id), and invites |
 | `packages/web/src/components/settings/background-work-card.tsx` | Always-on scheduler and webhook limits on the general tab |
 | `packages/web/src/hooks/use-chat-thread.ts` | Thread loading, queued sends, message edit, resend, retry, and delete, and the chat events feed (reconnects and refetches after a gap) |
 | `packages/web/src/lib/chat-queue.ts` | Pending-bubble and message merge rules for the events feed |
