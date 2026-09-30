@@ -11,7 +11,7 @@ import { createA2AService, type A2AService } from "./a2a/service.ts";
 import { createSendAgentMessageTool } from "./a2a/tool.ts";
 import { LoginRateLimiter } from "./auth/rate-limit.ts";
 import { SlidingWindowLimiter } from "./listeners/limit.ts";
-import type { ServerConfig } from "./config.ts";
+import { presetCliProfiles, type ServerConfig } from "./config.ts";
 import { createCliToolHost, registerCliMcp, type CliToolHost } from "./cli-mcp.ts";
 import { createCliService, type CliService } from "./cli-install/service.ts";
 import { seedInstance } from "./db/store.ts";
@@ -153,7 +153,10 @@ export function createApp(deps: AppDeps): App {
     deps.cli ??
     createCliService({
       env: deps.env ?? (process.env as Env),
-      profiles: () => deps.config.profiles,
+      profiles: async () => [...deps.config.profiles, ...(await deps.store.globalProfiles.list())],
+      enable: async (name) => {
+        for (const profile of presetCliProfiles(name)) await deps.store.globalProfiles.upsert(profile);
+      },
     });
   const router = createRouter();
   registerHealth(router);

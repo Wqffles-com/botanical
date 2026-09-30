@@ -57,6 +57,7 @@ export {
   CLI_NAMES,
   CLI_PROFILE_PRESET_IDS,
   DEFAULT_CLI_TIMEOUT_MS,
+  cliPresetSpec,
   expandCliModels,
   mergeCliProfiles,
   parseCliLine,

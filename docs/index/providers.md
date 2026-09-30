@@ -34,7 +34,7 @@ With no profiles override, each configured hosted provider lists every model in 
 
 ## Exports
 
-`createRegistry`, `builtinProviderConfigs`, `parseProfilesDocument`, `selectProfiles`, `readProfilesOverride`, `mergeCliProfiles`, `parseCliProfileShortcut`, `createRuntimeBridge`, `resolveApiKey`, `runCli`, `CliInstaller`, `LoginManager`, `createMockProvider`.
+`createRegistry`, `builtinProviderConfigs`, `parseProfilesDocument`, `selectProfiles`, `readProfilesOverride`, `mergeCliProfiles`, `parseCliProfileShortcut`, `cliPresetSpec`, `createRuntimeBridge`, `resolveApiKey`, `runCli`, `CliInstaller`, `LoginManager`, `createMockProvider`.
 
 ## Env vars
 
