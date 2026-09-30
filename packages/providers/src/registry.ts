@@ -14,14 +14,12 @@ import {
   UnknownProviderError,
 } from "./errors.ts";
 import { assertHttpUrl, assertSafeHeaders } from "./http.ts";
-import { createMockProvider } from "./mock.ts";
 import { streamChatCompletions } from "./openai-client.ts";
 import {
   PROVIDER_TYPES,
   type ChatRequest,
   type CompletionInput,
   type LLMProvider,
-  type MockScript,
   type ModelCapabilities,
   type ModelProfile,
   type OpenRouterRouting,
@@ -83,8 +81,8 @@ export function parseProvidersConfig(input: unknown): ProvidersConfig {
       { code: "config" },
     );
   }
-  if (!Array.isArray(record.providers) || record.providers.length === 0) {
-    throw new ProviderError("At least one provider is required.", { code: "config" });
+  if (!Array.isArray(record.providers)) {
+    throw new ProviderError("providers must be an array.", { code: "config" });
   }
   if (!Array.isArray(record.profiles)) {
     throw new ProviderError("profiles must be an array.", { code: "config" });
@@ -198,10 +196,6 @@ export function createRegistry(input: unknown, options: RegistryOptions = {}): P
 }
 
 function buildProvider(config: ProviderConfig, options: RegistryOptions): LLMProvider {
-  if (config.type === "mock") {
-    return createMockProvider(config.id, config.mock ?? {});
-  }
-
   const baseURL = config.baseURL ?? defaultBaseURL(config.type);
   if (!baseURL) {
     throw new ProviderError(`Provider "${config.id}" requires baseURL.`, { code: "config" });
@@ -296,7 +290,7 @@ function vendorBody(config: ProviderConfig): Record<string, unknown> | undefined
 function providerStatus(provider: ProviderConfig, env: Env | undefined): ProviderStatus {
   const apiKeyEnv = provider.apiKeyEnv;
   const keyConfigured =
-    provider.type === "mock" || apiKeyEnv === undefined || isApiKeyConfigured(apiKeyEnv, env);
+    apiKeyEnv === undefined || isApiKeyConfigured(apiKeyEnv, env);
   const status: ProviderStatus = {
     id: provider.id,
     type: provider.type,
@@ -372,7 +366,7 @@ function parseProvider(value: unknown): ProviderConfig {
     }
     assertEnvName(record.apiKeyEnv);
     config.apiKeyEnv = record.apiKeyEnv;
-  } else if (config.type !== "mock" && config.type !== "openai-compat") {
+  } else if (config.type !== "openai-compat") {
     config.apiKeyEnv = CANONICAL_API_KEY_ENVS[config.type];
   }
   if (record.baseURL !== undefined) {
@@ -414,12 +408,6 @@ function parseProvider(value: unknown): ProviderConfig {
   if (record.capabilities !== undefined) {
     config.capabilities = parseCapabilityMap(record.capabilities, `Provider "${id}" capabilities`);
   }
-  if (record.mock !== undefined) {
-    if (config.type !== "mock") {
-      throw new ProviderError(`Provider "${id}" cannot set mock unless type is "mock".`, { code: "config" });
-    }
-    config.mock = parseMock(record.mock);
-  }
   return config;
 }
 
@@ -455,31 +443,6 @@ function parseRouting(value: unknown): OpenRouterRouting {
     routing.allowFallbacks = record.allowFallbacks;
   }
   return routing;
-}
-
-function parseMock(value: unknown): MockScript {
-  const record = asRecord(value);
-  if (!record) throw new ProviderError("mock must be an object.", { code: "config" });
-  const script: MockScript = {};
-  if (record.reply !== undefined) {
-    if (typeof record.reply !== "string" && typeof record.reply !== "function") {
-      throw new ProviderError("mock.reply must be a string.", { code: "config" });
-    }
-    script.reply = record.reply as MockScript["reply"];
-  }
-  if (record.events !== undefined) {
-    if (!Array.isArray(record.events) && typeof record.events !== "function") {
-      throw new ProviderError("mock.events must be an array.", { code: "config" });
-    }
-    script.events = record.events as MockScript["events"];
-  }
-  if (record.chunkSize !== undefined) script.chunkSize = requirePositive(record.chunkSize, "mock.chunkSize");
-  if (record.capabilities !== undefined) {
-    const parsed = parseCapabilityMap({ model: record.capabilities }, "mock.capabilities");
-    const caps = parsed.model;
-    if (caps) script.capabilities = caps;
-  }
-  return script;
 }
 
 function parseCapabilityMap(

@@ -6,7 +6,7 @@ import {
   type LLMProvider,
   type ToolContributor,
 } from "@botanical/agent-runtime";
-import { bearer, createAgent, login, readJson, setup } from "./helpers.ts";
+import { bearer, createAgent, login, readJson, setup , ECHO_PROFILE } from "./helpers.ts";
 
 async function postJson(
   app: ReturnType<typeof setup>["app"],
@@ -69,7 +69,7 @@ describe("agent turn", () => {
 
   test("hides tools that are not on the agent allowlist", async () => {
     const profiles = [
-      { id: "mock", name: "Mock echo", provider: "mock", model: "echo" },
+      ECHO_PROFILE,
       { id: "grok", name: "Grok", provider: "xai", model: "grok-4" },
     ];
     const { app } = setup({ BOTANICAL_PROFILES: JSON.stringify(profiles) });
@@ -78,19 +78,19 @@ describe("agent turn", () => {
     const created = await postJson(
       app,
       "/api/chats",
-      { agentId: agent.id, profileId: "mock" },
+      { agentId: agent.id, profileId: "echo" },
       bearer(token),
     );
     const chatId = (await readJson<{ chat: { id: string } }>(created)).chat.id;
     const posted = await postJson(
       app,
       `/api/chats/${chatId}/messages`,
-      { content: "List it", profileId: "mock", stream: false },
+      { content: "List it", profileId: "echo", stream: false },
       bearer(token),
     );
     const body = await readJson<{ assistantMessage: { content: string }; toolCall?: { name: string } }>(posted);
     expect(body.toolCall).toBeUndefined();
-    expect(body.assistantMessage.content).toBe("mock:List it");
+    expect(body.assistantMessage.content).toBe("echo:List it");
 
     const catalog = await readJson<{ tools: Array<{ id: string; source: string }> }>(
       await app.fetch(new Request("http://localhost/api/tools", { headers: bearer(token) })),

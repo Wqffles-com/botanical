@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { runAsUser } from "@botanical/db";
 
 import { createSendAgentMessageTool } from "../src/a2a/tool.ts";
-import { bearer, createAgent, login, readJson, setup } from "./helpers.ts";
+import { bearer, createAgent, login, readJson, setup , ECHO_PROFILE } from "./helpers.ts";
 
 const PROFILES = [
   { id: "grok", name: "Grok", provider: "xai", model: "grok-4" },
-  { id: "mock", name: "Mock", provider: "mock", model: "echo" },
+  ECHO_PROFILE,
 ];
 
 function appWith(overrides: Record<string, string> = {}) {
@@ -214,18 +214,18 @@ describe("agent messages", () => {
     ]);
   });
 
-  test("a mock turn can call send_agent_message", async () => {
+  test("an echo turn can call send_agent_message", async () => {
     const { app } = appWith();
     const { token } = await login(app);
     const from = await createAgent(app, token, { name: "Scout", toolIds: ["send_agent_message"] });
     const to = await createAgent(app, token, { name: "Keeper" });
-    const chatId = await createChat(app, token, from.id, "mock");
+    const chatId = await createChat(app, token, from.id, "echo");
     const content = `send_agent_message ${JSON.stringify({ toAgentId: to.id, body: "Beds are dry." })}`;
 
     const posted = await postJson(
       app,
       `/api/chats/${chatId}/messages`,
-      { content, profileId: "mock", stream: false },
+      { content, profileId: "echo", stream: false },
       token,
     );
     expect(posted.status).toBe(201);
@@ -341,7 +341,7 @@ describe("agent messages", () => {
     const { token } = await login(app);
     const from = await createAgent(app, token, { name: "Scout" });
     const to = await createAgent(app, token, { name: "Keeper" });
-    await createChat(app, token, to.id, "mock", "Ordinary");
+    await createChat(app, token, to.id, "echo", "Ordinary");
     await postJson(
       app,
       "/api/agent-messages",
@@ -373,12 +373,12 @@ describe("chat @mentions", () => {
     const { token } = await login(app);
     const owner = await createAgent(app, token, { name: "Scout" });
     const other = await createAgent(app, token, { name: "Seed Keeper" });
-    const chatId = await createChat(app, token, owner.id, "mock");
+    const chatId = await createChat(app, token, owner.id, "echo");
 
     const response = await postJson(
       app,
       `/api/chats/${chatId}/messages`,
-      { content: "Ask @seed keeper about tomatoes. Not @Scout, not me@Seed.", profileId: "mock", stream: false },
+      { content: "Ask @seed keeper about tomatoes. Not @Scout, not me@Seed.", profileId: "echo", stream: false },
       token,
     );
     expect(response.status).toBe(201);
@@ -403,11 +403,11 @@ describe("chat @mentions", () => {
     const { app } = appWith();
     const { token } = await login(app);
     const owner = await createAgent(app, token, { name: "Scout" });
-    const chatId = await createChat(app, token, owner.id, "mock");
+    const chatId = await createChat(app, token, owner.id, "echo");
     const response = await postJson(
       app,
       `/api/chats/${chatId}/messages`,
-      { content: "hello", profileId: "mock", async: true },
+      { content: "hello", profileId: "echo", async: true },
       token,
     );
     expect(response.status).toBe(202);

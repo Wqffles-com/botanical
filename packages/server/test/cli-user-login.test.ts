@@ -10,6 +10,7 @@ import { cliUserHome, userCliAvailability } from "../src/cli-install/service.ts"
 import { createMemoryStore } from "../src/db/memory.ts";
 import { seedInstance } from "../src/db/store.ts";
 import type { ModelProfile } from "../src/types.ts";
+import { ECHO_PROFILE } from "./helpers.ts";
 
 const fixture = fileURLToPath(new URL("../../providers/test/fixtures/fake-cli.ts", import.meta.url));
 chmodSync(fixture, 0o755);
@@ -62,14 +63,14 @@ describe("seedInstance", () => {
 
   test("adds CLI profiles enabled after first boot", async () => {
     const store = createMemoryStore();
-    const api: ModelProfile = { id: "mock", name: "Mock", provider: "mock", model: "echo" };
+    const api: ModelProfile = { ...ECHO_PROFILE };
     const grok: ModelProfile = { id: "grok-build", name: "Grok Build", provider: "cli", kind: "cli", cli: "grok", model: "grok" };
     const claude: ModelProfile = { id: "claude-code", name: "Claude Code", provider: "cli", kind: "cli", cli: "claude", model: "claude" };
     await seedInstance(store, config([api, grok]) as never, {});
     await store.globalProfiles.upsert({ ...grok, name: "Renamed" });
     await seedInstance(store, config([api, grok, claude]) as never, {});
     const ids = (await store.globalProfiles.list()).map((profile) => profile.id);
-    expect(ids).toEqual(["claude-code", "grok-build", "mock"]);
+    expect(ids).toEqual(["claude-code", "echo", "grok-build"]);
     const kept = (await store.globalProfiles.list()).find((profile) => profile.id === "grok-build");
     expect(kept?.name).toBe("Renamed");
   });

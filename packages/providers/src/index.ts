@@ -90,7 +90,6 @@ export {
   compatApiKeyEnv,
   compatBaseUrl,
   createConfiguredRegistry,
-  defaultMockProfile,
   normalizeBaseUrl,
   parseProfilesDocument,
   providerConfigured,
@@ -108,7 +107,6 @@ export {
   isAbortError,
   type ProviderErrorCode,
 } from "./errors.ts";
-export { createMockProvider, type MockProvider } from "./mock.ts";
 export {
   API_KNOWN_MODELS,
   HOSTED_PROVIDERS,
@@ -151,7 +149,6 @@ export {
   type ContentPart,
   type ImagePart,
   type LLMProvider,
-  type MockScript,
   type ModelCapabilities,
   type ModelProfile,
   type OpenRouterRouting,

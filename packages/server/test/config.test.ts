@@ -95,7 +95,6 @@ describe("loadConfig", () => {
     expect(config.profiles.find((profile) => profile.id === "local")?.baseUrl).toBe(
       "http://127.0.0.1:11434/v1",
     );
-    expect(config.profiles.some((profile) => profile.id === "mock")).toBe(true);
 
     expect(() =>
       loadConfig(

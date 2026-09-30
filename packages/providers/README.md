@@ -44,7 +44,6 @@ Config and request objects reject an inline `apiKey`. Hosted providers read thes
 | DeepSeek | `deepseek` | `DEEPSEEK_API_KEY` | `https://api.deepseek.com` |
 | OpenRouter | `openrouter` | `OPENROUTER_API_KEY` | `https://openrouter.ai/api/v1` |
 | Custom host | `openai-compat` | optional `apiKeyEnv` | required `baseURL` |
-| Tests | `mock` | none | none |
 
 Model ids live on profiles. The samples above are examples, not a built-in choice. Profile and provider ids are URL-safe slugs: letters, numbers, and `.` `_` `:` `-`.
 
@@ -62,26 +61,10 @@ Model ids live on profiles. The samples above are examples, not a built-in choic
 
 Capability fields are hints for policy (tools, vision, context). Override them per model with `capabilities` on the provider config.
 
-## Mock provider
-
-```ts
-const providers = createRegistry({
-  providers: [{
-    id: "mock",
-    type: "mock",
-    mock: { reply: "hello", chunkSize: 4 },
-  }],
-  profiles: [{ id: "test", provider: "mock", model: "mock-1" }],
-});
-```
-
-`mock.events` replays a script of `ChatEvent`s (a terminal `done` is added if you omit one). `createMockProvider()` records `calls` for assertions. The mock never reads the environment and never calls the network.
-
 ## Server catalog
 
 `selectProfiles(override, env)` builds the list behind `GET /api/profiles`.
 
-- `mock` is always included.
 - With no override, each configured key (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`) adds a profile per model in `API_KNOWN_MODELS` (`src/models.ts`): the provider id on the first model, `<provider>--<model>` on the rest.
 - `RETIRED_MODELS` maps model ids a vendor removed (DeepSeek `deepseek-chat`, `deepseek-reasoner`) to their replacement. The server moves stored profiles off them on boot and refuses them on `POST /api/admin/profiles`.
 - `openai-compat` is added only when both `OPENAI_COMPAT_BASE_URL` and `OPENAI_COMPAT_API_KEY` are set. `OPENAI_COMPAT_MODEL` sets that profile's model id. `CUSTOM_OPENAI_BASE_URL` and `CUSTOM_OPENAI_API_KEY` are legacy aliases used when the canonical name is unset.
@@ -98,8 +81,6 @@ const registry = createConfiguredRegistry(profiles, { env: process.env });
 const resolver = createRuntimeBridge(registry);
 // deps.profiles in runAgentTurn
 ```
-
-The HTTP server still runs the mock profile through the deterministic `file_list` turn. The bridge's mock provider only echoes.
 
 ## Develop
 

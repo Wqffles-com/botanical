@@ -93,7 +93,7 @@ describe("parse catalogs", () => {
     const byId = Object.fromEntries(keys.map((row) => [row.id, row.configured]));
     expect(byId.xai).toBe(true);
     expect(byId.anthropic).toBe(true);
-    expect(byId.mock).toBe(true);
+    expect(byId.mock).toBeUndefined();
     expect(byId.openai).toBe(false);
   });
 

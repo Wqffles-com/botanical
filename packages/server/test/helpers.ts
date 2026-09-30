@@ -31,27 +31,87 @@ export function baseEnv(overrides: Record<string, string> = {}): Record<string, 
   };
 }
 
+/** A profile whose model is `echo` gets the scripted reply from `echoEvents`. */
+export const ECHO_PROFILE = { id: "echo", name: "Echo", provider: "xai", model: "echo" } as const;
+
+interface WireMessage {
+  role: string;
+  content?: unknown;
+  tool_call_id?: string;
+  tool_calls?: Array<{ id: string; function: { name: string } }>;
+}
+
+interface WireRequest {
+  model?: unknown;
+  messages?: WireMessage[];
+  tools?: Array<{ function?: { name?: string } }>;
+}
+
 /** OpenAI-style SSE so profile tests never call a vendor. */
 export function defaultProviderFetch(input: Request | URL | string, init?: RequestInit): Promise<Response> {
   void input;
-  let model = "model";
+  let request: WireRequest = {};
   if (typeof init?.body === "string") {
     try {
-      const parsed = JSON.parse(init.body) as { model?: unknown };
-      if (typeof parsed.model === "string" && parsed.model.trim() !== "") model = parsed.model;
+      request = JSON.parse(init.body) as WireRequest;
     } catch {
       // The provider client always sends JSON. A bad body still gets a harmless reply.
     }
   }
-  const text = `Reply from ${model}`;
+  const model = typeof request.model === "string" && request.model.trim() !== "" ? request.model : "model";
+  const chunks = model === "echo" ? echoChunks(request) : [{ choices: [{ delta: { content: `Reply from ${model}` } }] }];
   const body = [
-    `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`,
+    ...chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`),
     `data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 3, completion_tokens: 2 } })}\n\n`,
     "data: [DONE]\n\n",
   ].join("");
   return Promise.resolve(
     new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } }),
   );
+}
+
+/**
+ * Scripted echo model. It calls `send_agent_message` when the user text is that
+ * tool plus a JSON object and the tool is offered. Otherwise it calls
+ * `file_list` when offered, then echoes the user text plus the tool output.
+ */
+function echoChunks(request: WireRequest): unknown[] {
+  const messages = request.messages ?? [];
+  const names = new Set((request.tools ?? []).map((tool) => tool.function?.name));
+  let lastUser = -1;
+  messages.forEach((message, index) => {
+    if (message.role === "user") lastUser = index;
+  });
+  const turn = lastUser < 0 ? messages : messages.slice(lastUser);
+  const userText = typeof turn[0]?.content === "string" ? turn[0].content : "";
+  const toolMessages = turn.filter((message) => message.role === "tool");
+  if (toolMessages.length === 0) {
+    const directive = names.has("send_agent_message")
+      ? /^send_agent_message\s+(\{[\s\S]*\})$/.exec(userText.trim())?.[1]
+      : undefined;
+    if (directive) return [toolCallChunk("call_send_agent_message", "send_agent_message", directive)];
+    if (names.has("file_list")) return [toolCallChunk("call_file_list", "file_list", JSON.stringify({ path: "." }))];
+  }
+  const toolText = toolMessages.map((message) => (typeof message.content === "string" ? message.content : "")).join("\n");
+  const calls = turn.flatMap((message) => message.tool_calls ?? []);
+  const toolName = calls.find((call) => call.id === toolMessages[0]?.tool_call_id)?.function.name ?? "tool";
+  const text = toolText ? `echo:${userText}\n\nUsed ${toolName}:\n${toolText}` : `echo:${userText}`;
+  const chunks: unknown[] = [];
+  for (let index = 0; index < text.length; index += 24) {
+    chunks.push({ choices: [{ delta: { content: text.slice(index, index + 24) } }] });
+  }
+  return chunks;
+}
+
+function toolCallChunk(id: string, name: string, args: string): unknown {
+  return {
+    choices: [
+      {
+        delta: { tool_calls: [{ index: 0, id, type: "function", function: { name, arguments: args } }] },
+        finish_reason: "tool_calls",
+      },
+    ],
+  };
 }
 
 export function setup(

@@ -5,10 +5,10 @@ import { MEMORY_OPERATOR_ID } from "../src/db/always-on.ts";
 import { createMemoryStore } from "../src/db/memory.ts";
 import { createScheduler } from "../src/routines/scheduler.ts";
 import { createTurnCoordinator } from "../src/runtime/turns.ts";
-import { bearer, createAgent, login, readJson, setup } from "./helpers.ts";
+import { bearer, createAgent, login, readJson, setup , ECHO_PROFILE } from "./helpers.ts";
 
 const PROFILES = [
-  { id: "mock", name: "Mock", provider: "mock", model: "echo" },
+  ECHO_PROFILE,
   { id: "grok", name: "Grok", provider: "xai", model: "grok-4" },
 ];
 
@@ -51,7 +51,7 @@ describe("routine scheduler", () => {
       prompt: "Check the beds",
       cron: "0 * * * *",
       timezone: "UTC",
-      profileId: "mock",
+      profileId: "echo",
       enabled: true,
       nextRunAt: due.toISOString(),
     });
@@ -94,7 +94,7 @@ describe("routine scheduler", () => {
       prompt: "Quiet",
       cron: "0 * * * *",
       timezone: "UTC",
-      profileId: "mock",
+      profileId: "echo",
       enabled: true,
       nextRunAt: "2026-06-15T07:00:00.000Z",
     });
@@ -125,7 +125,7 @@ describe("routine scheduler", () => {
       prompt: "Catch up",
       cron: "0 * * * *",
       timezone: "UTC",
-      profileId: "mock",
+      profileId: "echo",
       enabled: true,
       nextRunAt: "2026-06-15T07:00:00.000Z",
     });
@@ -135,7 +135,7 @@ describe("routine scheduler", () => {
       prompt: "No",
       cron: "0 * * * *",
       timezone: "UTC",
-      profileId: "mock",
+      profileId: "echo",
       enabled: false,
       nextRunAt: "2026-06-15T07:00:00.000Z",
     });
@@ -171,7 +171,7 @@ describe("routine scheduler", () => {
       prompt: "Hi",
       cron: "0 * * * *",
       timezone: "UTC",
-      profileId: "mock",
+      profileId: "echo",
       enabled: true,
       nextRunAt: "2026-06-15T18:00:00.000Z",
     });
@@ -209,7 +209,7 @@ describe("routine scheduler", () => {
       agentId: agent.id,
       name: "Hook",
       kind: "webhook",
-      profileId: "mock",
+      profileId: "echo",
       promptTemplate: "ping",
       secret: "s".repeat(32),
       enabled: true,
@@ -275,7 +275,7 @@ describe("routine API", () => {
     expect(bad.error).toMatch(/minute/i);
   });
 
-  test("records a mock run from queued to succeeded and links the chat", async () => {
+  test("records an echo run from queued to succeeded and links the chat", async () => {
     const { app } = appWith();
     const { token } = await login(app);
     const agent = await createAgent(app, token, { name: "Ada", toolIds: ["notify_user"] });
@@ -289,7 +289,7 @@ describe("routine API", () => {
           prompt: "Look at the ferns",
           cron: "0 9 * * *",
           timezone: "UTC",
-          profileId: "mock",
+          profileId: "echo",
         },
         token,
       ),
@@ -310,7 +310,7 @@ describe("routine API", () => {
       await app.fetch(new Request(`http://localhost/api/chats/${chatId}/messages`, { headers: bearer(token) })),
     );
     expect(messages.messages.some((message) => message.role === "user" && message.content.includes("ferns"))).toBe(true);
-    expect(messages.messages.some((message) => message.role === "assistant" && message.content.includes("mock:"))).toBe(true);
+    expect(messages.messages.some((message) => message.role === "assistant" && message.content.includes("echo:"))).toBe(true);
     const notes = await readJson<{ notifications: { id: string; kind: string; chatId: string | null }[]; unreadCount: number }>(
       await app.fetch(new Request("http://localhost/api/notifications", { headers: bearer(token) })),
     );
@@ -386,7 +386,7 @@ describe("routine API", () => {
     const { app } = setup(
       {
         BOTANICAL_PROFILES: JSON.stringify([
-          { id: "mock", name: "Mock", provider: "mock", model: "echo" },
+          ECHO_PROFILE,
           { id: "grok", name: "Grok", provider: "xai", model: "grok-4" },
         ]),
       },
@@ -439,7 +439,7 @@ describe("routine API", () => {
           prompt: "Still runs",
           cron: "0 9 * * 1",
           timezone: "UTC",
-          profileId: "mock",
+          profileId: "echo",
           enabled: false,
         },
         token,

@@ -21,15 +21,6 @@ There is still no default profile (`defaultProfileId` is always `null`).
 {
   "profiles": [
     {
-      "id": "mock",
-      "name": "Mock",
-      "provider": "mock",
-      "model": "echo",
-      "description": "In-process echo. No API key.",
-      "kind": "api",
-      "available": true
-    },
-    {
       "id": "grok-build",
       "name": "Grok Build",
       "provider": "cli",

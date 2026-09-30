@@ -7,7 +7,6 @@ const PROVIDER_LABELS: Record<string, string> = {
   "openai-compat": "OpenAI-compatible",
   openai_compat: "OpenAI-compatible",
   custom: "Custom",
-  mock: "Mock",
 };
 
 export function providerLabel(id: string): string {

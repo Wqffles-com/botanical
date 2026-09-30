@@ -9,7 +9,7 @@ Runtime is **Bun**. `SELF_HOST` and `SAAS` are the same server. The deployment m
 ```bash
 cd packages/server
 cp .env.example .env
-# set BOTANICAL_ENCRYPTION_KEY before saving provider keys. Mock profile is always listed.
+# set BOTANICAL_ENCRYPTION_KEY before saving provider keys.
 bun install
 bun src/serve.ts
 ```
@@ -27,7 +27,7 @@ docker run --rm -p 8787:8787 \
   botanical-server
 ```
 
-There is no default model. `GET /api/profiles` lists `mock` plus one profile for each provider key that is set. Every chat and every message names a `profileId`. `BOTANICAL_PROFILES` or `BOTANICAL_PROFILES_FILE` replaces the built-in model list.
+There is no default model. `GET /api/profiles` lists one profile for each provider key that is set. Every chat and every message names a `profileId`. `BOTANICAL_PROFILES` or `BOTANICAL_PROFILES_FILE` replaces the built-in model list.
 
 An agent's `defaultProfileId` is only a suggestion for the picker. It does not select a profile for a chat.
 
@@ -85,7 +85,6 @@ The turn runs through `@botanical/agent-runtime`. The agent's `systemPrompt` is 
 - `stream: true`, or `Accept: text/event-stream`, returns server-sent events: `message.created`, `text-delta`, `tool-call`, `tool-result`, `error`, `message.completed`, `done`. Payloads use the core stream types (`text-delta`, `tool-call`, `tool-result`, `error`, `done`).
 - Omitting `profileId` uses the profile stored on the chat (the one chosen at create, or the last explicit switch).
 - Sending a different configured `profileId` switches the chat. Unknown ids return 422. Nothing is chosen for you.
-- The `mock` provider calls `file_list` when that id is on the allowlist, then echoes the user text and the tool output. A user message of the form `send_agent_message {"toAgentId":"…","body":"…"}` calls that tool when it is on the allowlist. It does not use the network.
 
 `GET /api/tools` returns `{ tools: [{ id, name, description, parameters, source, serverId? }] }`. `source` is `builtin` or `mcp`. File tools are registered as `builtin.files`. Shell, web, and MCP packages plug in by exporting `createToolContributor` from `@botanical/tools-shell`, `@botanical/tools-web`, and `@botanical/mcp` (see `@botanical/agent-runtime` tool registry v1). The server loads those factories at startup. MCP servers connected from `BOTANICAL_MCP_CONFIG` are also listed, with ids `mcp:<server>:<tool>`.
 
@@ -154,18 +153,17 @@ Session rows store a SHA-256 of the token, not the token itself. Model API keys 
 
 `GET /api/profiles` returns `defaultProfileId: null` and:
 
-- `mock` always
 - for each configured key (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`), one profile per current model (`API_KNOWN_MODELS` in `@botanical/providers`). Built-in models added in a later release are seeded on the next boot; one an admin removes stays removed. Admins add any other model id in Settings, Admin, Models
 - `openai-compat` when both `OPENAI_COMPAT_BASE_URL` and `OPENAI_COMPAT_API_KEY` are set (`CUSTOM_OPENAI_*` are legacy aliases)
 
-Providers: `openai`, `anthropic`, `xai`, `deepseek`, `openrouter`, `openai-compat`, `mock`.
+Providers: `openai`, `anthropic`, `xai`, `deepseek`, `openrouter`, `openai-compat`.
 
 Optional `profiles.json` (`BOTANICAL_PROFILES_FILE`) or inline `BOTANICAL_PROFILES` replaces that model list. Entries for providers without a key are omitted. See `profiles.example.json`. Profile JSON rejects `apiKey`.
 
-`POST /api/chats/:id/messages` requires `profileId`. `mock` echoes the user and calls `file_list`. Any other profile streams through `@botanical/providers`, normalized to the agent-runtime `LLMProvider` interface (`config.providers.runtime`). File-tool schemas on the agent allowlist are sent as function tools. The runtime tool loop (m06) executes tools; this route forwards `tool-call` events from the model.
+`POST /api/chats/:id/messages` requires `profileId`. API profiles stream through `@botanical/providers`, normalized to the agent-runtime `LLMProvider` interface (`config.providers.runtime`). File-tool schemas on the agent allowlist are sent as function tools. The runtime tool loop (m06) executes tools; this route forwards `tool-call` events from the model.
 
 ## What's left
 
 - Postgres `createStore` from `packages/db` runs migrations on boot when `DATABASE_URL` is set.
 - Shell and web packages register when they export `createToolContributor`.
-- Non-mock profiles resolve through `config.providers.runtime`. Mock profiles still call `file_list` or `send_agent_message` from the local script. MCP boots with the server.
+- API profiles resolve through `config.providers.runtime`. MCP boots with the server.

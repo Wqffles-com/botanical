@@ -21,7 +21,6 @@ function hostedConfig() {
     providers: [
       ...builtinProviderConfigs(),
       { id: "local", type: "openai-compat", baseURL: "http://127.0.0.1:11434/v1", includeUsage: false },
-      { id: "mock", type: "mock", mock: { reply: "mocked", chunkSize: 3 } },
     ],
     profiles: [
       { id: "fast", provider: "deepseek", model: "deepseek-chat", temperature: 0 },
@@ -29,7 +28,6 @@ function hostedConfig() {
       { id: "grok", provider: "xai", model: "grok-4", maxTokens: 16 },
       { id: "router", provider: "openrouter", model: "openrouter/auto" },
       { id: "local", provider: "local", model: "llama" },
-      { id: "mock", provider: "mock", model: "mock-1" },
     ],
   };
 }
@@ -81,7 +79,6 @@ describe("profiles", () => {
       "grok",
       "router",
       "local",
-      "mock",
     ]);
     expect("defaultProfile" in registry).toBe(false);
   });
@@ -93,10 +90,9 @@ describe("profiles", () => {
       const captured = captureFetch(ok);
       const registry = createRegistry(
         {
-          providers: [{ id: "openai", type: "openai" }, { id: "mock", type: "mock" }],
+          providers: [{ id: "openai", type: "openai" }],
           profiles: [
             { id: "chat", provider: "openai", model: "gpt-4.1" },
-            { id: "mock", provider: "mock", model: "mock-1" },
           ],
         },
         { env: {}, fetch: captured.fetch },
@@ -117,14 +113,14 @@ describe("profiles", () => {
   test("refuses an api key passed on the completion", () => {
     const registry = createRegistry(
       {
-        providers: [{ id: "mock", type: "mock" }],
-        profiles: [{ id: "mock", provider: "mock", model: "mock-1" }],
+        providers: [{ id: "openai", type: "openai" }],
+        profiles: [{ id: "chat", provider: "openai", model: "gpt-4.1" }],
       },
-      { env: {} },
+      { env: { OPENAI_API_KEY: "sk" } },
     );
     expect(() =>
       registry.complete({
-        profileId: "mock",
+        profileId: "chat",
         messages: [{ role: "user", content: "hi" }],
         apiKey: "sk-nope",
       } as never),
