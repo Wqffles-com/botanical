@@ -455,3 +455,17 @@ A chat that never ends outgrows the model's context, so:
 - **Clear.** The chat menu can delete every message (`DELETE /api/chats/:id/messages`). Memories, files, and settings stay.
 
 **Considered:** Keeping many chats per agent next to a pinned "main" chat. Not built: it keeps the question "which chat was that in?", which one chat per agent removes. Compacting before a turn instead of after was also left out: the user's new messages are already stored by then, so the summary would land after them.
+
+---
+
+## 2026-09-30: Agents talk with send_message
+
+**Status:** Accepted.
+**Effect:** Replaces "one reply per user message". An agent's text output is no longer what the user reads.
+
+- Every agent has a `send_message` tool. Each call stores a message in the chat right away, so one turn can send several (a quick "on it", then the result). The tool needs no allowlist entry, role capability, or A2A flag.
+- The agent's text output and tool calls are its notes. The web folds them into a collapsed block between messages.
+- In a group chat, other agents read each other's sent messages, not their notes, and a handoff `@mention` counts in any of them.
+- Older chats, and a turn where the model sends nothing, read as before: that turn's text output is the reply.
+
+**Considered:** Keeping the text output as the reply and adding a tool for extra messages. Not built: the issue asked for the text output to be hidden, and two ways to talk makes it unclear which one the user reads.

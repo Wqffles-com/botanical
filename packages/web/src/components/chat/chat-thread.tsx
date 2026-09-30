@@ -3,6 +3,7 @@
 import { MessageSquareOff } from "lucide-react";
 import { isCompactionMessage, type Agent, type Chat, type ChatMessage, type ModelProfile } from "@botanical/core";
 import { useEffect, useRef, type ReactNode } from "react";
+import { AgentActivity } from "@/components/chat/agent-activity";
 import { ChatActionsMenu } from "@/components/chat/chat-actions-menu";
 import { ShellHeader } from "@/components/app-shell";
 import { ChatAgentHeader } from "@/components/chat/chat-agent-header";
@@ -113,7 +114,7 @@ export function ChatThread({
     );
   }
 
-  const rows = presentThread(messages);
+  const rows = presentThread(messages, chat.agentId);
   // The transcript is locked while the agent works or messages wait to be answered.
   const locked = working || pending.length > 0;
   const actionsFor = (message: ChatMessage): MessageActionHandlers | undefined => {
@@ -211,6 +212,9 @@ export function ChatThread({
               if (isCompactionMessage(row.message)) return <CompactionDivider key={row.key} message={row.message} />;
               if (row.message.role === "system") return null;
               const author = messageAuthor(row.message, chat, agents) ?? agent;
+              if (row.kind === "activity") {
+                return <AgentActivity key={row.key} entry={row} name={group ? author?.name : undefined} />;
+              }
               return (
                 <MessageBubble
                   key={row.key}
@@ -265,7 +269,10 @@ export function ChatThread({
   );
 }
 
-/** A reply that follows another reply from the same agent drops its avatar and sits closer. */
+/**
+ * A reply that follows another reply from the same agent drops its avatar and sits closer.
+ * Working notes in between do not count: they carry no avatar of their own.
+ */
 function continuesRun(
   rows: ReturnType<typeof presentThread>,
   index: number,
@@ -274,7 +281,9 @@ function continuesRun(
   agents: Agent[],
 ): boolean {
   const current = rows[index]?.message;
-  const previous = rows[index - 1]?.message;
+  let before = index - 1;
+  while (rows[before]?.kind === "activity") before -= 1;
+  const previous = rows[before]?.message;
   if (!current || !previous || current.role === "user" || previous.role === "user") return false;
   if (previous.role === "system" || isCompactionMessage(previous)) return false;
   if (isInboxMessage(current) || isInboxMessage(previous)) return false;

@@ -95,7 +95,7 @@ describe("per-run CLI MCP", () => {
       await rpc(app, session.runId, session.token, { jsonrpc: "2.0", id: 3, method: "tools/list" }),
     );
     const names = listed.result.tools.map((tool) => tool.name).sort();
-    expect(names).toEqual(["file_read", "memory_search", "memory_write"]);
+    expect(names).toEqual(["file_read", "memory_search", "memory_write", "send_message"]);
 
     const called = await readJson<{ result: { isError: boolean; content: { text: string }[] } }>(
       await rpc(app, session.runId, session.token, {
@@ -193,7 +193,7 @@ describe("per-run CLI MCP", () => {
     const listed = await readJson<{ result: { tools: { name: string }[] } }>(
       await rpc(app, session.runId, session.token, { jsonrpc: "2.0", id: 1, method: "tools/list" }),
     );
-    expect(listed.result.tools.map((tool) => tool.name).sort()).toEqual(["mcp__notes__search", "memory_write"]);
+    expect(listed.result.tools.map((tool) => tool.name).sort()).toEqual(["mcp__notes__search", "memory_write", "send_message"]);
     const called = await readJson<{ result: { isError: boolean; content: { text: string }[] } }>(
       await rpc(app, session.runId, session.token, {
         jsonrpc: "2.0",
@@ -227,7 +227,7 @@ describe("per-run CLI MCP", () => {
     const listed = await readJson<{ result: { tools: { name: string }[] } }>(
       await rpc(app, session.runId, session.token, { jsonrpc: "2.0", id: 1, method: "tools/list" }),
     );
-    expect(listed.result.tools.map((tool) => tool.name).sort()).toEqual(["memory_search", "memory_write"]);
+    expect(listed.result.tools.map((tool) => tool.name).sort()).toEqual(["memory_search", "memory_write", "send_message"]);
     const called = await readJson<{ result: { isError: boolean; content: { text: string }[] } }>(
       await rpc(app, session.runId, session.token, {
         jsonrpc: "2.0",
@@ -320,7 +320,7 @@ describe("per-run CLI MCP", () => {
       const tool = messages.messages.find((message) => message.role === "tool");
       expect(tool?.name).toBe("memory_write");
       expect(tool?.content).toContain("\"id\"");
-      expect(assistant?.content).toContain("PROMPT_TOOLS:memory_write, memory_search");
+      expect(assistant?.content).toContain("PROMPT_TOOLS:send_message, memory_write, memory_search");
       const memories = await runAsUser(userId, () => store.memories.listVisible(agentId, { limit: 10 }));
       expect(memories.some((memory) => memory.content === "fern from cli" && memory.agentId === agentId)).toBe(true);
       const runId = /RUN_ID:([^\s]+)/.exec(assistant?.content ?? "")?.[1] ?? "";
@@ -348,7 +348,7 @@ describe("per-run CLI MCP", () => {
     }
   });
 
-  test("an agent with no tools gets no MCP endpoint", async () => {
+  test("an agent with no tools still gets the MCP endpoint for send_message", async () => {
     clearCliAvailabilityCache();
     const previousMode = process.env.FAKE_CLI_MODE;
     const previousHome = process.env.BOTANICAL_CLI_HOME;
@@ -399,8 +399,9 @@ describe("per-run CLI MCP", () => {
         await app.fetch(new Request(`http://localhost/api/chats/${chatId}/messages`, { headers: bearer(token) })),
       );
       const assistant = messages.messages.find((message) => message.role === "assistant");
-      expect(assistant?.content).toContain("CONFIG:no");
-      expect(assistant?.content).toContain("TOKEN_ENV:missing");
+      // send_message is every agent's tool, so the CLI always gets the endpoint.
+      expect(assistant?.content).toContain("CONFIG:yes");
+      expect(assistant?.content).toContain("TOKEN_ENV:ok");
       expect(app.cliTools.size()).toBe(0);
     } finally {
       if (previousMode === undefined) delete process.env.FAKE_CLI_MODE;

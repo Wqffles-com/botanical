@@ -61,6 +61,55 @@ describe("presentThread", () => {
   });
 });
 
+describe("presentThread with send_message", () => {
+  const row = (message: Partial<ChatMessage> & Pick<ChatMessage, "id" | "role">): ChatMessage => ({
+    chatId: "c",
+    content: "",
+    createdAt: "t",
+    ...message,
+  });
+
+  test("sent messages are replies and the rest of the turn folds into notes", () => {
+    const rows = presentThread(
+      [
+        row({ id: "u1", role: "user", content: "Why is it slow?" }),
+        row({
+          id: "a1",
+          role: "assistant",
+          content: "Checking the logs",
+          toolCalls: [
+            { id: "s1", name: "send_message", arguments: { text: "On it." } },
+            { id: "t1", name: "file_list", arguments: {} },
+          ],
+        }),
+        row({ id: "m1", role: "assistant", name: "send_message", content: "On it." }),
+        row({ id: "r1", role: "tool", name: "send_message", toolCallId: "s1", content: "{}" }),
+        row({ id: "r2", role: "tool", name: "file_list", toolCallId: "t1", content: "app.log" }),
+        row({ id: "a2", role: "assistant", content: "The cache is cold" }),
+        row({ id: "m2", role: "assistant", name: "send_message", content: "Found it." }),
+      ],
+      "ada",
+    );
+    expect(rows.map((entry) => [entry.kind, entry.message.id])).toEqual([
+      ["message", "u1"],
+      ["activity", "a1"],
+      ["message", "m1"],
+      ["activity", "a2"],
+      ["message", "m2"],
+    ]);
+    // The send_message call itself is not shown as a tool: its message is.
+    expect(rows[1]?.tools.map((call) => call.name)).toEqual(["file_list"]);
+  });
+
+  test("a turn without send_message still reads as a reply", () => {
+    const rows = presentThread(
+      [row({ id: "u1", role: "user", content: "hi" }), row({ id: "a1", role: "assistant", content: "hello" })],
+      "ada",
+    );
+    expect(rows.map((entry) => entry.kind)).toEqual(["message", "message"]);
+  });
+});
+
 describe("profile_unavailable", () => {
   test("turns a 422 into a profile-specific message", () => {
     const error = new BotanicalApiError("CLI binary not found", {

@@ -174,7 +174,8 @@ describe("provider streaming", () => {
     expect(outbound.messages[0]?.role).toBe("system");
     expect(outbound.messages[0]?.content).toContain("You keep the garden.");
     expect(outbound.messages[0]?.content).toContain("Description: Tends the plots");
-    expect(outbound.tools[0]?.function.name).toBe("file_list");
+    expect(outbound.tools[0]?.function.name).toBe("send_message");
+    expect(outbound.tools[1]?.function.name).toBe("file_list");
     expect(JSON.stringify(outbound)).not.toContain("sk-xai-secret");
   });
 

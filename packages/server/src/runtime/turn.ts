@@ -5,6 +5,7 @@ import {
   ChatNotFoundError,
   ProfileNotFoundError,
   ProfileRequiredError,
+  replyIds,
   runAgentTurn,
   type RuntimeDeps,
   type MessageRecord,
@@ -24,9 +25,12 @@ export interface TurnErrorBody {
 
 export interface TurnResult {
   userMessage: Message;
+  /** The last message the user reads from this turn (see `turnReplies`). */
   assistantMessage: Message | null;
   /** Group chats: the last reply of each agent that answered, in speaking order. */
   replies?: Message[];
+  /** Every row the turn stored, in order: messages, notes, and tool results. */
+  stored: Message[];
   profileId: string;
   toolCall?: { id: string; name: string; arguments: unknown };
   toolResult?: string;
@@ -130,7 +134,7 @@ async function* streamRound(
     answered.add(agentId);
     yield { event: "agent", data: { type: "agent", agentId } };
     let done: SseEvent | null = null;
-    let reply: Message | null = null;
+    let replies: Message[] = [];
     for await (const event of streamChatTurn(store, runtime, {
       ...input,
       agentId,
@@ -142,7 +146,7 @@ async function* streamRound(
         continue;
       }
       if (!first && event.event === "message.created") continue;
-      if (event.event === "message.completed") reply = readMessage(event);
+      if (event.event === "message.completed") replies = readReplies(event);
       yield event;
     }
     first = false;
@@ -151,8 +155,9 @@ async function* streamRound(
       if (done) yield done;
       return;
     }
-    if (reply?.agentId === agentId && reply.content.includes("@")) {
-      waiting.push(...handoffs(chat, agents, reply.content, new Set([...answered, ...waiting])));
+    const said = replies.filter((reply) => reply.agentId === agentId).map((reply) => reply.content).join("\n\n");
+    if (said.includes("@")) {
+      waiting.push(...handoffs(chat, agents, said, new Set([...answered, ...waiting])));
     }
     if (waiting.length === 0 && done) yield done;
   }
@@ -164,6 +169,8 @@ export async function* streamChatTurn(
   input: ChatTurnInput,
 ): AsyncGenerator<SseEvent> {
   const { chat, content, profile } = input;
+  const agentId = input.agentId ?? chat.agentId;
+  const before = new Set((await store.messages.listByChat(chat.id)).map((message) => message.id));
   let announced = false;
   const announce = async function* (): AsyncGenerator<SseEvent> {
     if (announced) return;
@@ -189,8 +196,10 @@ export async function* streamChatTurn(
       if (event.type === "done") {
         yield* announce();
         await retitle(store, chat, content);
-        const assistant = await latest(store, chat.id, "assistant");
-        if (assistant) yield { event: "message.completed", data: { message: assistant } };
+        const replies = await turnReplies(store, chat, agentId, before);
+        // A turn with no reply (tool calls only) still names its last assistant row, as before.
+        const assistant = replies.at(-1) ?? (await latest(store, chat.id, "assistant"));
+        if (assistant) yield { event: "message.completed", data: { message: assistant, replies } };
         yield {
           event: "done",
           data: {
@@ -230,11 +239,16 @@ export async function collectChatTurn(
   let toolCall: TurnResult["toolCall"];
   let toolResult: string | undefined;
   let error: TurnErrorBody | undefined;
+  const before = new Set((await store.messages.listByChat(input.chat.id)).map((message) => message.id));
   const replies: Message[] = [];
+  let assistantMessage: Message | null = null;
   for await (const event of streamChatReplies(store, runtime, input)) {
     if (event.event === "message.completed") {
       const reply = readMessage(event);
-      if (reply) replies.push(reply);
+      if (reply) {
+        replies.push(reply);
+        assistantMessage = reply;
+      }
     }
     if (!toolCall) {
       const call = readToolCall(event);
@@ -247,10 +261,14 @@ export async function collectChatTurn(
   }
   const userMessage = await latest(store, input.chat.id, "user");
   if (!userMessage) throw new HttpError(500, "internal_error", "Internal server error");
-  const assistantMessage = await latest(store, input.chat.id, "assistant");
+  assistantMessage ??= await latest(store, input.chat.id, "assistant");
+  const stored = (await store.messages.listByChat(input.chat.id)).filter(
+    (message) => !before.has(message.id) && message.id !== userMessage.id,
+  );
   return {
     userMessage,
     assistantMessage,
+    stored,
     ...(isGroupChat(input.chat) ? { replies } : {}),
     profileId: input.profile.id,
     ...(toolCall ? { toolCall } : {}),
@@ -301,6 +319,18 @@ function publicTurnError(error: unknown): TurnErrorBody {
   return { code: "internal_error", message: "The model request failed" };
 }
 
+/**
+ * What the user reads from one agent's turn: the messages it stored since `before` that count
+ * as replies (`replyIds`: its `send_message` rows, or its text output when it sent none).
+ */
+async function turnReplies(store: Store, chat: Chat, agentId: string, before: ReadonlySet<string>): Promise<Message[]> {
+  const messages = await store.messages.listByChat(chat.id);
+  const ids = replyIds(messages, chat.agentId);
+  return messages.filter(
+    (message) => !before.has(message.id) && ids.has(message.id) && (message.agentId ?? chat.agentId) === agentId,
+  );
+}
+
 async function latest(store: Store, chatId: string, role: Message["role"]): Promise<Message | null> {
   const messages = await store.messages.listByChat(chatId);
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -324,6 +354,13 @@ function titleFromContent(content: string): string {
 function readMessage(event: SseEvent): Message | null {
   if (!isRecord(event.data) || !isRecord(event.data.message)) return null;
   return event.data.message as unknown as Message;
+}
+
+function readReplies(event: SseEvent): Message[] {
+  if (!isRecord(event.data)) return [];
+  if (Array.isArray(event.data.replies)) return event.data.replies as Message[];
+  const message = readMessage(event);
+  return message ? [message] : [];
 }
 
 function readToolCall(event: SseEvent): TurnResult["toolCall"] | null {

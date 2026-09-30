@@ -47,7 +47,14 @@ export {
   normalizeProfile,
 } from "./normalize";
 export { activeMentionQuery, findMentions, mentionedAgents } from "./mentions";
-export { COMPACTION_MESSAGE_NAME, isAgentChat, isCompactionMessage } from "./chats";
+export {
+  COMPACTION_MESSAGE_NAME,
+  SENT_MESSAGE_NAME,
+  isAgentChat,
+  isCompactionMessage,
+  isSentMessage,
+  replyIds,
+} from "./chats";
 export type { Mention, Mentionable } from "./mentions";
 export { API } from "./paths";
 export { parseNdjsonLine, parseSseFrame, readChatStream, readSseMessages } from "./sse";

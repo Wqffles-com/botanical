@@ -13,7 +13,7 @@ Shared API types, response normalizers, and the HTTP client the web app uses. No
 | Path | Purpose |
 |------|---------|
 | `packages/core/src/client.ts` | `BotanicalClient` |
-| `packages/core/src/chats.ts` | `isAgentChat` (one chat per agent), `isCompactionMessage`, `COMPACTION_MESSAGE_NAME` |
+| `packages/core/src/chats.ts` | `isAgentChat` (one chat per agent), `isCompactionMessage`, `COMPACTION_MESSAGE_NAME`, `isSentMessage`, `SENT_MESSAGE_NAME`, `replyIds` (which rows are replies, the rest are an agent's notes) |
 | `packages/core/src/mentions.ts` | `findMentions`, `mentionedAgents`, `activeMentionQuery` (chat `@Name` parsing, shared by server and composer) |
 | `packages/core/src/paths.ts` | `API` path builders |
 | `packages/core/src/types.ts` | Wire types (`Agent`, `Chat`, `Health`, `RoleRecord`, …) |
@@ -34,7 +34,7 @@ The browser singleton is `packages/web/src/lib/api.ts`. Server components use `p
 
 ## Exports
 
-`BotanicalClient`, `API`, `isAgentChat`, `isCompactionMessage`, `COMPACTION_MESSAGE_NAME`, `readChatStream`, `readSseMessages`, `normalizeAgent`, `normalizeChat`, `normalizeMessage`, `normalizeMemory`, `normalizeRoleRecord`, `EXAMPLE_AGENTS`, `PLATFORM_TOOLS`, `CLIENT_CONTRACT_VERSION`. Deployment entry: `loadDeploymentConfig`, `readDeploymentMode`, `verifySingleTenantPasscode`, `createBillingHooks`.
+`BotanicalClient`, `API`, `isAgentChat`, `isCompactionMessage`, `COMPACTION_MESSAGE_NAME`, `isSentMessage`, `SENT_MESSAGE_NAME`, `replyIds`, `readChatStream`, `readSseMessages`, `normalizeAgent`, `normalizeChat`, `normalizeMessage`, `normalizeMemory`, `normalizeRoleRecord`, `EXAMPLE_AGENTS`, `PLATFORM_TOOLS`, `CLIENT_CONTRACT_VERSION`. Deployment entry: `loadDeploymentConfig`, `readDeploymentMode`, `verifySingleTenantPasscode`, `createBillingHooks`.
 
 `API` in `packages/core/src/paths.ts` covers health, auth, profiles, tools, agents, roles, memories, chats, messages, agent-messages, routines, listeners, notifications, `/api/settings/always-on`, and `/api/settings/appearance`. `BotanicalClient.getAppearance` and `updateAppearance` read and write the signed-in user's accent. `queueMessage` posts with `async: true`, `chatEvents` reads `GET /api/chats/:id/events` as `ChatEvent`s, `stopChat` calls `POST /api/chats/:id/stop`, and `updateMessage` / `deleteMessage` call `PATCH` / `DELETE /api/chats/:id/messages/:messageId`. `streamMessage` still drives the streaming form. `listAgentFiles` and `readAgentFile` read an agent's workspace (`GET /api/agents/:id/files` and `/files/content`) as `WorkspaceListing` and `WorkspaceFile`. `Chat.memberIds` lists a group chat's other agents and is empty for an agent's own chat; `createChat` without members opens that chat, and with `memberIds` starts a group chat. `getAgentChat` reads `GET /api/agents/:id/chat` (null before the first conversation), `clearChat` calls `DELETE /api/chats/:id/messages`, and `compactChat` calls `POST /api/chats/:id/compact`. `ChatMessage.agentId` is a reply's author, and the `status` chat event carries the `agentId` answering. Agent create and update send `title`, `shape`, and `picture` when those fields are set. It does not list CLI, MCP, capabilities, transcription, or `POST /api/hooks/:listenerId` (the public webhook is not called by `BotanicalClient`). CLI and MCP fetches live in `packages/web/src/lib/mvp-api.ts` and `packages/web/src/lib/cli-api.ts`.
 
