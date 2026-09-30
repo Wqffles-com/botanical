@@ -1,15 +1,18 @@
 "use client";
 
-import { AtSign, Mail } from "lucide-react";
-import Link from "next/link";
+import { AtSign, ChevronRight, Mail } from "lucide-react";
+import { useState } from "react";
 import { useWorkspace } from "@/components/workspace-provider";
-import { Markdown } from "@/components/chat/markdown";
+import { AgentConversationDialog, type AgentConversationTarget } from "@/components/chat/agent-conversation-dialog";
 import { MessageAgentAvatar } from "@/components/chat/message-agent-avatar";
 import { agentIdentity } from "@/lib/agent-identity";
 import { relativeTime } from "@/lib/format";
-import type { InboxEntry } from "@/lib/inbox-message";
+import { inboxPreview, type InboxEntry } from "@/lib/inbox-message";
 
-/** Mail from other agents, shown as notes from each sender rather than as the human's words. */
+/**
+ * Mail from other agents, collapsed to one row per message so it does not crowd the human's chat.
+ * A row opens every message between the sender and the recipient.
+ */
 export function InboxMessageCard({
   entries,
   recipient,
@@ -17,55 +20,50 @@ export function InboxMessageCard({
 }: {
   entries: InboxEntry[];
   /** The agent that received the mail, usually the chat's owner. */
-  recipient?: string;
+  recipient?: { id: string; name: string } | null;
   toolbar?: React.ReactNode;
 }) {
   const { agents } = useWorkspace();
+  const [open, setOpen] = useState<AgentConversationTarget | null>(null);
   return (
-    <article className="group/message flex flex-col gap-2" data-testid="message" data-role="inbox">
+    <article className="group/message flex flex-col gap-1.5" data-testid="message" data-role="inbox">
       {entries.map((entry) => {
         const sender = agents.find((agent) => agent.id === entry.fromAgentId);
         const identity = agentIdentity(sender ?? { name: entry.fromName });
         const when = new Date(entry.createdAt);
         return (
-          <div key={entry.id} className="flex gap-3" data-testid="inbox-entry">
-            <div className="shrink-0 self-start">
-              <MessageAgentAvatar agent={identity} />
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col items-start gap-1 pt-0.5">
-              <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
-                {entry.mention ? <AtSign className="size-3" aria-hidden /> : <Mail className="size-3" aria-hidden />}
-                <span className="font-medium text-foreground">{identity.name}</span>
-                {entry.mention ? (
-                  <span>
-                    mentioned {recipient || "this agent"} in{" "}
-                    <Link href={`/chats/${entry.mention.chatId}`} className="font-medium text-foreground underline-offset-2 hover:underline">
-                      {entry.mention.chatTitle || "a chat"}
-                    </Link>
-                  </span>
-                ) : (
-                  <span>sent a message</span>
-                )}
-                {Number.isNaN(when.getTime()) ? null : (
-                  <time dateTime={entry.createdAt} title={when.toLocaleString()}>
-                    · {relativeTime(entry.createdAt)}
-                  </time>
-                )}
-              </div>
-              <div className="min-w-0 max-w-[min(85%,48rem)] rounded-2xl rounded-tl-md border border-dashed bg-muted/40 px-3.5 py-2.5 text-sm leading-relaxed">
-                {entry.mention ? (
-                  <blockquote className="whitespace-pre-wrap border-l-2 pl-3 text-muted-foreground">
-                    {entry.mention.text}
-                  </blockquote>
-                ) : (
-                  <Markdown>{entry.body}</Markdown>
-                )}
-              </div>
-            </div>
-          </div>
+          <button
+            key={entry.id}
+            type="button"
+            data-testid="inbox-entry"
+            onClick={() =>
+              setOpen({
+                fromAgentId: entry.fromAgentId,
+                fromName: identity.name,
+                ...(recipient ? { toAgentId: recipient.id, toName: recipient.name } : {}),
+                messageId: entry.id,
+              })
+            }
+            className="flex w-full min-w-0 max-w-[min(85%,48rem)] items-center gap-2.5 rounded-2xl border border-dashed bg-muted/40 px-2.5 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <MessageAgentAvatar agent={identity} />
+            {entry.mention ? <AtSign className="size-3 shrink-0" aria-hidden /> : <Mail className="size-3 shrink-0" aria-hidden />}
+            <span className="shrink-0 font-medium text-foreground">{identity.name}</span>
+            <span className="shrink-0">
+              {entry.mention ? `mentioned ${recipient?.name || "this agent"}` : "sent a message"}
+            </span>
+            <span className="min-w-0 flex-1 truncate">{inboxPreview(entry)}</span>
+            {Number.isNaN(when.getTime()) ? null : (
+              <time className="shrink-0" dateTime={entry.createdAt} title={when.toLocaleString()}>
+                {relativeTime(entry.createdAt)}
+              </time>
+            )}
+            <ChevronRight className="size-3.5 shrink-0" aria-hidden />
+          </button>
         );
       })}
       {toolbar ? <div className="ml-9">{toolbar}</div> : null}
+      <AgentConversationDialog target={open} onClose={() => setOpen(null)} />
     </article>
   );
 }

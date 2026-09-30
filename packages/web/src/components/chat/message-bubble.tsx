@@ -84,7 +84,7 @@ export function MessageBubble({
     ) : null;
 
   if (inbox) {
-    return <InboxMessageCard entries={inbox} recipient={agent?.name} toolbar={actions ? toolbar : null} />;
+    return <InboxMessageCard entries={inbox} recipient={agent ? { id: agent.id, name: agent.name } : null} toolbar={actions ? toolbar : null} />;
   }
 
   if (message.role === "user") {
