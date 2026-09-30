@@ -119,7 +119,7 @@ BOTANICAL_CLI_PROFILES=grok-build
 docker compose -f docker-compose.yml -f docker-compose.cli.yml up --build -d
 ```
 
-Open http://localhost:3000, sign in, and go to Settings → Coding CLIs. Install the CLI, then log in. The container downloads the Linux build into a volume. Pick the Grok Build profile in a chat. Add `claude-code` or `codex` to `BOTANICAL_CLI_PROFILES` the same way. The default `docker compose up` does not install CLIs.
+Open http://localhost:3000, sign in, and go to Settings → Coding CLIs. Install the CLI, then log in. The container downloads the Linux build into a volume. Pick the Grok Build profile in a chat. Claude Code and Codex are listed there too: installing one adds its profile to the model picker, so `BOTANICAL_CLI_PROFILES` is optional. The default `docker compose up` does not install CLIs.
 
 ### Option B: Prebuilt release zip
 

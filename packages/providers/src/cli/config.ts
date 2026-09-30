@@ -70,6 +70,12 @@ export function parseCliProfileShortcut(value: string | undefined): CliProfileSp
   return specs;
 }
 
+/** The preset profile for one CLI, as `BOTANICAL_CLI_PROFILES` would add it. */
+export function cliPresetSpec(cli: CliName): CliProfileSpec {
+  const id = CLI_PROFILE_PRESET_IDS.find((preset) => PRESET_LABELS[preset].cli === cli) ?? "grok-build";
+  return presetSpec(id);
+}
+
 /** Explicit profiles win. Shortcut entries fill ids that were not already declared. */
 export function mergeCliProfiles(explicit: readonly CliProfileSpec[], shortcut: readonly CliProfileSpec[]): CliProfileSpec[] {
   const ids = new Set(explicit.map((spec) => spec.id));

@@ -1,9 +1,7 @@
 "use client";
 
-import { SquareTerminal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { EmptyState } from "@botanical/ui/components/empty-state";
 import { StatusBadge } from "@botanical/ui/components/status-badge";
 import { Button } from "@botanical/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@botanical/ui/components/card";
@@ -20,6 +18,7 @@ import {
   type CliLogin,
   type CliRow,
 } from "@/lib/cli-api";
+import { useWorkspace } from "@/components/workspace-provider";
 
 const TERMINAL: Record<CliId, string> = {
   grok: "docker compose exec -u botanical server grok login --device-auth",
@@ -28,6 +27,7 @@ const TERMINAL: Record<CliId, string> = {
 };
 
 export function CliPanel() {
+  const { refresh } = useWorkspace();
   const [rows, setRows] = useState<CliRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -87,6 +87,10 @@ export function CliPanel() {
       const next = await installCli(row.cli, row.status === "installed");
       setRows((current) => current?.map((item) => (item.cli === next.cli ? next : item)) ?? [next]);
       if (next.status === "failed") toast.error(next.lastError ?? "Install failed.");
+      else if (next.enabled && !row.enabled) {
+        toast.success(`${next.label} installed. Log in to use it in chats.`);
+        await refresh().catch(() => undefined);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Install failed.");
       await load().catch(() => undefined);
@@ -153,52 +157,46 @@ export function CliPanel() {
           {error}
         </p>
       ) : null}
-      {rows && rows.length === 0 ? (
-        <EmptyState
-          icon={SquareTerminal}
-          title="No coding CLIs enabled"
-          body="Set BOTANICAL_CLI_PROFILES to grok-build, claude-code, or codex (comma-separated) and recreate the server container. Then install and sign in here."
-          bordered
-        />
-      ) : (
-        rows?.map((row) => (
-          <Card key={row.cli}>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex flex-wrap items-center gap-2">
-                {row.label}
-                <InstallStatus row={row} />
-                <LoginBadge loggedIn={row.loggedIn} />
-              </CardTitle>
-              <CardDescription className="font-mono text-xs">
-                {row.cli}
-                {row.arch ? ` · ${row.arch}` : ""}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {row.lastError ? <p className="text-sm text-muted-foreground">{row.lastError}</p> : null}
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => void onInstall(row)} disabled={busy !== null || row.status === "installing"}>
-                  {row.status === "installing" ? "Installing…" : row.status === "installed" ? "Update" : "Install"}
+      {rows?.map((row) => (
+        <Card key={row.cli}>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex flex-wrap items-center gap-2">
+              {row.label}
+              <InstallStatus row={row} />
+              <LoginBadge loggedIn={row.loggedIn} />
+            </CardTitle>
+            <CardDescription className="font-mono text-xs">
+              {row.cli}
+              {row.arch ? ` · ${row.arch}` : ""}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!row.enabled && row.status !== "installing" ? (
+              <p className="text-sm text-muted-foreground">Install to add {row.label} to the model list.</p>
+            ) : null}
+            {row.lastError ? <p className="text-sm text-muted-foreground">{row.lastError}</p> : null}
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => void onInstall(row)} disabled={busy !== null || row.status === "installing"}>
+                {row.status === "installing" ? "Installing…" : row.status === "installed" ? "Update" : "Install"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void onLogin(row)}
+                disabled={busy !== null || row.status !== "installed"}
+              >
+                Log in
+              </Button>
+              {login?.cli === row.cli && (login.state === "pending" || login.state === "needs_input") ? (
+                <Button size="sm" variant="outline" onClick={() => void onCancel(row.cli)} disabled={busy !== null}>
+                  Cancel
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void onLogin(row)}
-                  disabled={busy !== null || row.status !== "installed"}
-                >
-                  Log in
-                </Button>
-                {login?.cli === row.cli && (login.state === "pending" || login.state === "needs_input") ? (
-                  <Button size="sm" variant="outline" onClick={() => void onCancel(row.cli)} disabled={busy !== null}>
-                    Cancel
-                  </Button>
-                ) : null}
-              </div>
-              {login?.cli === row.cli ? <LoginPanel login={login} paste={paste} setPaste={setPaste} onPaste={() => void onPaste(row.cli)} busy={busy !== null} /> : null}
-            </CardContent>
-          </Card>
-        ))
-      )}
+              ) : null}
+            </div>
+            {login?.cli === row.cli ? <LoginPanel login={login} paste={paste} setPaste={setPaste} onPaste={() => void onPaste(row.cli)} busy={busy !== null} /> : null}
+          </CardContent>
+        </Card>
+      ))}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle>Terminal fallback</CardTitle>

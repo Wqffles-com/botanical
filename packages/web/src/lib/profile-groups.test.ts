@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { groupProfilesByProvider, modelLabel, profileForProvider, type PickableProfile } from "./profile-groups";
 
 const profiles: PickableProfile[] = [
-  { id: "mock", name: "Mock", provider: "mock", model: "echo", kind: "api" },
+  { id: "grok", name: "Grok", provider: "xai", model: "grok-4", kind: "api" },
   { id: "deepseek", name: "DeepSeek", provider: "deepseek", model: "deepseek-chat", kind: "api" },
   { id: "deepseek-r1", name: "DeepSeek R1", provider: "deepseek", model: "deepseek-reasoner", kind: "api" },
   { id: "claude-code", name: "Claude Code", provider: "cli", model: "claude", kind: "cli", cli: "claude", defaultModel: true },
@@ -24,7 +24,7 @@ describe("groupProfilesByProvider", () => {
   test("lists vendors and harnesses as providers, with their profiles as models", () => {
     const groups = groupProfilesByProvider(profiles);
     expect(groups.map((group) => [group.label, group.kind, group.profiles.map((profile) => profile.id)])).toEqual([
-      ["Mock", "api", ["mock"]],
+      ["xAI", "api", ["grok"]],
       ["DeepSeek", "api", ["deepseek", "deepseek-r1"]],
       ["Claude Code", "cli", ["claude-code", "claude-opus"]],
       ["Grok Build", "cli", ["grok-build"]],
@@ -57,7 +57,7 @@ describe("profileForProvider", () => {
   test("keeps the current profile inside the provider, else takes the first that can run", () => {
     const [, deepseek, claude, grok] = groupProfilesByProvider(profiles);
     expect(profileForProvider(deepseek!, "deepseek-r1")?.id).toBe("deepseek-r1");
-    expect(profileForProvider(deepseek!, "mock")?.id).toBe("deepseek");
+    expect(profileForProvider(deepseek!, "grok")?.id).toBe("deepseek");
     expect(profileForProvider(claude!, null)?.id).toBe("claude-code");
     expect(profileForProvider(grok!, null)).toBeNull();
   });

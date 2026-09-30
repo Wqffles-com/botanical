@@ -10,7 +10,7 @@ import { clearCliAvailabilityCache } from "@botanical/providers";
 import { agentWorkspace } from "../src/runtime/workspace.ts";
 import { CLI_MCP_PATH } from "../src/cli-mcp.ts";
 import { createDefaultToolRegistry } from "../src/tools/catalog.ts";
-import { bearer, login, readJson, setup } from "./helpers.ts";
+import { bearer, login, readJson, setup , ECHO_PROFILE } from "./helpers.ts";
 
 const fixture = fileURLToPath(new URL("../../providers/test/fixtures/fake-cli.ts", import.meta.url));
 chmodSync(fixture, 0o755);
@@ -266,7 +266,7 @@ describe("per-run CLI MCP", () => {
     process.env.BOTANICAL_CLI_HOME = cliHome;
     process.env.FAKE_CLI_MODE = "mcp-call";
     const profiles = [
-      { id: "mock", name: "Mock", provider: "mock", model: "echo" },
+      ECHO_PROFILE,
       { id: "grok-build", kind: "cli", cli: "grok", label: "Grok Build", bin: fixture, timeoutMs: 20_000 },
     ];
     const { app, store } = setup({ BOTANICAL_PROFILES: JSON.stringify(profiles) });
@@ -358,7 +358,7 @@ describe("per-run CLI MCP", () => {
     process.env.BOTANICAL_CLI_HOME = cliHome;
     process.env.FAKE_CLI_MODE = "capture";
     const profiles = [
-      { id: "mock", name: "Mock", provider: "mock", model: "echo" },
+      ECHO_PROFILE,
       { id: "grok-build", kind: "cli", cli: "grok", label: "Grok Build", bin: fixture, timeoutMs: 20_000 },
     ];
     const { app } = setup({ BOTANICAL_PROFILES: JSON.stringify(profiles) });

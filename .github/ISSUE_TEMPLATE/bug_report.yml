@@ -41,7 +41,7 @@ body:
     id: provider
     attributes:
       label: Model profile / provider involved (if any)
-      placeholder: e.g. anthropic, openai-compat, claude-code CLI, mock
+      placeholder: e.g. anthropic, openai-compat, claude-code CLI
   - type: textarea
     id: logs
     attributes:

@@ -19,13 +19,13 @@ describe("agent identity mapping", () => {
       toolIds: ["web_search", { id: "files" }],
       icon: "Sprout",
       color: "green",
-      default_profile_id: "mock",
+      default_profile_id: "grok",
     });
     expect(agent.prompt).toBe("You garden.");
     expect(agent.tools).toEqual(["web_search", "files"]);
     expect(agent.icon).toBe("Sprout");
     expect(agent.color).toBe("green");
-    expect(agent.defaultProfileId).toBe("mock");
+    expect(agent.defaultProfileId).toBe("grok");
   });
 
   test("unwraps list envelopes", () => {
@@ -124,9 +124,9 @@ describe("agent identity mapping", () => {
     expect(tools[0]?.id).toBe("web_search");
     expect(tools[1]?.id).toBe("shell");
     const profiles = profilesFromUnknown({
-      profiles: [{ id: "mock", name: "Mock", provider: "mock", model: "mock" }],
+      profiles: [{ id: "grok", name: "Grok", provider: "xai", model: "grok-4" }],
     });
-    expect(profiles[0]?.id).toBe("mock");
+    expect(profiles[0]?.id).toBe("grok");
   });
 
   test("filters agents by name and description", () => {

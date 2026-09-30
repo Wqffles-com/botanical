@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { bearer, createAgent, login, readJson, setup } from "./helpers.ts";
+import { bearer, createAgent, login, readJson, setup , ECHO_PROFILE } from "./helpers.ts";
 
 const PROFILES = [
-  { id: "mock", name: "Mock", provider: "mock", model: "echo" },
+  ECHO_PROFILE,
   { id: "grok", name: "Grok", provider: "xai", model: "grok-4" },
 ];
 
@@ -24,7 +24,7 @@ function send(app: App, token: string, method: string, path: string, body?: unkn
 }
 
 async function openChat(app: App, token: string, agentId: string, memberIds: string[] = []) {
-  const response = await send(app, token, "POST", "/api/chats", { agentId, profileId: "mock", memberIds });
+  const response = await send(app, token, "POST", "/api/chats", { agentId, profileId: "echo", memberIds });
   return (await readJson<{ chat: { id: string; memberIds: string[] } }>(response)).chat;
 }
 
@@ -44,7 +44,7 @@ describe("one chat per agent", () => {
     const none = await readJson<{ chat: unknown }>(await send(app, token, "GET", `/api/agents/${ada.id}/chat`));
     expect(none.chat).toBeNull();
 
-    const first = await send(app, token, "POST", "/api/chats", { agentId: ada.id, profileId: "mock" });
+    const first = await send(app, token, "POST", "/api/chats", { agentId: ada.id, profileId: "echo" });
     expect(first.status).toBe(201);
     const own = (await readJson<{ chat: { id: string; title: string } }>(first)).chat;
     expect(own.title).toBe("Ada");
@@ -94,7 +94,7 @@ describe("one chat per agent", () => {
         prompt: "Look at the ferns",
         cron: "0 9 * * *",
         timezone: "UTC",
-        profileId: "mock",
+        profileId: "echo",
       }),
     );
     await send(app, token, "POST", `/api/routines/${routine.routine.id}/run`, {});
@@ -130,7 +130,7 @@ describe("one chat per agent", () => {
     expect(nothing.status).toBe(409);
     expect((await readJson<{ error: { code: string } }>(nothing)).error.code).toBe("nothing_to_compact");
 
-    await send(app, token, "POST", `/api/chats/${chat.id}/messages`, { content: "Water the ferns", profileId: "mock" });
+    await send(app, token, "POST", `/api/chats/${chat.id}/messages`, { content: "Water the ferns", profileId: "echo" });
     const compacted = await send(app, token, "POST", `/api/chats/${chat.id}/compact`, {});
     expect(compacted.status).toBe(201);
     const summary = (await readJson<{ message: { role: string; name: string; content: string } }>(compacted)).message;

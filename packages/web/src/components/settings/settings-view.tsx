@@ -300,7 +300,7 @@ function ProfilesTab({
         <EmptyState
           icon={Layers}
           title="No model profiles"
-          body="The server only lists profiles whose provider key is set, plus mock. Set a key and reload."
+          body="The server only lists profiles whose provider key is set. Set a key and reload."
           bordered
         />
       ) : (

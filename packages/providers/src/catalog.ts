@@ -77,16 +77,6 @@ export function builtinApiProfiles(): ListedProfile[] {
   return profiles;
 }
 
-export function defaultMockProfile(): ListedProfile {
-  return {
-    id: "mock",
-    name: "Mock",
-    provider: "mock",
-    model: "echo",
-    description: "In-process echo. No API key.",
-  };
-}
-
 export function compatApiKeyEnv(env: Env): string {
   if (isApiKeyConfigured(OPENAI_COMPAT_API_KEY_ENV, env)) return OPENAI_COMPAT_API_KEY_ENV;
   if (isApiKeyConfigured(LEGACY_COMPAT_API_KEY_ENV, env)) return LEGACY_COMPAT_API_KEY_ENV;
@@ -99,8 +89,6 @@ export function compatBaseUrl(env: Env): string | undefined {
 
 export function providerConfigured(provider: ProviderType, env: Env, baseUrl?: string): boolean {
   switch (provider) {
-    case "mock":
-      return true;
     case "openai":
     case "anthropic":
     case "xai":
@@ -119,17 +107,14 @@ export function providerConfigured(provider: ProviderType, env: Env, baseUrl?: s
 /**
  * `override` replaces the built-in one-profile-per-provider list.
  * `undefined` means "no override" (use the built-in list). An empty array
- * means the operator listed nothing, so only mock remains.
- * Profiles whose provider key is missing are omitted. Mock is always present.
+ * means the operator listed nothing, so no profiles remain.
+ * Profiles whose provider key is missing are omitted.
  * Nothing in the result is a default selection.
  */
 export function selectProfiles(override: readonly ListedProfile[] | undefined, env: Env): ListedProfile[] {
   const source = override === undefined ? autoProfiles(env) : override.map((profile) => ({ ...profile }));
   const kept: ListedProfile[] = [];
   for (const profile of source) {
-    if (profile.id === "mock" && profile.provider !== "mock") {
-      throw new ProviderError('Profile id "mock" is reserved for the mock provider.', { code: "config" });
-    }
     const baseUrl = profile.provider === "openai-compat" ? resolveCompatBase(profile, env) : profile.baseUrl;
     if (!providerConfigured(profile.provider, env, baseUrl)) continue;
     const next: ListedProfile = { ...profile, description: profile.description ?? null };
@@ -139,11 +124,7 @@ export function selectProfiles(override: readonly ListedProfile[] | undefined, e
     }
     kept.push(next);
   }
-
-  const mocks = kept.filter((profile) => profile.provider === "mock");
-  const rest = kept.filter((profile) => profile.provider !== "mock");
-  if (!mocks.some((profile) => profile.id === "mock")) mocks.unshift(defaultMockProfile());
-  return [...mocks, ...rest];
+  return kept;
 }
 
 /**
@@ -213,16 +194,12 @@ export function createConfiguredRegistry(
   options: RegistryOptions = {},
 ): ProviderRegistry {
   const env = options.env ?? process.env;
-  const providers: ProviderConfig[] = [{ id: "mock", type: "mock" }];
-  const seenProviders = new Set<string>(["mock"]);
+  const providers: ProviderConfig[] = [];
+  const seenProviders = new Set<string>();
   const compatIds = compatProviderIds(profiles, env);
   const registryProfiles: ModelProfile[] = [];
 
   for (const profile of profiles) {
-    if (profile.provider === "mock") {
-      registryProfiles.push(toRegistryProfile(profile, "mock"));
-      continue;
-    }
     if (profile.provider === "openai-compat") {
       const base = profile.baseUrl ?? compatBaseUrl(env);
       if (!base) {

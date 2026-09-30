@@ -22,10 +22,8 @@ const KEYS = {
 } as const;
 
 describe("profile catalog", () => {
-  test("lists mock only when no provider key is set", () => {
-    const profiles = selectProfiles(undefined, {});
-    expect(profiles.map((profile) => profile.id)).toEqual(["mock"]);
-    expect(profiles[0]?.provider).toBe("mock");
+  test("lists nothing when no provider key is set", () => {
+    expect(selectProfiles(undefined, {})).toEqual([]);
   });
 
   test("adds a profile per known model of each configured provider and never a default", () => {
@@ -33,12 +31,11 @@ describe("profile catalog", () => {
       const profiles = selectProfiles(undefined, { [envName]: "secret" });
       const known = API_KNOWN_MODELS[provider as HostedProvider];
       expect(profiles.map((profile) => profile.id)).toEqual([
-        "mock",
         provider,
         ...known.slice(1).map((model) => modelProfileId(provider, model)),
       ]);
-      expect(profiles.slice(1).map((profile) => profile.model)).toEqual([...known]);
-      expect(profiles.slice(1).every((profile) => profile.provider === provider)).toBe(true);
+      expect(profiles.map((profile) => profile.model)).toEqual([...known]);
+      expect(profiles.every((profile) => profile.provider === provider)).toBe(true);
       // Global profile names are unique.
       expect(new Set(profiles.map((profile) => profile.name)).size).toBe(profiles.length);
     }
@@ -59,21 +56,19 @@ describe("profile catalog", () => {
   });
 
   test("ignores blank keys and lists openai-compat only when base URL and key are both set", () => {
-    expect(selectProfiles(undefined, { OPENAI_API_KEY: "  " }).map((profile) => profile.id)).toEqual(["mock"]);
+    expect(selectProfiles(undefined, { OPENAI_API_KEY: "  " }).map((profile) => profile.id)).toEqual([]);
     expect(
       selectProfiles(undefined, { OPENAI_COMPAT_BASE_URL: "http://127.0.0.1:11434/v1" }).map((profile) => profile.id),
-    ).toEqual(["mock"]);
-    expect(selectProfiles(undefined, { OPENAI_COMPAT_API_KEY: "local-key" }).map((profile) => profile.id)).toEqual([
-      "mock",
-    ]);
+    ).toEqual([]);
+    expect(selectProfiles(undefined, { OPENAI_COMPAT_API_KEY: "local-key" }).map((profile) => profile.id)).toEqual([]);
 
     const listed = selectProfiles(undefined, {
       OPENAI_COMPAT_BASE_URL: "http://127.0.0.1:11434/v1",
       OPENAI_COMPAT_API_KEY: "local-key",
       OPENAI_COMPAT_MODEL: "llama3.1",
     });
-    expect(listed.map((profile) => profile.id)).toEqual(["mock", "openai-compat"]);
-    expect(listed[1]).toMatchObject({
+    expect(listed.map((profile) => profile.id)).toEqual(["openai-compat"]);
+    expect(listed[0]).toMatchObject({
       provider: "openai-compat",
       model: "llama3.1",
       baseUrl: "http://127.0.0.1:11434/v1",
@@ -97,7 +92,7 @@ describe("profile catalog", () => {
       ],
     });
     const profiles = selectProfiles(override, { DEEPSEEK_API_KEY: "ds", ANTHROPIC_API_KEY: "ant" });
-    expect(profiles.map((profile) => profile.id)).toEqual(["mock", "fast", "reason"]);
+    expect(profiles.map((profile) => profile.id)).toEqual(["fast", "reason"]);
     expect(profiles.find((profile) => profile.id === "reason")?.name).toBe("claude-sonnet-4-5");
     expect(profiles.find((profile) => profile.id === "reason")?.maxTokens).toBe(4096);
   });
@@ -111,7 +106,6 @@ describe("profile catalog", () => {
     });
     const profiles = selectProfiles(override, { OPENAI_API_KEY: "sk", XAI_API_KEY: "xk" });
     expect(profiles.map((profile) => `${profile.id}:${profile.model}`)).toEqual([
-      "mock:echo",
       "openai-gpt-4-1:gpt-4.1",
       "openai-gpt-4-1-mini:gpt-4.1-mini",
       "xai:grok-4",
@@ -129,12 +123,6 @@ describe("profile catalog", () => {
         { id: "a", name: "B", provider: "openai", model: "gpt-4.1-mini" },
       ]),
     ).toThrow(ProviderError);
-    expect(() =>
-      selectProfiles(
-        [{ id: "mock", name: "Nope", provider: "openai", model: "gpt-4.1", description: null }],
-        { OPENAI_API_KEY: "sk" },
-      ),
-    ).toThrow(/reserved/);
   });
 
   test("reads a profiles file ahead of inline JSON", () => {
@@ -147,7 +135,7 @@ describe("profile catalog", () => {
       JSON.stringify({ profiles: [{ id: "from-file", name: "File", provider: "openai", model: "gpt-4.1" }] }),
     );
     const profiles = selectProfiles(parseProfilesDocument(raw), env);
-    expect(profiles.map((profile) => profile.id)).toEqual(["mock", "from-file"]);
+    expect(profiles.map((profile) => profile.id)).toEqual(["from-file"]);
   });
 
   test("a missing or empty profiles file is a config error and a blank inline value is no override", () => {
@@ -163,7 +151,7 @@ describe("profile catalog", () => {
     const profiles = selectProfiles(undefined, { XAI_API_KEY: "xk" });
     const registry = createConfiguredRegistry(profiles, { env: { XAI_API_KEY: "xk" } });
     const bridge = createRuntimeBridge(registry);
-    expect((await bridge.list()).map((profile) => profile.id)).toEqual(["mock", "xai", "xai--grok-code-fast-1"]);
+    expect((await bridge.list()).map((profile) => profile.id)).toEqual(["xai", "xai--grok-code-fast-1"]);
     await expect(bridge.resolve("")).rejects.toMatchObject({ code: "PROFILE_REQUIRED" });
     await expect(bridge.resolve("missing")).rejects.toMatchObject({ code: "PROFILE_NOT_FOUND" });
   });

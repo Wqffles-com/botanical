@@ -15,7 +15,7 @@ export function registerCli(router: Router, service: CliService): void {
     "POST",
     "/api/cli/:cli/install",
     authed(async (ctx) => {
-      const cli = requireEnabled(ctx, service);
+      const cli = requireKnown(ctx);
       const update = await wantsUpdate(ctx);
       const row = await service.install(cli, update, ctx.user?.id ?? "");
       return json(200, { cli: row });
@@ -26,7 +26,7 @@ export function registerCli(router: Router, service: CliService): void {
     "POST",
     "/api/cli/:cli/login",
     authed((ctx) => {
-      const cli = requireEnabled(ctx, service);
+      const cli = requireKnown(ctx);
       try {
         return json(200, { login: service.loginStart(cli, ctx.user?.id ?? "") });
       } catch (error) {
@@ -40,7 +40,7 @@ export function registerCli(router: Router, service: CliService): void {
     "GET",
     "/api/cli/:cli/login",
     authed((ctx) => {
-      const cli = requireEnabled(ctx, service);
+      const cli = requireKnown(ctx);
       return json(200, { login: service.loginGet(cli, ctx.user?.id ?? "") });
     }),
   );
@@ -49,7 +49,7 @@ export function registerCli(router: Router, service: CliService): void {
     "POST",
     "/api/cli/:cli/login/input",
     authed(async (ctx) => {
-      const cli = requireEnabled(ctx, service);
+      const cli = requireKnown(ctx);
       const body = await readJson(ctx.request, ctx.config);
       if (!isRecord(body) || typeof body.input !== "string") {
         throw new HttpError(400, "invalid_body", "input must be a string");
@@ -67,16 +67,16 @@ export function registerCli(router: Router, service: CliService): void {
     "DELETE",
     "/api/cli/:cli/login",
     authed((ctx) => {
-      const cli = requireEnabled(ctx, service);
+      const cli = requireKnown(ctx);
       return json(200, { login: service.loginCancel(cli, ctx.user?.id ?? "") });
     }),
   );
 }
 
-function requireEnabled(ctx: RequestContext, service: CliService): string {
+function requireKnown(ctx: RequestContext): string {
   const name = ctx.params.cli ?? "";
-  if (!isCliName(name) || !service.describe(name)) {
-    throw new HttpError(404, "not_found", "Unknown or disabled CLI");
+  if (!isCliName(name)) {
+    throw new HttpError(404, "not_found", "Unknown CLI");
   }
   return name;
 }

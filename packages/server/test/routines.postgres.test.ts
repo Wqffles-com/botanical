@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { loadConfig } from "../src/config.ts";
+import { defaultProviderFetch, ECHO_PROFILE } from "./helpers.ts";
 import { createStore } from "../src/db/store.ts";
 import { createScheduler } from "../src/routines/scheduler.ts";
 import { createTurnCoordinator } from "../src/runtime/turns.ts";
@@ -21,8 +22,9 @@ describe("postgres routine claim", () => {
     const config = loadConfig({
       BOTANICAL_PASSWORD: "correct horse",
       DATABASE_URL: databaseUrl,
-      BOTANICAL_PROFILES: JSON.stringify([{ id: "mock", name: "Mock", provider: "mock", model: "echo" }]),
-    });
+      BOTANICAL_PROFILES: JSON.stringify([ECHO_PROFILE]),
+      XAI_API_KEY: "test-xai-key",
+    }, { fetch: defaultProviderFetch });
     const store = await createStore(config);
     try {
       for (const routine of await store.routines.list()) await store.routines.delete(routine.id);
@@ -46,7 +48,7 @@ describe("postgres routine claim", () => {
         prompt: "Check",
         cron: "0 * * * *",
         timezone: "UTC",
-        profileId: "mock",
+        profileId: "echo",
         enabled: true,
         nextRunAt: "2026-06-15T07:00:00.000Z",
       });
@@ -56,7 +58,7 @@ describe("postgres routine claim", () => {
         prompt: "No",
         cron: "0 * * * *",
         timezone: "UTC",
-        profileId: "mock",
+        profileId: "echo",
         enabled: false,
         nextRunAt: "2026-06-15T07:00:00.000Z",
       });
@@ -125,7 +127,7 @@ describe("postgres routine claim", () => {
         prompt: "No",
         cron: "0 * * * *",
         timezone: "UTC",
-        profileId: "mock",
+        profileId: "echo",
         enabled: true,
         nextRunAt: "2026-06-15T12:00:00.000Z",
       });

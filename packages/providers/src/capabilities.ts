@@ -53,14 +53,6 @@ export const DEFAULT_CAPABILITIES: Record<ProviderType, ModelCapabilities> = {
     streaming: true,
     reasoning: false,
   },
-  mock: {
-    tools: true,
-    parallelTools: true,
-    vision: false,
-    maxContext: 8_192,
-    streaming: true,
-    reasoning: false,
-  },
 };
 
 export function capabilitiesFor(

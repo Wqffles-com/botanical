@@ -19,14 +19,13 @@ Streaming model adapters and headless coding-CLI profiles. This is the only pack
 | `packages/providers/src/openai-client.ts` | OpenAI-compatible chat-completions stream |
 | `packages/providers/src/anthropic.ts` | Messages stream for type `anthropic` |
 | `packages/providers/src/sse.ts` | SSE parser for provider HTTP |
-| `packages/providers/src/mock.ts` | `createMockProvider` |
 | `packages/providers/src/runtime.ts` | Bridge into the agent-runtime provider shape |
 | `packages/providers/src/capabilities.ts` | Per-model capability flags |
 | `packages/providers/src/collect.ts` | `collectChat` test helper |
 | `packages/providers/src/cli` | Install, login, args, and `runCli` for CLI profiles. `runCli` `input` writes mid-turn messages to Claude Code's stream-json stdin |
 | `packages/providers/test` | `bun test` |
 
-Provider type ids: `openai`, `anthropic`, `xai`, `deepseek`, `openrouter`, `openai-compat`, `mock`. CLI names in `packages/providers/src/cli/types.ts`: `grok`, `claude`, `codex`. Preset profile ids: `grok-build`, `claude-code`, `codex`. `expandCliModels` (`packages/providers/src/cli/config.ts`) lists each CLI profile's `models` (default `CLI_KNOWN_MODELS` in `types.ts`) as sibling profiles `<id>--<model>` for the model picker.
+Provider type ids: `openai`, `anthropic`, `xai`, `deepseek`, `openrouter`, `openai-compat`. CLI names in `packages/providers/src/cli/types.ts`: `grok`, `claude`, `codex`. Preset profile ids: `grok-build`, `claude-code`, `codex`. `expandCliModels` (`packages/providers/src/cli/config.ts`) lists each CLI profile's `models` (default `CLI_KNOWN_MODELS` in `types.ts`) as sibling profiles `<id>--<model>` for the model picker.
 
 With no profiles override, each configured hosted provider lists every model in `API_KNOWN_MODELS` (`packages/providers/src/models.ts`): the provider id on the first, `<provider>--<model>` on the rest. `RETIRED_MODELS` maps removed vendor ids to replacements; `seedInstance` in `packages/server/src/db/store.ts` rewrites stored profiles on boot and `POST /api/admin/profiles` refuses them.
 
@@ -34,7 +33,7 @@ With no profiles override, each configured hosted provider lists every model in 
 
 ## Exports
 
-`createRegistry`, `builtinProviderConfigs`, `parseProfilesDocument`, `selectProfiles`, `readProfilesOverride`, `mergeCliProfiles`, `parseCliProfileShortcut`, `createRuntimeBridge`, `resolveApiKey`, `runCli`, `CliInstaller`, `LoginManager`, `createMockProvider`.
+`createRegistry`, `builtinProviderConfigs`, `parseProfilesDocument`, `selectProfiles`, `readProfilesOverride`, `mergeCliProfiles`, `parseCliProfileShortcut`, `cliPresetSpec`, `createRuntimeBridge`, `resolveApiKey`, `runCli`, `CliInstaller`, `LoginManager`.
 
 ## Env vars
 

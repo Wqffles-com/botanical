@@ -10,7 +10,6 @@ export const PROVIDER_TYPES = [
   "deepseek",
   "openrouter",
   "openai-compat",
-  "mock",
 ] as const;
 
 export type ProviderType = (typeof PROVIDER_TYPES)[number];
@@ -99,21 +98,13 @@ export interface OpenRouterRouting {
   ignore?: string[];
 }
 
-export interface MockScript {
-  reply?: string | ((req: ChatRequest) => string);
-  events?: ChatEvent[] | ((req: ChatRequest) => ChatEvent[]);
-  /** Characters per text chunk when `reply` is used. Default 12. */
-  chunkSize?: number;
-  capabilities?: Partial<ModelCapabilities>;
-}
-
 export interface ProviderConfig {
   id: string;
   type: ProviderType;
   /**
    * Environment variable on the server that holds the API key.
    * The key value is never stored in config.
-   * Omitted for `mock`. Optional for `openai-compat` (no Authorization header).
+   * Optional for `openai-compat` (no Authorization header).
    * Other types default to the canonical `*_API_KEY` name.
    */
   apiKeyEnv?: string;
@@ -129,8 +120,6 @@ export interface ProviderConfig {
   /** Anthropic Messages API version header. Default `2023-06-01`. */
   anthropicVersion?: string;
   capabilities?: Record<string, Partial<ModelCapabilities>>;
-  /** Used only when `type` is `mock`. */
-  mock?: MockScript;
 }
 
 export interface ModelProfile {

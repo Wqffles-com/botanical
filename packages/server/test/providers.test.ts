@@ -29,7 +29,7 @@ async function postJson(
 }
 
 describe("GET /api/profiles", () => {
-  test("returns mock only until a provider key is set, and never a default", async () => {
+  test("returns nothing until a provider key is set, and never a default", async () => {
     const { app } = setup({
       BOTANICAL_PROFILES: "",
       XAI_API_KEY: "",
@@ -40,7 +40,7 @@ describe("GET /api/profiles", () => {
       await app.fetch(new Request("http://localhost/api/profiles", { headers: bearer(token) })),
     );
     expect(body.defaultProfileId).toBeNull();
-    expect(body.profiles.map((profile) => profile.id)).toEqual(["mock"]);
+    expect(body.profiles.map((profile) => profile.id)).toEqual([]);
   });
 
   test("lists one profile for each configured key and the compat host", async () => {
@@ -58,7 +58,6 @@ describe("GET /api/profiles", () => {
       await app.fetch(new Request("http://localhost/api/profiles", { headers: bearer(token) })),
     );
     expect(body.profiles.map((profile) => profile.id)).toEqual([
-      "mock",
       "openai",
       "openai--gpt-5-4",
       "openai--gpt-5-mini",
@@ -91,14 +90,14 @@ describe("GET /api/profiles", () => {
           }),
       },
     );
-    expect(config.profiles.map((profile) => profile.id)).toEqual(["mock", "grok-mini"]);
+    expect(config.profiles.map((profile) => profile.id)).toEqual(["grok-mini"]);
     const hosted = createApp({ config, store: createMemoryStore() });
     const { token } = await login(hosted);
     const body = await readJson<{ profiles: { id: string; model: string }[]; defaultProfileId: null }>(
       await hosted.fetch(new Request("http://localhost/api/profiles", { headers: bearer(token) })),
     );
     expect(body.defaultProfileId).toBeNull();
-    expect(body.profiles.map((profile) => profile.model)).toEqual(["echo", "grok-3"]);
+    expect(body.profiles.map((profile) => profile.model)).toEqual(["grok-3"]);
   });
 });
 
