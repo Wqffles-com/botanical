@@ -18,6 +18,7 @@ import { toolAccess } from "./permissions";
 import { trimToBudget } from "./context";
 import { sinceCompaction } from "./compaction";
 import { buildSystemPrompt, type GroupContext } from "./prompt";
+import { isSentMessage, replyIds, withMessageTool } from "./replies";
 import type { ChatMessage, LiveInput, SteeringMessage, TurnSteering } from "./provider";
 import type { AgentMessageBus } from "./bus";
 import type { MessageRepository } from "./store";
@@ -148,6 +149,8 @@ export async function* runAgentTurn(
   const group = groupContext(chat, agent.id, names);
   const cwd = deps.workspaceFor?.(agent.id);
 
+  // `send_message` rides along with the server's tools on every turn.
+  const toolSources = withMessageTool(deps.toolSources, deps.store.messages);
   const steering = input.steering;
   // Messages a provider took as live input, stored at its next event.
   const taken: SteeringMessage[] = [];
@@ -183,7 +186,7 @@ export async function* runAgentTurn(
     }
     yield { type: "step", step };
 
-    const catalog = await collectTools(deps.toolSources);
+    const catalog = await collectTools(toolSources);
     const visibleTools = catalog.filter((tool) => toolAccess(agent, tool).ok);
     const budget = profile.provider.capabilities(profile.model).maxContext;
     const requestMessages = trimToBudget(toProviderMessages(agent, transcript, recalled, chat, group, names), budget);
@@ -298,7 +301,7 @@ export async function* runAgentTurn(
         return;
       }
       // agentId is the executing agent. File tools and shell cwd use it; tool arguments cannot replace it.
-      const executed = await executeCall(deps, agent, catalog, call, {
+      const executed = await executeCall({ toolSources }, agent, catalog, call, {
         agentId: agent.id,
         chatId: chat.id,
         signal: input.signal,
@@ -365,17 +368,20 @@ function toProviderMessages(
   const messages: ChatMessage[] = [
     { role: "system", content: buildSystemPrompt(agent, memories, group, summary?.content) },
   ];
+  const replies = group ? replyIds(records, chat.agentId) : new Set<string>();
   for (const record of records) {
     if (record.role === "system") continue;
     // In a group chat, another agent's reply is something said to this agent, not its own words.
-    // Its tool calls and results are its own business and stay out.
+    // Its tool calls, results, and notes are its own business and stay out.
     const author = record.role === "assistant" || record.role === "tool" ? (record.agentId ?? chat.agentId) : null;
     if (group && author && author !== agent.id) {
-      if (record.role === "assistant" && record.content.trim()) {
+      if (replies.has(record.id)) {
         messages.push({ role: "user", content: `[${names.get(author) ?? "Another agent"}] ${record.content}` });
       }
       continue;
     }
+    // The agent's own sent messages are already in its send_message calls.
+    if (isSentMessage(record)) continue;
     const message: ChatMessage = { role: record.role, content: record.content };
     if (record.toolCallId) message.toolCallId = record.toolCallId;
     if (record.toolCalls) message.toolCalls = record.toolCalls;
@@ -433,7 +439,7 @@ export async function dispatchToolCall(
 }
 
 async function executeCall(
-  deps: RuntimeDeps,
+  deps: Pick<RuntimeDeps, "toolSources">,
   agent: AgentRecord,
   catalog: readonly ListedTool[],
   call: ToolCall,

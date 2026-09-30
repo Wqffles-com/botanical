@@ -63,7 +63,7 @@ describe("agent turn", () => {
     expect(request?.messages[0]?.role).toBe("system");
     expect(request?.messages[0]?.content).toContain("You keep the garden.");
     expect(request?.messages[0]?.content).toContain("Description: Tends the plots");
-    expect(request?.tools?.map((tool) => tool.name)).toEqual(["file_list"]);
+    expect(request?.tools?.map((tool) => tool.name)).toEqual(["send_message", "file_list"]);
     expect(request?.messages.some((message) => message.role === "user" && message.content === "Hello")).toBe(true);
   });
 

@@ -57,7 +57,7 @@ export {
   type SendAgentMessageInput,
 } from "./a2a";
 export { assertChatAgentBinding, chatParticipants, rejectAgentRebind } from "./binding";
-export { buildSystemPrompt, RESPONSE_STYLE } from "./prompt";
+export { buildSystemPrompt, MESSAGING, RESPONSE_STYLE } from "./prompt";
 export {
   AUTO_COMPACT_RATIO,
   COMPACTION_NAME,
@@ -115,6 +115,16 @@ export { createMemoryStore } from "./memory";
 export { createAgentMessageBus, type AgentMessageBus, type InboxQuery } from "./bus";
 export { DeliveryWorker } from "./worker";
 export { createRuntimeToolSource } from "./runtime-tools";
+export {
+  SEND_MESSAGE_MAX,
+  SEND_MESSAGE_TOOL,
+  SENT_MESSAGE_NAME,
+  createMessageToolSource,
+  isSentMessage,
+  replyIds,
+  withMessageTool,
+  type ReplyCandidate,
+} from "./replies";
 export { claimInbox, renderInbox } from "./inbox";
 export {
   DEFAULT_MAX_STEPS,

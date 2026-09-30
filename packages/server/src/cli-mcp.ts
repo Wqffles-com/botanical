@@ -7,6 +7,7 @@ import {
   dispatchToolCall,
   toolAccess,
   toolResultToContent,
+  withMessageTool,
   type AgentRecord,
   type ListedTool,
   type RuntimeDeps,
@@ -203,7 +204,7 @@ async function listTools(deps: RuntimeDeps, run: ToolRun): Promise<Array<Record<
   const agent = await deps.store.agents.get(run.agentId);
   // An empty list reads as "no tools" to the CLI. A missing agent is a fault.
   if (!agent) throw new Error(`Agent ${run.agentId} not found for this run`);
-  const catalog = await collectTools(deps.toolSources);
+  const catalog = await collectTools(withMessageTool(deps.toolSources, deps.store.messages));
   const visible = catalog.filter((tool) => toolAccess(agent, tool).ok);
   const names = facingNames(visible);
   return visible.map((tool) => ({
@@ -221,10 +222,12 @@ async function callTool(deps: RuntimeDeps, run: ToolRun, params: unknown): Promi
   }
   const agent = await deps.store.agents.get(run.agentId);
   if (!agent) return toolError("agent not found");
-  const catalog = await collectTools(deps.toolSources);
+  // `send_message` rides along with the server's tools, as in the model loop.
+  const toolSources = withMessageTool(deps.toolSources, deps.store.messages);
+  const catalog = await collectTools(toolSources);
   const resolved = resolveToolName(agent, catalog, requested);
   const result = await dispatchToolCall(
-    deps,
+    { toolSources },
     agent,
     catalog,
     { name: resolved, arguments: record.arguments ?? {} },

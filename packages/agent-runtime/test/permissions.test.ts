@@ -43,7 +43,7 @@ describe("permission dispatch", () => {
       tools: [fileWrite],
       call: "file_write",
     });
-    expect(provider.requests[0]?.tools?.map((tool) => tool.name)).toEqual(["file_write"]);
+    expect(provider.requests[0]?.tools?.map((tool) => tool.name)).toEqual(["send_message", "file_write"]);
     expect(resultText(events)).toContain("wrote");
     expect(events.some((event) => event.type === "tool-result" && event.isError)).toBe(false);
   });
@@ -55,7 +55,8 @@ describe("permission dispatch", () => {
       tools: [fileWrite],
       call: "file_write",
     });
-    expect(provider.requests[0]?.tools ?? []).toEqual([]);
+    // Only send_message, which needs no capability.
+    expect(provider.requests[0]?.tools?.map((tool) => tool.name)).toEqual(["send_message"]);
     const message = resultText(events);
     expect(message).toContain("lacks capability");
     expect(message).toContain("file.write");

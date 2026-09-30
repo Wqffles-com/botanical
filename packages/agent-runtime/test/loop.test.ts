@@ -252,7 +252,7 @@ describe("agent tool loop", () => {
     };
     deps.toolSources = [deps.toolSources[0]!, createBuiltinToolSource([guarded])];
     const events = await collect(deps, { chatId: chat.id, content: "try", profileId: "fast" });
-    expect(provider.requests[0]?.tools?.map((tool) => tool.name)).toEqual(["agent_send", "agent_inbox"]);
+    expect(provider.requests[0]?.tools?.map((tool) => tool.name)).toEqual(["send_message", "agent_send", "agent_inbox"]);
     expect(calls).toBe(0);
     const result = events.find((event) => event.type === "tool-result");
     expect(result).toMatchObject({ name: "echo", isError: true });
@@ -424,7 +424,7 @@ describe("agent tool loop", () => {
       script: [() => [{ type: "text-delta", text: "only me" }, { type: "done" }]],
     });
     await collect(deps, { chatId: chat.id, content: "hi", profileId: "fast" });
-    expect(provider.requests[0]?.tools).toEqual([]);
+    expect(provider.requests[0]?.tools?.map((tool) => tool.name)).toEqual(["send_message"]);
   });
 });
 

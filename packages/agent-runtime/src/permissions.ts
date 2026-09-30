@@ -2,13 +2,15 @@
  * Capability checks for built-in and MCP tools.
  *
  * Combination rule (2026-09-27): a tool is callable when the agent's allowlist
- * matches it (runtime A2A tools follow `a2aEnabled` instead) AND, when the
+ * matches it (runtime A2A tools follow `a2aEnabled` instead, and `send_message`
+ * is always allowed) AND, when the
  * agent has one or more roles, the union of those roles permits the tool.
  * Agents with no roles keep allowlist-only behavior so existing agents are
  * unchanged. Dispatch must call `toolAccess` even if the tool was omitted
  * from the model payload — models can name tools they were not offered.
  */
 
+import { SEND_MESSAGE_TOOL } from "./replies";
 import { parseMcpToolName, toolAllowed } from "./tools";
 
 export const CAPABILITIES = [
@@ -188,6 +190,8 @@ export type ToolAccess =
  * No roles → allowlist result stands.
  */
 export function toolAccess(agent: ToolAccessSubject, tool: ToolAccessTarget): ToolAccess {
+  // Talking to the user is not a capability. Without it the user never hears back.
+  if (tool.origin === "runtime" && tool.name === SEND_MESSAGE_TOOL) return { ok: true };
   if (tool.origin === "runtime") {
     if (!agent.a2aEnabled) {
       return { ok: false, kind: "allowlist", message: notAllowed(agent.name, tool.name) };

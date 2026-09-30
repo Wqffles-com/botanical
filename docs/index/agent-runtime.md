@@ -35,6 +35,7 @@ The agent loop: prompt assembly, provider call, tool dispatch, permissions, and 
 | `packages/agent-runtime/src/events.ts` | `RuntimeEvent` |
 | `packages/agent-runtime/src/errors.ts` | `ProfileRequiredError`, `BotanicalError`, and siblings |
 | `packages/agent-runtime/src/runtime-tools.ts` | `createRuntimeToolSource` |
+| `packages/agent-runtime/src/replies.ts` | `send_message` (`createMessageToolSource`, `withMessageTool`), `isSentMessage`, `replyIds`: which rows the user reads as replies |
 | `packages/agent-runtime/test` | `bun test` |
 
 The server enters the loop from `packages/server/src/runtime/turn.ts`.
@@ -55,7 +56,8 @@ None. Timeouts and credentials are supplied by the server and tool packages.
 
 - **Change a turn (steps, tool round trip, transcript).** `packages/agent-runtime/src/loop.ts`.
 - **Change compaction.** `packages/agent-runtime/src/compaction.ts`. `toProviderMessages` in `packages/agent-runtime/src/loop.ts` sends only the messages after the latest compaction row and passes its summary to `buildSystemPrompt` (an `## Earlier in this chat` section). `autoCompact` runs when those messages pass `AUTO_COMPACT_RATIO` of the profile's `maxContext`. Tests: `packages/agent-runtime/test/compaction.test.ts`.
-- **Change how a group chat reads to an agent.** `toProviderMessages` in `packages/agent-runtime/src/loop.ts` turns other agents' replies into `[Name] …` user messages and drops their tool rows. `buildSystemPrompt` in `packages/agent-runtime/src/prompt.ts` names the other participants.
+- **Change how an agent talks to the user.** `packages/agent-runtime/src/replies.ts`. Every agent has `send_message`, whatever its allowlist, roles, or A2A flag (`toolAccess`). The loop and the CLI MCP endpoint add it with `withMessageTool`. A call stores an assistant row named `send_message`; the agent's text output is only a note. `replyIds` picks the replies: an agent's sent messages in a round, or its text output when it sent none (older chats). `packages/core/src/chats.ts` has the same rule for the web. `MESSAGING` in `packages/agent-runtime/src/prompt.ts` tells the model. Tests: `packages/agent-runtime/test/replies.test.ts`.
+- **Change how a group chat reads to an agent.** `toProviderMessages` in `packages/agent-runtime/src/loop.ts` turns other agents' replies (`replyIds`) into `[Name] …` user messages and drops their notes and tool rows. `buildSystemPrompt` in `packages/agent-runtime/src/prompt.ts` names the other participants.
 - **Change mid-turn steering.** `runAgentTurn` in `packages/agent-runtime/src/loop.ts` takes `steering` messages before each model step and emits a `steer` event. It passes them to the provider as `ChatRequest.input` for live input.
 - **Change who may call a tool.** `packages/agent-runtime/src/permissions.ts` and the allowlist check in `packages/agent-runtime/src/tools.ts`.
 - **Add a builtin the loop can call.** Implement a `ToolContributor` (`packages/agent-runtime/src/registry.ts`) and register it from `packages/server` (see [server](server.md)).

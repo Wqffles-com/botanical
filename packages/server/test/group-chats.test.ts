@@ -132,6 +132,55 @@ describe("group chat members", () => {
     expect(body.mentions).toEqual([]);
   });
 
+  test("send_message replies are what others read and what hands off, not the text output", async () => {
+    // Ada thinks aloud, then sends two messages, the second mentioning Cy. Bob and Cy just answer.
+    const requests: Array<{ messages: ProviderMessage[] }> = [];
+    const fetch = (_input: Request | URL | string, init?: RequestInit): Promise<Response> => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as { messages: ProviderMessage[] };
+      requests.push(body);
+      const system = String(body.messages.find((message) => message.role === "system")?.content ?? "");
+      const name = /^You are (\w+)\./.exec(system)?.[1] ?? "Someone";
+      const sent = body.messages.filter((message) => message.role === "tool").length;
+      const chunk = (delta: unknown) => `data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`;
+      const call = (id: string, text: string) =>
+        chunk({
+          content: "thinking",
+          tool_calls: [{ index: 0, id, type: "function", function: { name: "send_message", arguments: JSON.stringify({ text }) } }],
+        });
+      const events =
+        name !== "Ada"
+          ? [chunk({ content: `${name} here` })]
+          : sent === 0
+            ? [call("c1", "On it.")]
+            : sent === 1
+              ? [call("c2", "Done. @Cy can you check?")]
+              : [];
+      return Promise.resolve(
+        new Response([...events, "data: [DONE]\n\n"].join(""), { status: 200, headers: { "content-type": "text/event-stream" } }),
+      );
+    };
+    const { app } = setup({}, { fetch });
+    const { token } = await login(app);
+    const ada = await createAgent(app, token, { name: "Ada", systemPrompt: "You are Ada." });
+    const bob = await createAgent(app, token, { name: "Bob", systemPrompt: "You are Bob." });
+    const cy = await createAgent(app, token, { name: "Cy", systemPrompt: "You are Cy." });
+    const created = await post(app, token, "/api/chats", { agentId: ada.id, memberIds: [bob.id, cy.id], profileId: "grok" });
+    const { chat } = await readJson<{ chat: { id: string } }>(created);
+
+    const response = await post(app, token, `/api/chats/${chat.id}/messages`, { content: "@Ada fix it", profileId: "grok", stream: false });
+    const body = await readJson<{ replies: Row[]; assistantMessage: Row }>(response);
+    expect(body.replies.map((row) => [row.agentId, row.content])).toEqual([
+      [ada.id, "Done. @Cy can you check?"],
+      [cy.id, "Cy here"],
+    ]);
+    const cySaw = requests.at(-1)?.messages.filter((message) => message.role !== "system");
+    expect(cySaw).toEqual([
+      { role: "user", content: "@Ada fix it" },
+      { role: "user", content: "[Ada] On it." },
+      { role: "user", content: "[Ada] Done. @Cy can you check?" },
+    ]);
+  });
+
   test("async messages run each responder and report who is working", async () => {
     const { app, token, ada, bob } = await groupSetup();
     const created = await post(app, token, "/api/chats", { agentId: ada.id, memberIds: [bob.id], profileId: "grok" });

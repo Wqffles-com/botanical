@@ -3,6 +3,7 @@ import { estimateTokens } from "./context";
 import type { MessageRecord } from "./message";
 import type { ChatMessage } from "./provider";
 import type { RuntimeDeps } from "./loop";
+import { SEND_MESSAGE_TOOL } from "./replies";
 
 /**
  * Compaction keeps a long chat working. It summarizes the conversation so far into one stored
@@ -204,10 +205,13 @@ function renderRecord(record: MessageRecord, names: ReadonlyMap<string, string>,
     const parts: string[] = [];
     if (record.content.trim()) parts.push(`${author}: ${record.content.trim()}`);
     for (const call of record.toolCalls ?? []) {
+      // The message itself is its own row.
+      if (call.name === SEND_MESSAGE_TOOL) continue;
       parts.push(`${author} called ${call.name}(${clip(JSON.stringify(call.arguments ?? {}))})`);
     }
     return parts.join("\n");
   }
+  if (record.role === "tool" && record.name === SEND_MESSAGE_TOOL) return "";
   if (record.role === "tool") return `Result of ${record.name ?? "tool"}: ${clip(record.content.trim())}`;
   return "";
 }
