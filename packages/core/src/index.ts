@@ -26,6 +26,17 @@ export {
 } from "./agents";
 export type { AgentColor, AgentShape, ExampleAgent } from "./agents";
 export { BotanicalClient } from "./client";
+export {
+  DEFAULT_GITHUB_LISTENER_EVENTS,
+  GITHUB_ACCOUNT_SETTING_KEY,
+  GITHUB_AGENT_MARKER,
+  GITHUB_LISTENER_EVENTS,
+  GITHUB_LISTENER_KIND,
+  GITHUB_SECRET_NAME,
+  githubHookEvents,
+  isGithubListenerEvent,
+} from "./github";
+export type { GithubListenerEvent } from "./github";
 export type { BotanicalClientOptions } from "./client";
 export {
   AgentRequiredError,
@@ -77,6 +88,10 @@ export type {
   MessageRole,
   AgentRoleRef,
   EffectivePermissions,
+  GithubAccount,
+  GithubConnection,
+  GithubHookResult,
+  GithubRepo,
   AlwaysOnSettings,
   AppNotification,
   Listener,

@@ -3,6 +3,7 @@ import { HttpError, isRecord, json, readJson } from "../http.ts";
 import { adminOnly, authed, type Router } from "../router.ts";
 import { MODEL_PROVIDERS, type ModelProfile, type ModelProvider } from "../types.ts";
 import { SIGNUP_MODES, type SignupMode } from "@botanical/db";
+import { GITHUB_SECRET_NAME } from "@botanical/core";
 import { ANTHROPIC_DEFAULT_MAX_TOKENS, API_KNOWN_MODELS, retiredModelReplacement } from "@botanical/providers";
 
 const SECRET_NAME = /^[a-z][a-z0-9_-]{0,63}$/;
@@ -217,6 +218,8 @@ function isForeignKeyViolation(error: unknown): boolean {
 function secretName(value: string | undefined): string {
   const name = (value ?? "").trim().toLowerCase();
   if (!SECRET_NAME.test(name)) throw new HttpError(400, "invalid_body", "Invalid secret name");
+  // The GitHub token is per user and checked with GitHub on save, so it has its own route.
+  if (name === GITHUB_SECRET_NAME) throw new HttpError(400, "invalid_body", "Connect GitHub through /api/github");
   return name;
 }
 

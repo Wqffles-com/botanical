@@ -8,7 +8,7 @@ Images, compose, release zip, and the one workflow. The API process inside the s
 
 | Path | Purpose |
 |------|---------|
-| `Dockerfile` | API image. Installs the workspace from `package.json` files only (a `manifests` stage), so a source edit keeps the install layer. Bun's download cache is a BuildKit cache mount (`id=botanical-bun`). Copies `deploy/scripts/server-entrypoint.sh` and `config/mcp.json`. Strips CR from the entrypoint before it runs |
+| `Dockerfile` | API image. Installs the workspace from `package.json` files only (a `manifests` stage), so a source edit keeps the install layer. Bun's download cache is a BuildKit cache mount (`id=botanical-bun`). Copies `deploy/scripts/server-entrypoint.sh` and `config/mcp.json`. Strips CR from the entrypoint before it runs. Installs `git` for the `git_*` agent tools |
 | `web.Dockerfile` | Next standalone image. Same `manifests` stage and Bun cache mount as `Dockerfile`, plus a cache mount on the web package's .next/cache (`id=botanical-next`) for Turbopack's build cache. Build calls `deploy/scripts/ensure-next-standalone.mjs` and `deploy/scripts/stage-next-standalone.sh`. Strips CR from those shell scripts before `sh` runs them |
 | `packages/server/Dockerfile` | Package-only image. Comment in the file says the supported build is the root `Dockerfile` |
 | `docker-compose.yml` | `postgres`, `server` (root `Dockerfile`), `web` (`web.Dockerfile`). Host ports default to web 3000, API `127.0.0.1:8788`, Postgres `127.0.0.1:5433` |

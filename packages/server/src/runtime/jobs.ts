@@ -19,7 +19,7 @@ const PROCESS_ID = randomUUID();
 /**
  * Runs a full agent turn for a routine slot or a listener delivery in the agent's own chat
  * (one chat per agent), through the chat queue so an open thread sees it live. The user
- * message starts with a `[Routine · …]` or `[Webhook · …]` line naming where it came from,
+ * message starts with a `[Routine · …]`, `[Webhook · …]`, or `[GitHub · …]` line naming where it came from,
  * and the run row links to the chat.
  */
 export function createBackgroundJobs(deps: {
@@ -155,7 +155,7 @@ export function createBackgroundJobs(deps: {
         const label = routineChatTitle(listener.name, new Date(delivery.receivedAt), "UTC");
         const result = await deps.chatQueue.runTurn({
           chatId: chat.id,
-          content: `[Webhook · ${label}]\n\n${prompt}`,
+          content: `[${handler.label} · ${label}]\n\n${prompt}`,
           profile,
         });
         if (result.error) {

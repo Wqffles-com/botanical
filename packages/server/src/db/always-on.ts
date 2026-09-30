@@ -367,6 +367,7 @@ export function createAlwaysOn(options: {
         agentId: input.agentId,
         name: input.name,
         kind: input.kind,
+        events: [...input.events],
         profileId: input.profileId,
         promptTemplate: input.promptTemplate,
         secret: input.secret,
@@ -382,6 +383,7 @@ export function createAlwaysOn(options: {
       if (!current) return null;
       const next: Listener = { ...current, updatedAt: stamp() };
       if (patch.name !== undefined) next.name = patch.name;
+      if (patch.events !== undefined) next.events = [...patch.events];
       if (patch.profileId !== undefined) next.profileId = patch.profileId;
       if (patch.promptTemplate !== undefined) next.promptTemplate = patch.promptTemplate;
       if (patch.enabled !== undefined) next.enabled = patch.enabled;

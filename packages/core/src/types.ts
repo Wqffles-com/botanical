@@ -123,6 +123,43 @@ export interface Appearance {
   accent: AccentColor;
 }
 
+/** The signed-in user's GitHub connection. The token itself never leaves the server. */
+export interface GithubConnection {
+  connected: boolean;
+  account: GithubAccount | null;
+  /** Web host repositories are cloned from, for example `https://github.com`. */
+  webUrl: string;
+}
+
+export interface GithubAccount {
+  login: string;
+  id: number;
+  name: string | null;
+  avatarUrl: string | null;
+  htmlUrl: string | null;
+  /** Classic token scopes from `X-OAuth-Scopes`. Empty for fine-grained tokens. */
+  scopes: string[];
+  connectedAt: string;
+}
+
+export interface GithubRepo {
+  fullName: string;
+  private: boolean;
+  defaultBranch: string;
+  htmlUrl: string;
+  description: string | null;
+  canAdmin: boolean;
+  canPush: boolean;
+}
+
+export interface GithubHookResult {
+  id: number;
+  repo: string;
+  events: string[];
+  /** Settings page for the webhook on GitHub. */
+  htmlUrl: string;
+}
+
 export interface Agent {
   id: string;
   /** Display name, 1–40 characters. */
@@ -333,7 +370,7 @@ export type ChatStreamEvent =
 
 export type RoutineRunStatus = "queued" | "running" | "succeeded" | "failed" | "skipped";
 export type RoutineRunTrigger = "schedule" | "manual";
-export type ListenerDeliveryStatus = "accepted" | "rejected" | "succeeded" | "failed";
+export type ListenerDeliveryStatus = "accepted" | "rejected" | "ignored" | "succeeded" | "failed";
 export type NotificationKind = "run_succeeded" | "run_failed" | "attention";
 
 export interface RoutineRun {
@@ -398,7 +435,10 @@ export interface Listener {
   userId: string;
   agentId: string;
   name: string;
+  /** `webhook` (generic) or `github`. */
   kind: string;
+  /** GitHub listeners: the `<event>.<action>` ids that start a turn. Empty for webhooks. */
+  events: string[];
   profileId: string;
   promptTemplate: string;
   enabled: boolean;
@@ -411,6 +451,8 @@ export interface ListenerInput {
   agentId: string;
   name: string;
   profileId: string;
+  kind?: string;
+  events?: string[];
   promptTemplate?: string;
   enabled?: boolean;
 }
@@ -418,6 +460,7 @@ export interface ListenerInput {
 export interface ListenerPatch {
   name?: string;
   profileId?: string;
+  events?: string[];
   promptTemplate?: string;
   enabled?: boolean;
 }

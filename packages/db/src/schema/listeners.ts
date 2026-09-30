@@ -25,6 +25,8 @@ export const listeners = pgTable(
       .references(() => agents.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     kind: text('kind').notNull(),
+    /** GitHub listeners: `<X-GitHub-Event>.<action>` ids that start a turn. Empty for webhooks. */
+    events: text('events').array().notNull().default(sql`'{}'::text[]`),
     profileId: text('profile_id').notNull(),
     promptTemplate: text('prompt_template').notNull().default(''),
     secret: text('secret').notNull(),
@@ -68,7 +70,7 @@ export const listenerDeliveries = pgTable(
       .where(sql`${t.status} = 'accepted'`),
     check(
       'listener_deliveries_status_check',
-      sql`${t.status} in ('accepted', 'rejected', 'succeeded', 'failed')`,
+      sql`${t.status} in ('accepted', 'rejected', 'ignored', 'succeeded', 'failed')`,
     ),
     check('listener_deliveries_payload_bytes_nonneg', sql`${t.payloadBytes} >= 0`),
   ],

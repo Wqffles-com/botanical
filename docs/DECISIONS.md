@@ -365,7 +365,7 @@ Short entries. Earlier entries still hold unless a status line here changes them
 
 **Reason:** A new issue should start an agent the way a generic webhook already can, through a real connection.
 
-**Status:** Planned. Generic webhook listeners ship. Typed forge connections do not.
+**Status:** GitHub shipped on 2026-09-30 (see the entry below). GitLab is planned.
 
 ### Tool safety
 
@@ -469,3 +469,19 @@ A chat that never ends outgrows the model's context, so:
 - Older chats, and a turn where the model sends nothing, read as before: that turn's text output is the reply.
 
 **Considered:** Keeping the text output as the reply and adding a tool for extra messages. Not built: the issue asked for the text output to be hidden, and two ways to talk makes it unclear which one the user reads.
+
+---
+
+## 2026-09-30: GitHub connection, git tools, and GitHub listeners
+
+**Status:** Accepted. Shipped (issue #122).
+**Effect:** A user connects their GitHub account once. Their agents can then clone repositories into their workspace, put files they made under git, commit, push, and work on issues and pull requests, and a GitHub listener wakes an agent when an issue is opened.
+
+- **Connection per user.** Settings → GitHub takes a personal access token. The server asks GitHub who it belongs to, then stores it encrypted as the user's `github` secret. It is never returned. There is no instance-wide GitHub token: an agent acts with the token of the user who owns it. `BOTANICAL_GITHUB_API_URL` and `BOTANICAL_GITHUB_URL` point at GitHub Enterprise.
+- **Git tools (capability `git`).** `git_clone`, `git_init`, `git_status`, `git_diff`, `git_log`, `git_checkout`, `git_commit`, `git_pull`, `git_push`, on folders in the agent's workspace. Git runs on the server, outside the shell jail, so the repository's git directory is kept outside the agent's directory and derived from the folder path; the `.git` file in the folder only points there for coding CLIs and people. An agent that writes hooks or config with the file tools cannot make the git tools run them. Hooks, fsmonitor, external diff and textconv, and system and global config are off. The token is an HTTP header scoped to the GitHub host and is never written to the repository. `git_pull` only fast-forwards and `git_push` never forces.
+- **GitHub tools (capability `github`).** List repositories; list, read, open, update, and comment on issues; list, read, and open pull requests. Merging is left to people.
+- **GitHub listeners.** Listener `kind: "github"` with `events` (`issues.opened` by default, also `issue_comment.created` and `pull_request.opened`). Only a valid `X-Hub-Signature-256` is accepted. Other events and pings are stored as `ignored`. The turn gets a short summary of the event, framed as untrusted data, not the raw payload. "Connect repository" creates the webhook on GitHub with the listener's URL, secret, and events.
+- **No loops.** Issues, comments, and pull requests written through the GitHub tools carry a hidden marker, and a GitHub listener ignores events that carry it, so an agent that comments on an issue does not wake itself.
+- **Roles.** The builtin Coder and Orchestrator roles gain `git` and `github` (migration `0010_github`). Reviewer does not.
+
+**Considered:** Registering GitHub's own MCP server with the user's token. Not built: MCP servers connect once for the whole process, not per user, and the git side still needs a workspace-aware tool. Letting the jailed `shell` run git with the token was also left out: the token would sit inside a sandbox the agent controls, and the jail may have no network.

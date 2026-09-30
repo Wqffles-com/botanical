@@ -1,7 +1,14 @@
+import {
+  DEFAULT_GITHUB_LISTENER_EVENTS,
+  GITHUB_LISTENER_EVENTS,
+  GITHUB_LISTENER_KIND,
+  isGithubListenerEvent,
+} from "@botanical/core";
+
 import type { ServerConfig } from "../config.ts";
 import { HttpError, isRecord, json, noContent, readJson } from "../http.ts";
 import { payloadPreview, readLimitedBytes } from "../listeners/body.ts";
-import { isListenerKind, listenerHandler } from "../listeners/kinds.ts";
+import { isListenerKind, LISTENER_KINDS, listenerHandler } from "../listeners/kinds.ts";
 import type { SlidingWindowLimiter } from "../listeners/limit.ts";
 import { generateListenerSecret } from "../listeners/verify.ts";
 import { readRequestedProfileId, resolveProfile } from "../profiles.ts";
@@ -60,7 +67,7 @@ export function registerListeners(router: Router): void {
     "/api/listeners/:id",
     authed(async (ctx) => {
       const existing = await loadListener(ctx.store, requireParam(ctx.params, "id"));
-      const patch = await readListenerPatch(ctx.store, ctx.config, ctx.request);
+      const patch = await readListenerPatch(ctx.store, ctx.config, ctx.request, existing);
       const listener = await ctx.store.listeners.update(existing.id, patch);
       if (!listener) throw new HttpError(404, "not_found", "Listener not found");
       return json(200, { listener: presentListener(listener, publicOrigin(ctx.config, ctx.url)) });
@@ -133,15 +140,26 @@ export function registerHooks(
       throw new HttpError(429, "rate_limited", "Too many requests");
     }
     const handler = listenerHandler(listener.kind);
-    const verified =
-      handler?.verify({ headers: ctx.request.headers, rawBody: limited.bytes, secret: listener.secret }) ?? false;
-    if (!verified) {
+    if (!handler?.verify({ headers: ctx.request.headers, rawBody: limited.bytes, secret: listener.secret })) {
       await reject(ctx.store, listener.id, 401, limited.bytes, "Unauthorized");
       throw new HttpError(401, "unauthorized", "Unauthorized");
     }
     if (!listener.enabled) {
       await reject(ctx.store, listener.id, 403, limited.bytes, "Listener is disabled");
       throw new HttpError(403, "forbidden", "Listener is disabled");
+    }
+    const text = new TextDecoder("utf-8", { fatal: false }).decode(limited.bytes);
+    const decision = handler.accept({ headers: ctx.request.headers, body: text, events: listener.events });
+    if (!decision.run) {
+      const ignored = await ctx.store.listenerDeliveries.create({
+        listenerId: listener.id,
+        status: "ignored",
+        httpStatus: 202,
+        error: decision.reason,
+        payloadBytes: limited.bytes.byteLength,
+        payloadPreview: payloadPreview(limited.bytes),
+      });
+      return json(202, { deliveryId: ignored.id, ignored: true, reason: decision.reason });
     }
     const delivery = await ctx.store.listenerDeliveries.create({
       listenerId: listener.id,
@@ -150,8 +168,7 @@ export function registerHooks(
       payloadBytes: limited.bytes.byteLength,
       payloadPreview: payloadPreview(limited.bytes),
     });
-    const text = new TextDecoder("utf-8", { fatal: false }).decode(limited.bytes);
-    void deps.jobs.executeListenerDelivery(delivery.id, text);
+    void deps.jobs.executeListenerDelivery(delivery.id, decision.payload);
     return json(202, { deliveryId: delivery.id });
   });
 }
@@ -180,6 +197,7 @@ function presentListener(listener: Listener, origin: string) {
     agentId: listener.agentId,
     name: listener.name,
     kind: listener.kind,
+    events: listener.events,
     profileId: listener.profileId,
     promptTemplate: listener.promptTemplate,
     enabled: listener.enabled,
@@ -213,21 +231,24 @@ async function readListenerBody(store: Store, config: ServerConfig, request: Req
   if (!name) throw new HttpError(400, "invalid_body", "name is required");
   const kind = body.kind === undefined ? "webhook" : readBoundedString(body.kind, "kind", { required: true, max: 40 });
   if (!kind || !isListenerKind(kind)) {
-    throw new HttpError(400, "invalid_body", "kind must be webhook");
+    throw new HttpError(400, "invalid_body", `kind must be ${LISTENER_KINDS.join(" or ")}`);
   }
+  const events = readEvents(body.events, kind) ?? (kind === GITHUB_LISTENER_KIND ? [...DEFAULT_GITHUB_LISTENER_EVENTS] : []);
   const profile = await resolveProfile(store, readRequestedProfileId(body.profileId, true), undefined);
   const promptTemplate =
     body.promptTemplate === undefined
       ? ""
       : (readBoundedString(body.promptTemplate, "promptTemplate", { required: false, max: TEMPLATE_MAX }) ?? "");
   const enabled = readOptionalBoolean(body.enabled, "enabled") ?? true;
-  return { agentId: agent.id, name, kind, profileId: profile.id, promptTemplate, enabled };
+  return { agentId: agent.id, name, kind, events, profileId: profile.id, promptTemplate, enabled };
 }
 
-async function readListenerPatch(store: Store, config: ServerConfig, request: Request) {
+async function readListenerPatch(store: Store, config: ServerConfig, request: Request, existing: Listener) {
   const body = await readJson(request, config);
   if (!isRecord(body)) throw new HttpError(400, "invalid_body", "JSON object expected");
-  const patch: { name?: string; profileId?: string; promptTemplate?: string; enabled?: boolean } = {};
+  const patch: { name?: string; events?: string[]; profileId?: string; promptTemplate?: string; enabled?: boolean } = {};
+  const events = readEvents(body.events, existing.kind);
+  if (events) patch.events = events;
   if (body.name !== undefined) {
     const name = readBoundedString(body.name, "name", { required: true, max: LIMITS.name });
     if (!name) throw new HttpError(400, "invalid_body", "name is required");
@@ -246,6 +267,33 @@ async function readListenerPatch(store: Store, config: ServerConfig, request: Re
     patch.enabled = enabled;
   }
   return patch;
+}
+
+/**
+ * GitHub listeners take one or more of `GITHUB_LISTENER_EVENTS`. Webhook listeners take none.
+ * Undefined leaves the default (on create) or the current list (on update).
+ */
+function readEvents(value: unknown, kind: string): string[] | undefined {
+  if (value === undefined) return undefined;
+  if (kind !== GITHUB_LISTENER_KIND) {
+    if (Array.isArray(value) && value.length === 0) return [];
+    throw new HttpError(400, "invalid_body", "events apply only to GitHub listeners");
+  }
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new HttpError(400, "invalid_body", "events must list at least one GitHub event");
+  }
+  const events: string[] = [];
+  for (const item of value) {
+    if (!isGithubListenerEvent(item)) {
+      throw new HttpError(
+        400,
+        "invalid_body",
+        `Unknown GitHub event ${JSON.stringify(item)}. Expected ${GITHUB_LISTENER_EVENTS.map((event) => event.id).join(", ")}`,
+      );
+    }
+    if (!events.includes(item)) events.push(item);
+  }
+  return events;
 }
 
 function readOptionalBoolean(value: unknown, field: string): boolean | undefined {

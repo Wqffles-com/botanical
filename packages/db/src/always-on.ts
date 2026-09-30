@@ -11,7 +11,7 @@ import { routineRuns, routines } from './schema/routines.ts';
 
 export type RoutineRunStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'skipped';
 export type RoutineRunTrigger = 'schedule' | 'manual';
-export type ListenerDeliveryStatus = 'accepted' | 'rejected' | 'succeeded' | 'failed';
+export type ListenerDeliveryStatus = 'accepted' | 'rejected' | 'ignored' | 'succeeded' | 'failed';
 export type NotificationKind = 'run_succeeded' | 'run_failed' | 'attention';
 
 export interface Routine {
@@ -99,6 +99,7 @@ export interface Listener {
   agentId: string;
   name: string;
   kind: string;
+  events: string[];
   profileId: string;
   promptTemplate: string;
   secret: string;
@@ -111,6 +112,7 @@ export interface NewListener {
   agentId: string;
   name: string;
   kind: string;
+  events: string[];
   profileId: string;
   promptTemplate: string;
   secret: string;
@@ -119,6 +121,7 @@ export interface NewListener {
 
 export interface ListenerPatch {
   name?: string;
+  events?: string[];
   profileId?: string;
   promptTemplate?: string;
   enabled?: boolean;
@@ -611,6 +614,7 @@ export function createAlwaysOn(db: BotanicalDb, legacyUserId: string) {
             agentId: input.agentId,
             name: input.name,
             kind: input.kind,
+            events: input.events,
             profileId: input.profileId,
             promptTemplate: input.promptTemplate,
             secret: input.secret,
@@ -632,12 +636,14 @@ export function createAlwaysOn(db: BotanicalDb, legacyUserId: string) {
         if (!current[0]) return null;
         const values: {
           name?: string;
+          events?: string[];
           profileId?: string;
           promptTemplate?: string;
           enabled?: boolean;
           updatedAt: Date;
         } = { updatedAt: new Date() };
         if (patch.name !== undefined) values.name = patch.name;
+        if (patch.events !== undefined) values.events = patch.events;
         if (patch.profileId !== undefined) values.profileId = patch.profileId;
         if (patch.promptTemplate !== undefined) values.promptTemplate = patch.promptTemplate;
         if (patch.enabled !== undefined) values.enabled = patch.enabled;
@@ -973,6 +979,7 @@ function toListener(row: ListenerRow): Listener {
     agentId: row.agentId,
     name: row.name,
     kind: row.kind,
+    events: [...row.events],
     profileId: row.profileId,
     promptTemplate: row.promptTemplate,
     secret: row.secret,

@@ -11,6 +11,8 @@ export const CAPABILITY_OPTIONS = [
   { id: "agent.create", label: "Create agents" },
   { id: "agent.message", label: "Message agents" },
   { id: "notify", label: "Notify the operator" },
+  { id: "git", label: "Git" },
+  { id: "github", label: "GitHub" },
 ] as const;
 
 export type CapabilityId = (typeof CAPABILITY_OPTIONS)[number]["id"];

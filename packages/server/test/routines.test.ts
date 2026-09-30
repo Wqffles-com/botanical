@@ -209,6 +209,7 @@ describe("routine scheduler", () => {
       agentId: agent.id,
       name: "Hook",
       kind: "webhook",
+      events: [],
       profileId: "echo",
       promptTemplate: "ping",
       secret: "s".repeat(32),
