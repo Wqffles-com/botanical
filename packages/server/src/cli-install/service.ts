@@ -7,6 +7,8 @@ import { currentUserId } from "@botanical/db";
 import {
   checkCliAvailability,
   childEnv,
+  CLI_NAMES,
+  cliPresetSpec,
   claudeHasLogin,
   grokHasLogin,
   CliInstaller,
@@ -39,12 +41,15 @@ export interface EnabledCli {
   id: string;
   label: string;
   cli: CliName;
+  /** A profile uses this CLI. Otherwise installing it adds the preset profile. */
+  enabled: boolean;
 }
 
 export interface CliListItem {
   id: string;
   label: string;
   cli: CliName;
+  enabled: boolean;
   status: "not_installed" | "installing" | "installed" | "failed";
   version: string | null;
   arch: string | null;
@@ -55,7 +60,6 @@ export interface CliListItem {
 
 export interface CliService {
   list(userId: string): Promise<CliListItem[]>;
-  describe(cli: string): EnabledCli | null;
   install(cli: string, update: boolean, userId: string): Promise<CliListItem>;
   loginStart(cli: string, userId: string): LoginView;
   loginGet(cli: string, userId: string): LoginView;
@@ -67,7 +71,9 @@ export interface CliService {
 
 export interface CliServiceOptions {
   env: Record<string, string | undefined>;
-  profiles: () => readonly CliProfileSource[];
+  profiles: () => readonly CliProfileSource[] | Promise<readonly CliProfileSource[]>;
+  /** Adds the preset profile for a CLI installed from settings that no profile used yet. */
+  enable?: (cli: CliName) => Promise<void>;
   io?: InstallIo;
   spawnLogin?: (bin: string, args: readonly string[], env: Record<string, string | undefined>) => LoginProcess;
   loginTimeoutMs?: number;
@@ -107,21 +113,34 @@ export function createCliService(options: CliServiceOptions): CliService {
     return manager;
   }
 
-  function enabled(): EnabledCli[] {
+  async function enabled(): Promise<EnabledCli[]> {
     const seen = new Set<CliName>();
     const list: EnabledCli[] = [];
-    for (const profile of options.profiles()) {
+    for (const profile of await options.profiles()) {
       const kind = profile.kind ?? (profile.provider === "cli" ? "cli" : "api");
       if (kind !== "cli" || !profile.cli || !isCliName(profile.cli) || seen.has(profile.cli)) continue;
       seen.add(profile.cli);
-      list.push({ id: profile.id, label: profile.name, cli: profile.cli });
+      list.push({ id: profile.id, label: profile.name, cli: profile.cli, enabled: true });
     }
     return list;
   }
 
-  function describe(cli: string): EnabledCli | null {
-    if (!isCliName(cli)) return null;
-    return enabled().find((item) => item.cli === cli) ?? null;
+  /** Every known CLI: enabled ones first, then the rest as installable presets. */
+  async function all(): Promise<EnabledCli[]> {
+    const list = await enabled();
+    for (const cli of CLI_NAMES) {
+      if (list.some((item) => item.cli === cli)) continue;
+      const preset = cliPresetSpec(cli);
+      list.push({ id: preset.id, label: preset.label, cli, enabled: false });
+    }
+    return list;
+  }
+
+  async function describe(cli: string): Promise<EnabledCli> {
+    if (!isCliName(cli)) throw new Error("Unknown CLI");
+    const item = (await all()).find((entry) => entry.cli === cli);
+    if (!item) throw new Error("Unknown CLI");
+    return item;
   }
 
   async function row(item: EnabledCli, userId: string): Promise<CliListItem> {
@@ -138,6 +157,7 @@ export function createCliService(options: CliServiceOptions): CliService {
       id: item.id,
       label: item.label,
       cli: item.cli,
+      enabled: item.enabled,
       status: view.status,
       version: view.version,
       arch: view.arch,
@@ -147,41 +167,40 @@ export function createCliService(options: CliServiceOptions): CliService {
     };
   }
 
+  function known(cli: string): CliName {
+    if (!isCliName(cli)) throw new Error("Unknown CLI");
+    return cli;
+  }
+
   return {
-    describe,
     async list(userId) {
       const items = [];
-      for (const item of enabled()) items.push(await row(item, userId));
+      for (const item of await all()) items.push(await row(item, userId));
       return items;
     },
     async install(cli, update, userId) {
-      const item = describe(cli);
-      if (!item) throw new Error("CLI is not enabled");
+      const item = await describe(cli);
       await installer.install(item.cli, { update });
+      if (!item.enabled && options.enable && (await installer.view(item.cli)).status === "installed") {
+        await options.enable(item.cli);
+        return row(await describe(cli), userId);
+      }
       return row(item, userId);
     },
     loginStart(cli, userId) {
-      const item = describe(cli);
-      if (!item) throw new Error("CLI is not enabled");
-      return loginFor(userId).start(item.cli);
+      return loginFor(userId).start(known(cli));
     },
     loginGet(cli, userId) {
-      const item = describe(cli);
-      if (!item) throw new Error("CLI is not enabled");
-      return loginFor(userId).view(item.cli);
+      return loginFor(userId).view(known(cli));
     },
     loginInput(cli, userId, value) {
-      const item = describe(cli);
-      if (!item) throw new Error("CLI is not enabled");
-      return loginFor(userId).input(item.cli, value);
+      return loginFor(userId).input(known(cli), value);
     },
     loginCancel(cli, userId) {
-      const item = describe(cli);
-      if (!item) throw new Error("CLI is not enabled");
-      return loginFor(userId).cancel(item.cli);
+      return loginFor(userId).cancel(known(cli));
     },
     async installEnabled() {
-      await installer.installMany(enabled().map((item) => item.cli));
+      await installer.installMany((await enabled()).map((item) => item.cli));
     },
     close() {
       for (const manager of logins.values()) manager.close();

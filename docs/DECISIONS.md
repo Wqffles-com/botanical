@@ -160,7 +160,7 @@ A CLI turn opens `POST /internal/mcp/runs/<runId>` on the same server process fo
 
 ### Install
 
-On listen, unless `BOTANICAL_CLI_AUTO_INSTALL=0`, the server installs each CLI named by an enabled profile (`BOTANICAL_CLI_PROFILES` or a `kind: "cli"` profile) in the background. A failed install is recorded on that CLI and does not stop the server or the other CLIs. Settings → Coding CLIs can install or update one CLI. One install per CLI runs at a time; a second call joins the first. Downloads land in a temp directory and move into place with rename.
+On listen, unless `BOTANICAL_CLI_AUTO_INSTALL=0`, the server installs each CLI named by an enabled profile (`BOTANICAL_CLI_PROFILES` or a `kind: "cli"` profile) in the background. A failed install is recorded on that CLI and does not stop the server or the other CLIs. Settings → Coding CLIs lists Grok Build, Claude Code, and Codex whether or not a profile uses them, and can install or update one CLI. Installing a CLI that no profile uses adds its preset profiles (the same ones `BOTANICAL_CLI_PROFILES` would add) to the instance's stored profiles, so it shows in the model picker without an env change or a restart; the server then also reinstalls it on listen (issue #121). One install per CLI runs at a time; a second call joins the first. Downloads land in a temp directory and move into place with rename.
 
 Versions default to the latest stable at install time. `BOTANICAL_GROK_VERSION`, `BOTANICAL_CLAUDE_VERSION`, and `BOTANICAL_CODEX_VERSION` pin one. An install is skipped when the manifest version is already present, the binary exists, and it matches the pin (or there is no pin and this is not an update). Update re-resolves latest.
 

@@ -3,7 +3,8 @@ import { describe, expect, test } from "bun:test";
 import { LoginBusyError } from "@botanical/providers";
 import { createCliService, type CliService } from "../src/cli-install/service.ts";
 import type { InstallIo } from "@botanical/providers";
-import { loadConfig } from "../src/config.ts";
+import { loadConfig, presetCliProfiles } from "../src/config.ts";
+import { createMemoryStore } from "../src/db/memory.ts";
 import { bearer, login, readJson, setup, baseEnv } from "./helpers.ts";
 
 const SECRET = "super-secret-token-value";
@@ -35,7 +36,7 @@ describe("coding CLI routes", () => {
     expect(JSON.stringify(body)).not.toContain(SECRET);
   });
 
-  test("require a session and reject unknown or disabled CLIs", async () => {
+  test("require a session and reject unknown CLIs", async () => {
     const calls: string[] = [];
     const cli = stub((name) => {
       calls.push(name);
@@ -54,15 +55,6 @@ describe("coding CLI routes", () => {
       }),
     );
     expect(unknown.status).toBe(404);
-
-    const disabled = await app.fetch(
-      new Request("http://localhost/api/cli/claude/install", {
-        method: "POST",
-        headers: { "content-type": "application/json", ...bearer(token) },
-        body: JSON.stringify({ update: true }),
-      }),
-    );
-    expect(disabled.status).toBe(404);
     expect(calls).toEqual([]);
 
     const busy = stub(() => {
@@ -111,13 +103,63 @@ describe("coding CLI routes", () => {
     }
     const response = await app.fetch(new Request("http://localhost/api/cli", { headers: bearer(token) }));
     expect(response.status).toBe(200);
-    const body = await readJson<{ clis: { cli: string; loggedIn: boolean | string; lastError: string | null }[] }>(response);
+    const body = await readJson<{
+      clis: { cli: string; enabled: boolean; status: string; loggedIn: boolean | string; lastError: string | null }[];
+    }>(response);
     const raw = JSON.stringify(body);
     expect(raw).not.toContain(SECRET);
     expect(raw).not.toContain("access_token");
     expect(body.clis.find((item) => item.cli === "grok")?.loggedIn).toBe(true);
     expect(body.clis.find((item) => item.cli === "claude")?.loggedIn).toBe(true);
-    expect(body.clis.find((item) => item.cli === "codex")).toBeUndefined();
+    expect(body.clis.find((item) => item.cli === "grok")?.enabled).toBe(true);
+    const codex = body.clis.find((item) => item.cli === "codex");
+    expect(codex?.enabled).toBe(false);
+    expect(codex?.status).toBe("not_installed");
+  });
+
+  test("installing a CLI no profile uses adds its preset profiles", async () => {
+    const env = baseEnv({ BOTANICAL_CLI_PROFILES: "grok-build" });
+    const root = "/opt/botanical-cli";
+    const files = new Map<string, Uint8Array>();
+    const store = createMemoryStore();
+    const cli = createCliService({
+      env,
+      profiles: async () => store.globalProfiles.list(),
+      enable: async (name) => {
+        for (const profile of presetCliProfiles(name)) await store.globalProfiles.upsert(profile);
+      },
+      io: memory(files),
+      homeDir: "/home/botanical",
+      rootDir: root,
+      spawnLogin: () => {
+        throw new Error("login spawn");
+      },
+    });
+    const { app } = setup(env, { cli, store });
+    const { token } = await login(app);
+
+    const before = await readJson<{ clis: { cli: string; enabled: boolean }[] }>(
+      await app.fetch(new Request("http://localhost/api/cli", { headers: bearer(token) })),
+    );
+    expect(before.clis.map((item) => item.cli).sort()).toEqual(["claude", "codex", "grok"]);
+    expect(before.clis.find((item) => item.cli === "codex")?.enabled).toBe(false);
+    expect((await store.globalProfiles.list()).some((profile) => profile.cli === "codex")).toBe(false);
+
+    // A binary and manifest already on disk make the install a no-op download.
+    files.set(`${root}/bin/codex`, new Uint8Array([1]));
+    files.set(
+      `${root}/manifests/codex.json`,
+      new TextEncoder().encode(JSON.stringify({ cli: "codex", version: "0.9.0", arch: "x86_64", libc: "musl" })),
+    );
+
+    const response = await app.fetch(
+      new Request("http://localhost/api/cli/codex/install", { method: "POST", headers: bearer(token) }),
+    );
+    expect(response.status).toBe(200);
+    const body = await readJson<{ cli: { cli: string; enabled: boolean; status: string; id: string } }>(response);
+    expect(body.cli).toMatchObject({ cli: "codex", enabled: true, status: "installed", id: "codex" });
+    const profiles = await store.globalProfiles.list();
+    expect(profiles.find((profile) => profile.id === "codex")).toMatchObject({ kind: "cli", cli: "codex" });
   });
 
   test("grok login is the auth file or a non-empty XAI_API_KEY", async () => {
@@ -209,6 +251,7 @@ function recording(onInstall: (update: boolean) => void): CliService {
     id: "grok-build",
     label: "Grok Build",
     cli: "grok" as const,
+    enabled: true,
     status: "installed" as const,
     version: "1.2.3",
     arch: "x86_64",
@@ -217,9 +260,6 @@ function recording(onInstall: (update: boolean) => void): CliService {
     logTail: null,
   };
   return {
-    describe(cli) {
-      return cli === "grok" ? { id: "grok-build", label: "Grok Build", cli: "grok" } : null;
-    },
     async list() {
       return [row];
     },
@@ -250,10 +290,6 @@ function recording(onInstall: (update: boolean) => void): CliService {
 
 function stub(onLogin: (name: string) => null): CliService & { service: CliService } {
   const service: CliService = {
-    describe(cli) {
-      if (cli !== "grok") return null;
-      return { id: "grok-build", label: "Grok Build", cli: "grok" };
-    },
     async list() {
       return [];
     },
