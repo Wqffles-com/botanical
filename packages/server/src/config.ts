@@ -95,6 +95,15 @@ export interface ServerConfig {
   dictation: DictationSettings;
   /** Public origin used to build webhook URLs. Null uses the request origin. */
   publicOrigin: string | null;
+  /** GitHub (or GitHub Enterprise) hosts for the GitHub connection, git tools, and GitHub listeners. */
+  github: GithubHosts;
+}
+
+export interface GithubHosts {
+  /** REST API base, no trailing slash. Default `https://api.github.com`. */
+  apiUrl: string;
+  /** Web and git host, no trailing slash. Default `https://github.com`. */
+  webUrl: string;
 }
 
 export type DictationSettings =
@@ -175,6 +184,10 @@ export function loadConfig(
     a2aAutorun: parseBool(env.BOTANICAL_A2A_AUTORUN, "BOTANICAL_A2A_AUTORUN", true),
     dictation: loadDictation(env),
     publicOrigin: parsePublicOrigin(env.BOTANICAL_PUBLIC_ORIGIN),
+    github: {
+      apiUrl: parseHttpBase(env.BOTANICAL_GITHUB_API_URL, "https://api.github.com", "BOTANICAL_GITHUB_API_URL"),
+      webUrl: parseHttpBase(env.BOTANICAL_GITHUB_URL, "https://github.com", "BOTANICAL_GITHUB_URL"),
+    },
   };
 }
 
@@ -277,6 +290,25 @@ function parsePublicOrigin(raw: string | undefined): string | null {
     throw new ConfigError("BOTANICAL_PUBLIC_ORIGIN must be http or https");
   }
   return url.origin;
+}
+
+/** An http(s) base URL with an optional path (GitHub Enterprise serves its API under `/api/v3`). */
+function parseHttpBase(raw: string | undefined, fallback: string, name: string): string {
+  const text = raw?.trim() ?? "";
+  if (!text) return fallback;
+  let url: URL;
+  try {
+    url = new URL(text);
+  } catch {
+    throw new ConfigError(`${name} must be an absolute http(s) URL`);
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new ConfigError(`${name} must be http or https`);
+  }
+  if (url.username || url.password || url.search || url.hash) {
+    throw new ConfigError(`${name} must not include credentials, a query, or a hash`);
+  }
+  return `${url.origin}${url.pathname}`.replace(/\/+$/, "");
 }
 
 function parseDatabaseUrl(raw: string | undefined): string | undefined {

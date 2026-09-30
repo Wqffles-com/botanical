@@ -24,12 +24,13 @@ FROM ${BUN_IMAGE} AS runtime
 WORKDIR /app
 # Alpine stays the base: Grok's Linux build is a static binary, Claude publishes
 # a musl build, and Codex publishes a musl build. Claude's musl binary needs
-# libgcc, libstdc++, and the system ripgrep (its bundled rg is glibc).
+# libgcc, libstdc++, and the system ripgrep (its bundled rg is glibc). git backs
+# the git_* agent tools.
 RUN alpine_ver="$(cut -d. -f1,2 /etc/alpine-release)" \
   && if ! grep -q '/community' /etc/apk/repositories; then \
        echo "https://dl-cdn.alpinelinux.org/alpine/v${alpine_ver}/community" >> /etc/apk/repositories; \
      fi \
-  && apk add --no-cache ca-certificates su-exec libgcc libstdc++ ripgrep \
+  && apk add --no-cache ca-certificates su-exec libgcc libstdc++ ripgrep git \
   && addgroup -S botanical \
   && adduser -S -D -H -h /tmp -G botanical botanical \
   && mkdir -p /data /config /opt/botanical-cli/bin /home/botanical \

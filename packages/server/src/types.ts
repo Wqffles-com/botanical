@@ -395,7 +395,7 @@ export interface ProfileRepository {
 
 export type RoutineRunStatus = "queued" | "running" | "succeeded" | "failed" | "skipped";
 export type RoutineRunTrigger = "schedule" | "manual";
-export type ListenerDeliveryStatus = "accepted" | "rejected" | "succeeded" | "failed";
+export type ListenerDeliveryStatus = "accepted" | "rejected" | "ignored" | "succeeded" | "failed";
 export type NotificationKind = "run_succeeded" | "run_failed" | "attention";
 
 export interface Routine {
@@ -526,6 +526,8 @@ export interface Listener {
   agentId: string;
   name: string;
   kind: string;
+  /** GitHub listeners: `<X-GitHub-Event>.<action>` ids that start a turn. Empty for webhooks. */
+  events: string[];
   profileId: string;
   promptTemplate: string;
   secret: string;
@@ -538,6 +540,7 @@ export interface NewListener {
   agentId: string;
   name: string;
   kind: string;
+  events: string[];
   profileId: string;
   promptTemplate: string;
   secret: string;
@@ -546,6 +549,7 @@ export interface NewListener {
 
 export interface ListenerPatch {
   name?: string;
+  events?: string[];
   profileId?: string;
   promptTemplate?: string;
   enabled?: boolean;

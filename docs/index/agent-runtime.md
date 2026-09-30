@@ -42,7 +42,7 @@ The server enters the loop from `packages/server/src/runtime/turn.ts`.
 
 ## Exports
 
-`runAgentTurn`, `prepareTurn`, `dispatchToolCall`, `buildSystemPrompt`, `compactChat`, `autoCompact`, `needsCompaction`, `sinceCompaction`, `isCompaction`, `COMPACTION_NAME`, `AUTO_COMPACT_RATIO`, `createToolRegistry`, `contributorFromBuiltins`, `createAgentMessageBus`, `DeliveryWorker`, `effectivePermissions`, `toolAccess`, `CAPABILITIES`, `BUILTIN_ROLES`, `createMemoryStore`, `claimInbox`, `renderInbox`. Capability ids in `packages/agent-runtime/src/permissions.ts`: `file.read`, `file.write`, `shell`, `code_exec`, `web`, `memory.read`, `memory.write`, `agent.create`, `agent.message`, `notify`. `notify_user` maps to `notify`. The tool itself is `packages/server/src/tools/notify.ts`.
+`runAgentTurn`, `prepareTurn`, `dispatchToolCall`, `buildSystemPrompt`, `compactChat`, `autoCompact`, `needsCompaction`, `sinceCompaction`, `isCompaction`, `COMPACTION_NAME`, `AUTO_COMPACT_RATIO`, `createToolRegistry`, `contributorFromBuiltins`, `createAgentMessageBus`, `DeliveryWorker`, `effectivePermissions`, `toolAccess`, `CAPABILITIES`, `BUILTIN_ROLES`, `createMemoryStore`, `claimInbox`, `renderInbox`. Capability ids in `packages/agent-runtime/src/permissions.ts`: `file.read`, `file.write`, `shell`, `code_exec`, `web`, `memory.read`, `memory.write`, `agent.create`, `agent.message`, `notify`, `git`, `github`. `notify_user` maps to `notify`, the `git_*` tools to `git`, and the `github_*` tools to `github`; Coder and Orchestrator have both. The tool itself is `packages/server/src/tools/notify.ts`.
 
 ## Env vars
 

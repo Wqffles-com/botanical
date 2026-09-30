@@ -24,6 +24,8 @@ export const CAPABILITIES = [
   "agent.create",
   "agent.message",
   "notify",
+  "git",
+  "github",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -78,7 +80,7 @@ export const BUILTIN_ROLES: readonly BuiltinRoleDefinition[] = [
     id: BUILTIN_ROLE_IDS.Coder,
     name: "Coder",
     description:
-      "Implements changes. Can read and write files, run shell and code, use the web and memory, and message agents. Cannot create agents.",
+      "Implements changes. Can read and write files, run shell and code, use git and GitHub, use the web and memory, and message agents. Cannot create agents.",
     permissions: {
       capabilities: [
         "file.read",
@@ -89,6 +91,8 @@ export const BUILTIN_ROLES: readonly BuiltinRoleDefinition[] = [
         "memory.read",
         "memory.write",
         "agent.message",
+        "git",
+        "github",
       ],
       mcp: [],
     },
@@ -137,6 +141,24 @@ const TOOL_CAPABILITIES: Readonly<Record<string, Capability>> = {
   agent_send: "agent.message",
   agent_inbox: "agent.message",
   notify_user: "notify",
+  git_clone: "git",
+  git_init: "git",
+  git_status: "git",
+  git_diff: "git",
+  git_log: "git",
+  git_checkout: "git",
+  git_commit: "git",
+  git_pull: "git",
+  git_push: "git",
+  github_repo_list: "github",
+  github_issue_list: "github",
+  github_issue_read: "github",
+  github_issue_create: "github",
+  github_issue_update: "github",
+  github_issue_comment: "github",
+  github_pr_list: "github",
+  github_pr_read: "github",
+  github_pr_create: "github",
 };
 
 export function isCapability(value: string): value is Capability {

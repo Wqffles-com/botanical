@@ -153,7 +153,7 @@ Seeded roles:
 
 | Role | Capabilities | MCP |
 | --- | --- | --- |
-| Coder | file.read, file.write, shell, code_exec, web, memory.read, memory.write, agent.message | none |
+| Coder | file.read, file.write, shell, code_exec, web, memory.read, memory.write, agent.message, git, github | none |
 | Reviewer | file.read, web, memory.read | none |
 | Orchestrator | all of the above plus agent.create and notify | `{ "server": "*" }` |
 

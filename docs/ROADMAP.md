@@ -28,6 +28,7 @@ Botanical is in early alpha. This page separates what already ships from what is
 - **Notifications** when a background run finishes or fails, plus a `notify_user` tool when an agent needs attention.
 - **Message actions**: copy, edit, retry, and delete chat messages. Editing a user message resends it and drops what came after; editing a reply corrects it in place. Deleting can also drop everything after a message. Actions lock while the agent works.
 - **Chat side panel**: Files (browse and read the agent's workspace), Memory (global and the agent's own), and Details (message counts, tool calls, tokens, context length, model). Toggle from the chat header.
+- **GitHub**: each user connects their GitHub account in Settings. Agents clone repositories into their workspace or put their own files under git, then commit, push, and open issues and pull requests (`git_*` and `github_*` tools, capabilities `git` and `github`). GitHub listeners wake an agent when an issue is opened, a comment is posted, or a pull request is opened, and can add their webhook to a repository.
 - **Async chat**: keep sending while the agent works. A message sent mid-turn steers the running turn: the model reads it before its next step (Claude Code reads it on stdin). Replies arrive whole. Closing the tab does not stop the turn.
 
 ## In progress
@@ -74,10 +75,9 @@ Botanical is in early alpha. This page separates what already ships from what is
 - A desktop container per session, a web viewer the user can take over, and a computer-use tool gated by role.
 - Opt-in. Not a core tool for every agent.
 
-### GitHub and GitLab connections
-- **Connections page**: add a GitHub or GitLab (gitlab.com or self-managed) connection with an access token, stored server-side only.
-- **Issue triggers**: a per-connection webhook endpoint with secret verification, plus routing rules such as "new issue in repo X goes to agent Y". The agent receives a message with the issue title, body, labels, and link, and a background turn starts automatically. Starts with "issue opened"; comments, pull/merge requests, and CI events can reuse the same mechanism later. Generic webhook listeners already ship; these typed kinds do not.
-- **Forge MCP**: the same connection registers the official GitHub or GitLab MCP server with that token, so agents (including coding-agent CLI profiles through Botanical's MCP endpoint) can read and act on issues and pull requests within their role permissions.
+### GitLab and more forge events
+- GitHub ships (see Shipped). GitLab (gitlab.com or self-managed) is still planned: the same per-user token, git host, tools, and listener kind.
+- More GitHub events (CI results, reviews) and a Files panel view of an agent's repositories can reuse what ships.
 - Webhooks require the server to be reachable from GitHub or GitLab; local testing needs a tunnel.
 
 ### Voice

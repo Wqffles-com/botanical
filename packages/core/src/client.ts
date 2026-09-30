@@ -22,6 +22,9 @@ import {
 } from "./errors";
 import {
   normalizeDelivery,
+  normalizeGithubConnection,
+  normalizeGithubHook,
+  normalizeGithubRepo,
   normalizeListener,
   normalizeAlwaysOnSettings,
   normalizeNotification,
@@ -61,6 +64,9 @@ import type {
   ChatStreamEvent,
   CreateAgentInput,
   CreateChatInput,
+  GithubConnection,
+  GithubHookResult,
+  GithubRepo,
   Health,
   LoginResult,
   Me,
@@ -680,6 +686,35 @@ export class BotanicalClient {
   async listListenerDeliveries(id: string): Promise<ListenerDelivery[]> {
     const body = await this.requestJson(API.listenerDeliveries(id));
     return unwrapList(body, ["deliveries"]).map(normalizeDelivery);
+  }
+
+  async getGithub(): Promise<GithubConnection> {
+    return normalizeGithubConnection(await this.requestJson(API.github));
+  }
+
+  /** Checks the token with GitHub, then stores it encrypted on the server. */
+  async connectGithub(token: string): Promise<GithubConnection> {
+    const body = await this.requestJson(API.github, { method: "PUT", body: JSON.stringify({ token }) });
+    return normalizeGithubConnection(body);
+  }
+
+  async disconnectGithub(): Promise<void> {
+    await this.requestJson(API.github, { method: "DELETE" });
+  }
+
+  async listGithubRepos(query?: string): Promise<GithubRepo[]> {
+    const suffix = query?.trim() ? `?q=${encodeURIComponent(query.trim())}` : "";
+    const body = await this.requestJson(`${API.githubRepos}${suffix}`);
+    return unwrapList(body, ["repos"]).map(normalizeGithubRepo);
+  }
+
+  /** Creates the webhook for a GitHub listener on one repository (`owner/name`). */
+  async createListenerGithubHook(id: string, repo: string): Promise<GithubHookResult> {
+    const body = await this.requestJson(API.listenerGithubHook(id), {
+      method: "POST",
+      body: JSON.stringify({ repo }),
+    });
+    return normalizeGithubHook(unwrapEntity(body, ["hook"]));
   }
 
   async getAlwaysOnSettings(): Promise<AlwaysOnSettings> {

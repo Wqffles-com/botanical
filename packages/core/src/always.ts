@@ -1,6 +1,10 @@
 import { BotanicalApiError } from "./errors";
 import type {
   AppNotification,
+  GithubAccount,
+  GithubConnection,
+  GithubHookResult,
+  GithubRepo,
   Listener,
   ListenerDelivery,
   AlwaysOnSettings,
@@ -96,6 +100,7 @@ export function normalizeListener(value: unknown): Listener {
     agentId: text(row.agentId),
     name: text(row.name),
     kind: text(row.kind, "webhook"),
+    events: Array.isArray(row.events) ? row.events.filter((item): item is string => typeof item === "string") : [],
     profileId: text(row.profileId),
     promptTemplate: text(row.promptTemplate),
     enabled: bool(row.enabled, true),
@@ -119,6 +124,52 @@ export function normalizeDelivery(value: unknown): ListenerDelivery {
     payloadBytes: integer(row.payloadBytes),
     payloadPreview: text(row.payloadPreview),
     chatId: nullable(row.chatId),
+  };
+}
+
+export function normalizeGithubConnection(value: unknown): GithubConnection {
+  const row = record(value, "a GitHub connection");
+  const account = row.account && typeof row.account === "object" ? normalizeGithubAccount(row.account) : null;
+  return {
+    connected: row.connected === true,
+    account,
+    webUrl: text(row.webUrl, "https://github.com"),
+  };
+}
+
+function normalizeGithubAccount(value: unknown): GithubAccount {
+  const row = record(value, "a GitHub account");
+  return {
+    login: text(row.login),
+    id: integer(row.id),
+    name: nullable(row.name),
+    avatarUrl: nullable(row.avatarUrl),
+    htmlUrl: nullable(row.htmlUrl),
+    scopes: Array.isArray(row.scopes) ? row.scopes.filter((item): item is string => typeof item === "string") : [],
+    connectedAt: text(row.connectedAt),
+  };
+}
+
+export function normalizeGithubRepo(value: unknown): GithubRepo {
+  const row = record(value, "a GitHub repository");
+  return {
+    fullName: text(row.fullName),
+    private: bool(row.private),
+    defaultBranch: text(row.defaultBranch, "main"),
+    htmlUrl: text(row.htmlUrl),
+    description: nullable(row.description),
+    canAdmin: bool(row.canAdmin),
+    canPush: bool(row.canPush),
+  };
+}
+
+export function normalizeGithubHook(value: unknown): GithubHookResult {
+  const row = record(value, "a GitHub webhook");
+  return {
+    id: integer(row.id),
+    repo: text(row.repo),
+    events: Array.isArray(row.events) ? row.events.filter((item): item is string => typeof item === "string") : [],
+    htmlUrl: text(row.htmlUrl),
   };
 }
 

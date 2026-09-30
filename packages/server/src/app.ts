@@ -27,6 +27,7 @@ import { registerAccountSettings } from "./routes/account-settings.ts";
 import { registerAgents } from "./routes/agents.ts";
 import { registerAuth } from "./routes/auth.ts";
 import { registerChats } from "./routes/chats.ts";
+import { registerGithub } from "./routes/github.ts";
 import { registerCli } from "./routes/cli.ts";
 import { registerHealth } from "./routes/health.ts";
 import { registerMcp } from "./routes/mcp.ts";
@@ -44,6 +45,8 @@ import { createChatQueue, type ChatQueue } from "./runtime/chat-queue.ts";
 import { createBackgroundJobs } from "./runtime/jobs.ts";
 import { createTurnCoordinator, type TurnCoordinator } from "./runtime/turns.ts";
 import { createScheduler, type Scheduler } from "./routines/scheduler.ts";
+import { createGitContributor } from "./github/git.ts";
+import { createGithubContributor } from "./github/tools.ts";
 import { createAgentAdminContributor } from "./tools/agent-admin.ts";
 import { createMemoryContributor } from "./tools/memory.ts";
 import { createNotifyContributor } from "./tools/notify.ts";
@@ -168,6 +171,7 @@ export function createApp(deps: AppDeps): App {
   registerRoutines(router, jobs);
   registerListeners(router);
   registerHooks(router, { jobs, limiter: hookLimiter });
+  registerGithub(router);
   registerNotifications(router);
   registerAlwaysOnSettings(router);
   registerAppearance(router);
@@ -224,6 +228,8 @@ function createRuntime(
     registry.register(createMemoryContributor(deps.store));
     registry.register(createAgentAdminContributor(deps.store));
     registry.register(createNotifyContributor(deps.store));
+    registry.register(createGitContributor(deps.store, { webUrl: deps.config.github.webUrl }));
+    registry.register(createGithubContributor(deps.store, deps.config.github));
   }
   const profiles = deps.profiles ?? createServerProfileResolver(deps.config, env, cliTools, deps.store);
   const store = adaptServerStore(deps.store);

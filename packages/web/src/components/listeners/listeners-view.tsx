@@ -5,13 +5,19 @@ import { EmptyState } from "@botanical/ui/components/empty-state";
 import { Webhook } from "lucide-react";
 import { pageContainerVariants } from "@botanical/ui/components/page-container";
 import type { Agent, Listener, ListenerDelivery, ModelProfile } from "@botanical/core";
-import { isUnauthorized } from "@botanical/core";
+import {
+  DEFAULT_GITHUB_LISTENER_EVENTS,
+  GITHUB_LISTENER_EVENTS,
+  GITHUB_LISTENER_KIND,
+  isUnauthorized,
+} from "@botanical/core";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@botanical/ui/components/page-header";
 import { StatusBadge } from "@botanical/ui/components/status-badge";
 import { Button } from "@botanical/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@botanical/ui/components/card";
+import { Checkbox } from "@botanical/ui/components/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -27,12 +33,18 @@ import { Switch } from "@botanical/ui/components/switch";
 import { Textarea } from "@botanical/ui/components/textarea";
 import { api } from "@/lib/api";
 import { errorText } from "@/lib/errors";
+import { listenerKindLabel, toggleGithubEvent } from "@/lib/github";
 import { formatWhen } from "@/lib/schedule";
+import { GithubHookDialog } from "./github-hook-dialog";
+
+type ListenerKind = "webhook" | typeof GITHUB_LISTENER_KIND;
 
 interface Draft {
   id?: string;
   agentId: string;
   name: string;
+  kind: ListenerKind;
+  events: string[];
   profileId: string;
   promptTemplate: string;
   enabled: boolean;
@@ -41,9 +53,23 @@ interface Draft {
 interface Revealed {
   url: string;
   secret: string;
+  kind: string;
 }
 
-const EMPTY: Draft = { agentId: "", name: "", profileId: "", promptTemplate: "", enabled: true };
+const EMPTY: Draft = {
+  agentId: "",
+  name: "",
+  kind: "webhook",
+  events: [...DEFAULT_GITHUB_LISTENER_EVENTS],
+  profileId: "",
+  promptTemplate: "",
+  enabled: true,
+};
+
+const KINDS: Array<{ value: ListenerKind; label: string }> = [
+  { value: "webhook", label: "Webhook" },
+  { value: GITHUB_LISTENER_KIND, label: "GitHub" },
+];
 
 export function ListenersView() {
   const [listeners, setListeners] = useState<Listener[]>([]);
@@ -58,6 +84,7 @@ export function ListenersView() {
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [deliveries, setDeliveries] = useState<ListenerDelivery[]>([]);
   const [deliveryError, setDeliveryError] = useState<string | null>(null);
+  const [hookFor, setHookFor] = useState<Listener | null>(null);
 
   async function refresh() {
     const [nextListeners, nextAgents, nextProfiles] = await Promise.all([
@@ -94,11 +121,17 @@ export function ListenersView() {
       toast.error("Agent, name, and profile are required.");
       return;
     }
+    const github = editor.kind === GITHUB_LISTENER_KIND;
+    if (github && editor.events.length === 0) {
+      toast.error("Pick at least one GitHub event.");
+      return;
+    }
     setSaving(true);
     try {
       if (editor.id) {
         await api.updateListener(editor.id, {
           name: editor.name.trim(),
+          ...(github ? { events: editor.events } : {}),
           profileId: editor.profileId,
           promptTemplate: editor.promptTemplate,
           enabled: editor.enabled,
@@ -108,12 +141,15 @@ export function ListenersView() {
         const created = await api.createListener({
           agentId: editor.agentId,
           name: editor.name.trim(),
+          kind: editor.kind,
+          ...(github ? { events: editor.events } : {}),
           profileId: editor.profileId,
           promptTemplate: editor.promptTemplate,
           enabled: editor.enabled,
         });
         setEditor(null);
-        setRevealed({ url: created.url, secret: created.secret });
+        setRevealed({ url: created.url, secret: created.secret, kind: created.listener.kind });
+        if (github) setHookFor(created.listener);
       }
       await refresh();
     } catch (err) {
@@ -135,7 +171,7 @@ export function ListenersView() {
   async function rotate(listener: Listener) {
     try {
       const next = await api.rotateListenerSecret(listener.id);
-      setRevealed(next);
+      setRevealed({ ...next, kind: listener.kind });
     } catch (err) {
       toast.error(errorText(err));
     }
@@ -170,7 +206,7 @@ export function ListenersView() {
     <div className={pageContainerVariants()}>
       <PageHeader
         title="Listeners"
-        description="Inbound webhooks start a new chat for the agent. The payload is untrusted data, not instructions."
+        description="Webhooks and GitHub events start a turn in the agent's chat. The payload is untrusted data, not instructions."
         actions={<Button onClick={() => setEditor({ ...EMPTY })}>New listener</Button>}
       />
       {error ? (
@@ -189,7 +225,7 @@ export function ListenersView() {
           <EmptyState
             icon={Webhook}
             title="No listeners yet"
-            body="A listener gives an agent a webhook URL. Its secret is shown once, when you create it."
+            body="A listener gives an agent a webhook URL, or wakes it on GitHub issues and pull requests. Its secret is shown once, when you create it."
             action={<Button onClick={() => setEditor({ ...EMPTY })}>New listener</Button>}
             bordered
           />
@@ -200,7 +236,7 @@ export function ListenersView() {
                 <div className="min-w-0">
                   <CardTitle className="truncate">{listener.name}</CardTitle>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {agentName.get(listener.agentId) ?? "Unknown agent"} · {listener.kind}
+                    {agentName.get(listener.agentId) ?? "Unknown agent"} · {listenerKindLabel(listener)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -218,6 +254,11 @@ export function ListenersView() {
                   <Button size="sm" variant="outline" onClick={() => void copyText(listener.url)}>
                     Copy URL
                   </Button>
+                  {listener.kind === GITHUB_LISTENER_KIND ? (
+                    <Button size="sm" variant="outline" onClick={() => setHookFor(listener)}>
+                      Connect repository
+                    </Button>
+                  ) : null}
                   <Button size="sm" variant="outline" onClick={() => void rotate(listener)}>
                     Rotate secret
                   </Button>
@@ -232,6 +273,8 @@ export function ListenersView() {
                         id: listener.id,
                         agentId: listener.agentId,
                         name: listener.name,
+                        kind: listener.kind === GITHUB_LISTENER_KIND ? GITHUB_LISTENER_KIND : "webhook",
+                        events: listener.events,
                         profileId: listener.profileId,
                         promptTemplate: listener.promptTemplate,
                         enabled: listener.enabled,
@@ -282,6 +325,40 @@ export function ListenersView() {
                   </SelectContent>
                 </Select>
               </Field>
+              <Field label="Source">
+                <Select
+                  items={KINDS}
+                  value={editor.kind}
+                  onValueChange={(next) => next && setEditor({ ...editor, kind: next as ListenerKind })}
+                  disabled={Boolean(editor.id)}
+                >
+                  <SelectTrigger className="w-full" aria-label="Source">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {KINDS.map((kind) => (
+                      <SelectItem key={kind.value} value={kind.value}>
+                        {kind.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              {editor.kind === GITHUB_LISTENER_KIND ? (
+                <Field label="Wake the agent when">
+                  <div className="grid gap-2">
+                    {GITHUB_LISTENER_EVENTS.map((event) => (
+                      <label key={event.id} className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={editor.events.includes(event.id)}
+                          onCheckedChange={() => setEditor({ ...editor, events: toggleGithubEvent(editor.events, event.id) })}
+                        />
+                        {event.label}
+                      </label>
+                    ))}
+                  </div>
+                </Field>
+              ) : null}
               <Field label="Name">
                 <Input value={editor.name} onChange={(event) => setEditor({ ...editor, name: event.target.value })} />
               </Field>
@@ -324,6 +401,8 @@ export function ListenersView() {
         </DialogContent>
       </Dialog>
 
+      <GithubHookDialog listener={hookFor} onClose={() => setHookFor(null)} />
+
       <ConfirmDialog
         open={removeId !== null}
         onOpenChange={(open) => !open && setRemoveId(null)}
@@ -338,6 +417,7 @@ export function ListenersView() {
 }
 
 function SecretCard({ revealed, onClose }: { revealed: Revealed; onClose: () => void }) {
+  if (revealed.kind === GITHUB_LISTENER_KIND) return <GithubSecretCard revealed={revealed} onClose={onClose} />;
   const bearer = `curl -X POST '${revealed.url}' \\\n  -H 'Authorization: Bearer ${revealed.secret}' \\\n  -H 'Content-Type: application/json' \\\n  -d '{"hello":"world"}'`;
   const signed = `BODY='{"hello":"world"}'\nSIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac '${revealed.secret}' | awk '{print $2}')\ncurl -X POST '${revealed.url}' \\\n  -H "X-Botanical-Signature: sha256=$SIG" \\\n  -H 'Content-Type: application/json' \\\n  -d "$BODY"`;
   return (
@@ -363,6 +443,27 @@ function SecretCard({ revealed, onClose }: { revealed: Revealed; onClose: () => 
         </Field>
         <Button variant="outline" onClick={onClose}>
           I have saved the secret
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function GithubSecretCard({ revealed, onClose }: { revealed: Revealed; onClose: () => void }) {
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>Secret shown once</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p className="text-muted-foreground">
+          Connect repository adds the webhook for you. To add it by hand, open the repository's Settings → Webhooks on
+          GitHub, paste this URL and secret, and pick the content type application/json.
+        </p>
+        <CopyRow label="URL" value={revealed.url} />
+        <CopyRow label="Secret" value={revealed.secret} />
+        <Button variant="outline" onClick={onClose}>
+          Done
         </Button>
       </CardContent>
     </Card>
@@ -395,7 +496,9 @@ function DeliveryList({ deliveries, error }: { deliveries: ListenerDelivery[]; e
                   ? "danger"
                   : delivery.status === "succeeded"
                     ? "success"
-                    : "info"
+                    : delivery.status === "ignored"
+                      ? "neutral"
+                      : "info"
               }
               className="capitalize"
             >
@@ -406,7 +509,11 @@ function DeliveryList({ deliveries, error }: { deliveries: ListenerDelivery[]; e
             <span>{formatWhen(delivery.receivedAt)}</span>
           </span>
           <span className="flex flex-wrap items-center gap-2">
-            {delivery.error ? <span className="text-destructive">{delivery.error}</span> : null}
+            {delivery.error ? (
+              <span className={delivery.status === "ignored" ? "text-muted-foreground" : "text-destructive"}>
+                {delivery.error}
+              </span>
+            ) : null}
             {delivery.chatId ? (
               <a className="underline underline-offset-2" href={`/chats/${delivery.chatId}`}>
                 Open chat

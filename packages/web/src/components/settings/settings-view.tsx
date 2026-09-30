@@ -5,6 +5,7 @@ import type { ModelProfile } from "@botanical/core";
 import { isUnauthorized } from "@botanical/core";
 import {
   Brain,
+  GitBranch,
   Layers,
   Plug,
   Server,
@@ -30,6 +31,7 @@ import { providerLabel } from "@/lib/format-extra";
 import { useWorkspace } from "@/components/workspace-provider";
 import { cn } from "@/lib/utils";
 import { CliPanel } from "@/components/settings/cli-panel";
+import { GithubPanel } from "@/components/settings/github-panel";
 import { MemoryPanel } from "@/components/settings/memory-panel";
 import { ProfilesPanel } from "@/components/settings/profiles-panel";
 import { RolesPanel } from "@/components/settings/roles-panel";
@@ -41,7 +43,7 @@ import { AdminPanel } from "./admin-panel";
 import { BackgroundWorkCard } from "./background-work-card";
 import { DeploymentBadge } from "./deployment-badge";
 
-export type SettingsTab = "general" | "profiles" | "memory" | "roles" | "cli" | "admin";
+export type SettingsTab = "general" | "profiles" | "memory" | "roles" | "cli" | "github" | "admin";
 
 const SETTINGS_TABS: Array<{ value: SettingsTab; label: string; icon: LucideIcon }> = [
   { value: "general", label: "General", icon: Settings2 },
@@ -49,11 +51,21 @@ const SETTINGS_TABS: Array<{ value: SettingsTab; label: string; icon: LucideIcon
   { value: "memory", label: "Memory", icon: Brain },
   { value: "roles", label: "Roles & permissions", icon: ShieldCheck },
   { value: "cli", label: "Coding CLIs", icon: SquareTerminal },
+  { value: "github", label: "GitHub", icon: GitBranch },
   { value: "admin", label: "Admin", icon: UserCog },
 ];
 
 export function normalizeSettingsTab(value: string | null | undefined): SettingsTab {
-  if (value === "profiles" || value === "memory" || value === "roles" || value === "cli" || value === "admin") return value;
+  if (
+    value === "profiles" ||
+    value === "memory" ||
+    value === "roles" ||
+    value === "cli" ||
+    value === "github" ||
+    value === "admin"
+  ) {
+    return value;
+  }
   return "general";
 }
 
@@ -144,7 +156,7 @@ export function SettingsPanels({
   const dialog = layout === "dialog";
   const selectTab = (next: unknown) => onTab(normalizeSettingsTab(typeof next === "string" ? next : null));
 
-  // Six tabs do not fit a phone, so pick the section from a select below sm.
+  // The tabs do not fit a phone, so pick the section from a select below sm.
   const mobilePicker = (
     <Select items={visibleTabs} value={tab} onValueChange={(value) => value && selectTab(value)}>
       <SelectTrigger className="w-full sm:hidden" aria-label="Settings section">
@@ -193,6 +205,9 @@ export function SettingsPanels({
       </TabsContent>
       <TabsContent value="cli" className={cn(!dialog && "mt-4")}>
         <CliPanel />
+      </TabsContent>
+      <TabsContent value="github" className={cn(!dialog && "mt-4")}>
+        <GithubPanel />
       </TabsContent>
       {admin ? (
         <TabsContent value="admin" className={cn(!dialog && "mt-4")}>
