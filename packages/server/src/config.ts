@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import {
+  cliPresetSpec,
   expandCliModels,
   mergeCliProfiles,
   parseCliProfileShortcut,
@@ -9,6 +10,7 @@ import {
   readProfilesOverride,
   selectProfiles,
   splitProfileDocument,
+  type CliName,
   type CliProfileSpec,
   type ListedProfile,
 } from "@botanical/providers";
@@ -357,6 +359,11 @@ function toListed(profile: ModelProfile): ListedProfile {
   if (profile.maxTokens !== undefined) listed.maxTokens = profile.maxTokens;
   if (profile.temperature !== undefined) listed.temperature = profile.temperature;
   return listed;
+}
+
+/** The preset profiles for one CLI (one per known model), as `BOTANICAL_CLI_PROFILES` would list them. */
+export function presetCliProfiles(cli: CliName): ModelProfile[] {
+  return expandCliModels([cliPresetSpec(cli)]).map((spec) => toCliProfile(spec));
 }
 
 function toCliProfile(spec: CliProfileSpec): ModelProfile {

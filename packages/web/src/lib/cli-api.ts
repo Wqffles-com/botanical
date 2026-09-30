@@ -6,6 +6,8 @@ export interface CliRow {
   id: string;
   label: string;
   cli: CliId;
+  /** A model profile uses this CLI. Installing one that is not enabled adds it to the model list. */
+  enabled: boolean;
   status: "not_installed" | "installing" | "installed" | "failed";
   version: string | null;
   arch: string | null;
@@ -103,6 +105,7 @@ function parseRow(value: unknown): CliRow {
     id: typeof row.id === "string" ? row.id : cli,
     label: typeof row.label === "string" ? row.label : cli,
     cli,
+    enabled: row.enabled !== false,
     status:
       status === "installing" || status === "installed" || status === "failed" || status === "not_installed"
         ? status
