@@ -1,10 +1,11 @@
 "use client";
 
 import { useAppDialogs } from "@/components/app-dialogs";
+import { MemoryDialog } from "@/components/memory/memory-dialog";
+import { MemoryRow } from "@/components/memory/memory-row";
 import type { Agent, Chat, ChatMessage, MemoryRecord, ModelProfile, WorkspaceFile, WorkspaceListing } from "@botanical/core";
 import { ArrowLeft, Brain, File, Folder, FolderOpen, Link2, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Badge } from "@botanical/ui/components/badge";
 import { Button } from "@botanical/ui/components/button";
 import { EmptyState } from "@botanical/ui/components/empty-state";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@botanical/ui/components/select";
@@ -221,6 +222,7 @@ function MemoryTab({ agent, revision }: { agent: Agent; revision: number }) {
   const [shared, setShared] = useState<MemoryRecord[] | null>(null);
   const [own, setOwn] = useState<MemoryRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<MemoryRecord | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -253,8 +255,18 @@ function MemoryTab({ agent, revision }: { agent: Agent; revision: number }) {
 
   return (
     <div className="flex flex-col gap-4 py-3" data-testid="chat-memory">
-      <MemorySection title={`${agent.name}'s memory`} rows={own} empty={`${agent.name} has not saved anything yet.`} />
-      <MemorySection title="Global memory" rows={shared} empty="No shared memories. Every agent can read these." />
+      <MemorySection
+        title={`${agent.name}'s memory`}
+        rows={own}
+        empty={`${agent.name} has not saved anything yet.`}
+        onOpen={setViewing}
+      />
+      <MemorySection
+        title="Global memory"
+        rows={shared}
+        empty="No shared memories. Every agent can read these."
+        onOpen={setViewing}
+      />
       <p className="px-3 text-xs text-muted-foreground">
         Edit memories in{" "}
         <button
@@ -266,11 +278,38 @@ function MemoryTab({ agent, revision }: { agent: Agent; revision: number }) {
         </button>
         .
       </p>
+      <MemoryDialog
+        memory={viewing}
+        scopeLabel={viewing?.scope === "agent" ? `${agent.name}'s memory` : "Global memory"}
+        onOpenChange={(open) => !open && setViewing(null)}
+        footer={
+          <button
+            type="button"
+            onClick={() => {
+              setViewing(null);
+              openSettings("memory");
+            }}
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            Edit in Settings
+          </button>
+        }
+      />
     </div>
   );
 }
 
-function MemorySection({ title, rows, empty }: { title: string; rows: MemoryRecord[]; empty: string }) {
+function MemorySection({
+  title,
+  rows,
+  empty,
+  onOpen,
+}: {
+  title: string;
+  rows: MemoryRecord[];
+  empty: string;
+  onOpen: (memory: MemoryRecord) => void;
+}) {
   return (
     <section>
       <h3 className="flex items-center gap-1.5 px-3 pb-1.5 text-xs font-medium text-muted-foreground">
@@ -281,18 +320,10 @@ function MemorySection({ title, rows, empty }: { title: string; rows: MemoryReco
       {rows.length === 0 ? (
         <p className="px-3 text-xs text-muted-foreground">{empty}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5 px-3">
+        <ul className="flex flex-col gap-1 px-3">
           {rows.map((memory) => (
-            <li key={memory.id} className="rounded-md border px-2.5 py-2">
-              <p className="text-sm whitespace-pre-wrap break-words">{memory.content}</p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                {memory.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary">
-                    {tag}
-                  </Badge>
-                ))}
-                <span className="ml-auto text-xs text-muted-foreground">{relativeTime(memory.updatedAt)}</span>
-              </div>
+            <li key={memory.id}>
+              <MemoryRow memory={memory} onOpen={onOpen} />
             </li>
           ))}
         </ul>

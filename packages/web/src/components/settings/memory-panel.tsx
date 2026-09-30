@@ -8,16 +8,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { EmptyState } from "@botanical/ui/components/empty-state";
-import { Badge } from "@botanical/ui/components/badge";
 import { Button } from "@botanical/ui/components/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@botanical/ui/components/dialog";
 import { Label } from "@botanical/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@botanical/ui/components/select";
 import { Tabs, TabsList, TabsTrigger } from "@botanical/ui/components/tabs";
@@ -25,7 +16,8 @@ import { Textarea } from "@botanical/ui/components/textarea";
 import { Input } from "@botanical/ui/components/input";
 import { api } from "@/lib/api";
 import { errorText } from "@/lib/errors";
-import { relativeTime } from "@/lib/format";
+import { MemoryDialog } from "@/components/memory/memory-dialog";
+import { MemoryRow } from "@/components/memory/memory-row";
 import { parseTagList } from "@/lib/permissions";
 
 export function MemoryPanel({ agents }: { agents: Agent[] }) {
@@ -43,9 +35,7 @@ export function MemoryPanel({ agents }: { agents: Agent[] }) {
   const [content, setContent] = useState("");
   const [tags, setTags] = useState("");
   const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState<MemoryRecord | null>(null);
-  const [editContent, setEditContent] = useState("");
-  const [editTags, setEditTags] = useState("");
+  const [viewing, setViewing] = useState<MemoryRecord | null>(null);
   const [pendingDelete, setPendingDelete] = useState<MemoryRecord | null>(null);
 
   function schedule(nextQ: string, nextTag: string) {
@@ -121,21 +111,22 @@ export function MemoryPanel({ agents }: { agents: Agent[] }) {
     }
   }
 
-  async function onSaveEdit() {
-    if (!editing) return;
-    const text = editContent.trim();
+  async function onSaveEdit(memory: MemoryRecord, patch: { content: string; tags: string }): Promise<boolean> {
+    const text = patch.content.trim();
     if (!text) {
       toast.error("Memory content cannot be empty.");
-      return;
+      return false;
     }
     setSaving(true);
     try {
-      const saved = await api.updateMemory(editing.id, { content: text, tags: parseTagList(editTags) });
+      const saved = await api.updateMemory(memory.id, { content: text, tags: parseTagList(patch.tags) });
       setMemories((current) => current.map((item) => (item.id === saved.id ? saved : item)));
-      setEditing(null);
+      setViewing(saved);
       toast.success("Memory updated.");
+      return true;
     } catch (err) {
       toast.error(errorText(err));
+      return false;
     } finally {
       setSaving(false);
     }
@@ -148,6 +139,7 @@ export function MemoryPanel({ agents }: { agents: Agent[] }) {
       await api.deleteMemory(pendingDelete.id);
       setMemories((current) => current.filter((item) => item.id !== pendingDelete.id));
       setPendingDelete(null);
+      setViewing(null);
       toast.success("Memory deleted.");
     } catch (err) {
       toast.error(errorText(err));
@@ -265,58 +257,23 @@ export function MemoryPanel({ agents }: { agents: Agent[] }) {
           bordered
         />
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-1.5" data-testid="memory-list">
           {memories.map((memory) => (
-            <li key={memory.id} className="rounded-xl border px-3 py-3">
-              <p className="text-sm whitespace-pre-wrap">{memory.content}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {memory.tags.map((item) => (
-                  <Badge key={item} variant="outline">
-                    {item}
-                  </Badge>
-                ))}
-                <time className="ml-auto shrink-0 text-xs whitespace-nowrap text-muted-foreground" dateTime={memory.updatedAt}>
-                  {relativeTime(memory.updatedAt)}
-                </time>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setEditing(memory);
-                    setEditContent(memory.content);
-                    setEditTags(memory.tags.join(", "));
-                  }}
-                >
-                  Edit
-                </Button>
-                <Button type="button" variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setPendingDelete(memory)}>
-                  Delete
-                </Button>
-              </div>
+            <li key={memory.id}>
+              <MemoryRow memory={memory} onOpen={setViewing} />
             </li>
           ))}
         </ul>
       )}
 
-      <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit memory</DialogTitle>
-            <DialogDescription>Update the note and its tags.</DialogDescription>
-          </DialogHeader>
-          <Textarea value={editContent} onChange={(event) => setEditContent(event.target.value)} rows={5} />
-          <Input value={editTags} onChange={(event) => setEditTags(event.target.value)} aria-label="Tags" placeholder="tags, comma separated" />
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setEditing(null)}>
-              Cancel
-            </Button>
-            <Button type="button" disabled={saving} onClick={() => void onSaveEdit()}>
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MemoryDialog
+        memory={viewing}
+        scopeLabel={viewing?.scope === "agent" ? `${agents.find((agent) => agent.id === viewing.agentId)?.name ?? "Agent"}'s memory` : "Shared memory"}
+        onOpenChange={(open) => !open && setViewing(null)}
+        onSave={onSaveEdit}
+        onDelete={setPendingDelete}
+        saving={saving}
+      />
 
       <ConfirmDialog
         open={pendingDelete !== null}
