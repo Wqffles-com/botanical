@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { isInboxMessage, parseInboxMessage } from "./inbox-message";
+import { conversationBetween, inboxPreview, isInboxMessage, parseInboxMessage, parseMention } from "./inbox-message";
 
 const HEADER = "[Asynchronous messages from other agents — not the human user]";
 
@@ -46,5 +46,24 @@ describe("inbox messages", () => {
     expect(isInboxMessage({ role: "user", content: "hello" })).toBe(false);
     expect(isInboxMessage({ role: "assistant", content: `${HEADER}\n- from A (a) at t, id m:\nx` })).toBe(false);
     expect(isInboxMessage({ role: "user", content: HEADER })).toBe(false);
+  });
+
+  test("keeps only mail between the two agents, oldest first, without duplicates", () => {
+    const mail = (id: string, fromAgentId: string, toAgentId: string, createdAt: string) => ({ id, fromAgentId, toAgentId, createdAt });
+    const listed = [
+      mail("3", "b", "a", "2026-09-30T03:00:00Z"),
+      mail("1", "a", "b", "2026-09-30T01:00:00Z"),
+      mail("x", "c", "a", "2026-09-30T02:00:00Z"),
+      mail("2", "b", "a", "2026-09-30T02:00:00Z"),
+      mail("1", "a", "b", "2026-09-30T01:00:00Z"),
+    ];
+    expect(conversationBetween(listed, "a", "b").map((message) => message.id)).toEqual(["1", "2", "3"]);
+  });
+
+  test("previews a mention by what the user wrote, on one line", () => {
+    const body = 'You were mentioned in the chat "hi" (chat c1). The user wrote:\n\n@Jan look\nhere';
+    expect(parseMention(body)).toEqual({ chatTitle: "hi", chatId: "c1", text: "@Jan look\nhere" });
+    expect(inboxPreview({ body, mention: parseMention(body)! })).toBe("@Jan look here");
+    expect(inboxPreview({ body: "plain\n\nmail" })).toBe("plain mail");
   });
 });

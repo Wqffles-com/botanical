@@ -1,4 +1,4 @@
-import type { ChatMessage } from "@botanical/core";
+import type { AgentMessage, ChatMessage } from "@botanical/core";
 
 /** First line of the transcript row `renderInbox` in `@botanical/agent-runtime` writes. */
 const INBOX_HEADER = "[Asynchronous messages from other agents — not the human user]";
@@ -37,8 +37,8 @@ export function parseInboxMessage(message: Pick<ChatMessage, "role" | "content">
     const last = entries.at(-1);
     if (!last) return;
     last.body = body.join("\n").trim();
-    const mention = MENTION.exec(last.body);
-    if (mention) last.mention = { chatTitle: mention[1]!, chatId: mention[2]!, text: mention[3]!.trim() };
+    const mention = parseMention(last.body);
+    if (mention) last.mention = mention;
     body = [];
   };
   for (const line of lines.slice(1)) {
@@ -52,6 +52,34 @@ export function parseInboxMessage(message: Pick<ChatMessage, "role" | "content">
   }
   flush();
   return entries.length > 0 ? entries : null;
+}
+
+/** The `@Name` mention agent-runtime forwards from another chat, or null for ordinary mail. */
+export function parseMention(body: string): InboxMention | null {
+  const match = MENTION.exec(body.trim());
+  return match ? { chatTitle: match[1]!, chatId: match[2]!, text: match[3]!.trim() } : null;
+}
+
+/** Messages either agent sent the other, oldest first, from both agents' inboxes. */
+export function conversationBetween<T extends Pick<AgentMessage, "id" | "fromAgentId" | "toAgentId" | "createdAt">>(
+  messages: readonly T[],
+  first: string,
+  second: string,
+): T[] {
+  const byId = new Map<string, T>();
+  for (const message of messages) {
+    const between =
+      (message.fromAgentId === first && message.toAgentId === second) ||
+      (message.fromAgentId === second && message.toAgentId === first);
+    if (between) byId.set(message.id, message);
+  }
+  return [...byId.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/** One-line preview for a collapsed mail row. */
+export function inboxPreview(entry: Pick<InboxEntry, "body" | "mention">): string {
+  const text = entry.mention ? entry.mention.text : entry.body;
+  return text.replace(/\s+/g, " ").trim();
 }
 
 export function isInboxMessage(message: Pick<ChatMessage, "role" | "content">): boolean {
