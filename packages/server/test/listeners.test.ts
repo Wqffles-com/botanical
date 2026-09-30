@@ -3,10 +3,10 @@ import { createHmac } from "node:crypto";
 import { describe, expect, test } from "bun:test";
 
 import { framePayload, renderListenerPrompt } from "../src/listeners/prompt.ts";
-import { bearer, createAgent, login, readJson, setup } from "./helpers.ts";
+import { bearer, createAgent, login, readJson, setup , ECHO_PROFILE } from "./helpers.ts";
 
 const PROFILES = [
-  { id: "mock", name: "Mock", provider: "mock", model: "echo" },
+  ECHO_PROFILE,
   { id: "grok", name: "Grok", provider: "xai", model: "grok-4" },
 ];
 
@@ -29,7 +29,7 @@ async function createListener(app: ReturnType<typeof setup>["app"], token: strin
       body: JSON.stringify({
         agentId,
         name: "Door",
-        profileId: "mock",
+        profileId: "echo",
         promptTemplate: "Handle {{listener}} at {{received_at}}\n{{payload}}",
       }),
     }),

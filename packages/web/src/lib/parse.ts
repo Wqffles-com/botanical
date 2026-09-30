@@ -233,7 +233,7 @@ export function parseProviderKeys(value: unknown): ProviderKeyStatus[] {
     .filter((row): row is ProviderKeyStatus => row !== null);
 }
 
-/** Profiles listed by GET /api/profiles already imply a configured provider key (plus mock). */
+/** Profiles listed by GET /api/profiles already imply a configured provider key. */
 export function deriveProviderKeys(
   profiles: { provider: string }[],
   fromSettings: ProviderKeyStatus[],
@@ -244,10 +244,9 @@ export function deriveProviderKeys(
     const id = profile.provider.trim().toLowerCase();
     if (id) configured.add(id);
   }
-  configured.add("mock");
   const byId = new Map<string, ProviderKeyStatus>();
   for (const known of KNOWN_PROVIDERS) {
-    byId.set(known.id, { ...known, configured: configured.has(known.id) || known.id === "mock" });
+    byId.set(known.id, { ...known, configured: configured.has(known.id) });
   }
   for (const row of fromSettings) {
     const prev = byId.get(row.id);

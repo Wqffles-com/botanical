@@ -36,7 +36,6 @@ export const MODEL_PROVIDERS = [
   "deepseek",
   "openrouter",
   "openai-compat",
-  "mock",
 ] as const;
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
 

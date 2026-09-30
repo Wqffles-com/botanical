@@ -328,7 +328,7 @@ describe("agents, chats, messages, profiles", () => {
       bearer(emptyToken),
     );
     expect(noProfiles.status).toBe(422);
-    expect((await readJson<{ error: { code: string } }>(noProfiles)).error.code).toBe("unknown_profile");
+    expect((await readJson<{ error: { code: string } }>(noProfiles)).error.code).toBe("no_profiles_configured");
   });
 
   test("chats can be renamed and re-profiled over PATCH without dropping the agent", async () => {
@@ -484,7 +484,7 @@ describe("agents, chats, messages, profiles", () => {
       defaultProfileId: null;
     }>(response);
     expect(body.defaultProfileId).toBeNull();
-    expect(body.profiles.map((profile) => profile.id)).toEqual(["mock", "grok", "fast"]);
+    expect(body.profiles.map((profile) => profile.id)).toEqual(["grok", "fast"]);
     expect(JSON.stringify(body)).not.toContain("apiKey");
     expect(JSON.stringify(body)).not.toContain("sk-");
   });

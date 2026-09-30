@@ -16,7 +16,7 @@ The API and Postgres are published on loopback only. Change the host ports with 
 
 Model calls leave the server for OpenAI, Anthropic, xAI, DeepSeek, OpenRouter, or a custom OpenAI-compatible base URL. Keys stay in the server environment. The browser never receives them.
 
-There is no default model. A profile is chosen in the product for each chat. `BOTANICAL_PROFILES` only lists what can be chosen. `mock` is the local echo profile and needs no provider key.
+There is no default model. A profile is chosen in the product for each chat. `BOTANICAL_PROFILES` only lists what can be chosen.
 
 ## Self-host quickstart
 

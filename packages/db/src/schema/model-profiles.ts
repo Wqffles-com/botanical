@@ -15,7 +15,7 @@ export const modelProfiles = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     userId: uuid('user_id').references(() => users.id, { onDelete: 'restrict' }),
     /**
-     * Id the HTTP API uses (`grok`, `mock`). The uuid primary key stays internal
+     * Id the HTTP API uses (`grok`, `deepseek`). The uuid primary key stays internal
      * so chats can keep a foreign key.
      */
     publicId: text('public_id')

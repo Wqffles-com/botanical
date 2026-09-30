@@ -90,5 +90,4 @@ export const KNOWN_PROVIDERS: readonly ProviderKeyStatus[] = [
   { id: "deepseek", label: "DeepSeek", configured: false },
   { id: "openrouter", label: "OpenRouter", configured: false },
   { id: "openai-compat", label: "OpenAI-compatible", configured: false },
-  { id: "mock", label: "Mock", configured: true },
 ] as const;
