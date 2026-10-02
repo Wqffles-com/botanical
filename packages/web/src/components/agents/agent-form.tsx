@@ -28,6 +28,8 @@ import { createAgent, deleteAgent, updateAgent } from "@/lib/agent-api";
 import { fileToAgentPicture } from "@/lib/agent-picture";
 import { agentToExport, parseAgentImport } from "@/lib/agent-export";
 import { downloadText, fileStem } from "@/lib/download";
+import { AGENT_TEMPLATES } from "@/lib/agent-templates";
+import { getAgentIcon } from "@/lib/agent-icons";
 import {
   AGENT_DESCRIPTION_MAX,
   AGENT_NAME_MAX,
@@ -121,19 +123,31 @@ export function AgentForm({
     downloadText(`${fileStem(draft.name, "agent")}.json`, JSON.stringify(file, null, 2), "application/json");
   }
 
+  function applyImport(source: string, verb: string) {
+    const { draft: imported, notes } = parseAgentImport(
+      source,
+      profiles,
+      tools.map((tool) => tool.id),
+    );
+    // Keep the picture and roles: they are not part of the file.
+    setDraft((current) => ({ ...imported, picture: current.picture, roleIds: current.roleIds }));
+    toast.success(`${verb} ${imported.name}. Review it, then create the agent.`);
+    for (const note of notes) toast.info(note);
+  }
+
   async function onImport(file: File) {
     try {
-      const { draft: imported, notes } = parseAgentImport(
-        await file.text(),
-        profiles,
-        tools.map((tool) => tool.id),
-      );
-      // Keep the picture and roles: they are not part of the file.
-      setDraft((current) => ({ ...imported, picture: current.picture, roleIds: current.roleIds }));
-      toast.success(`Imported ${imported.name}. Review it, then create the agent.`);
-      for (const note of notes) toast.info(note);
+      applyImport(await file.text(), "Imported");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not read that file.");
+    }
+  }
+
+  function onTemplate(file: unknown) {
+    try {
+      applyImport(JSON.stringify(file), "Loaded template");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not load that template.");
     }
   }
 
@@ -234,6 +248,32 @@ export function AgentForm({
             )}
           </div>
         </div>
+
+        {agent ? null : (
+          <div className="mt-6 grid gap-2" data-testid="agent-templates">
+            <Label>Start from a template</Label>
+            <div className="flex flex-wrap gap-2">
+              {AGENT_TEMPLATES.map(({ id, file }) => {
+                const Icon = getAgentIcon(file.icon);
+                return (
+                  <Button
+                    key={id}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={saving}
+                    title={file.description}
+                    data-testid={`agent-template-${id}`}
+                    onClick={() => onTemplate(file)}
+                  >
+                    <Icon />
+                    {file.name}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="mt-8 grid gap-6">
           <div className="grid gap-2">
