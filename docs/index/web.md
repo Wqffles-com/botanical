@@ -80,6 +80,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/lib/profile-groups.ts` | Groups profiles by provider (API vendor or coding CLI) and labels each profile by its model |
 | `packages/web/src/lib/chat-export.ts` | `chatToMarkdown` / `chatToJson`: chat transcript with tool calls and compaction summaries |
 | `packages/web/src/lib/agent-export.ts` | `agentToExport` / `parseAgentImport`: portable agent JSON (default model by provider and name, no ids, roles, picture, or secrets). Export is on the agent settings, import on the new-agent form |
+| `packages/web/src/lib/agent-templates.ts` | Starter agents (`agent-templates/*.json`, the agent export format) offered as "Start from a template" on the new-agent form |
 | `packages/web/src/lib/download.ts` | `downloadText` browser file save and `fileStem` |
 | `packages/web/src/lib/chat-stream.ts` | Pair tool calls with results for the thread, tool result status. `presentThread` shows replies (`replyIds` from core) as messages and folds the rest of an agent's output into activity entries |
 | `packages/web/src/components/chat/agent-activity.tsx` | An agent's notes between replies (text output and tool calls), collapsed |

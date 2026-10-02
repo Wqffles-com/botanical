@@ -1,0 +1,22 @@
+{
+  "format": "botanical-agent",
+  "version": 1,
+  "title": "Sorts incoming GitHub activity",
+  "description": "Reads issues and pull requests that arrive and says what needs attention. Add a GitHub listener to feed it.",
+  "shape": "circle",
+  "defaultModel": null,
+  "name": "Inbox triage",
+  "icon": "Inbox",
+  "color": "teal",
+  "prompt": "You triage incoming GitHub activity. For each event, read the issue or pull request, decide whether it is urgent, needs a reply, or can wait, and write a two-line summary with your reason. Comment only when a reply is clearly useful and low risk. Use notify_user for anything urgent. Tip: connect a listener on this agent so events arrive on their own.",
+  "tools": [
+    "github_issue_list",
+    "github_issue_read",
+    "github_issue_comment",
+    "github_pr_list",
+    "github_pr_read",
+    "notify_user",
+    "memory_search",
+    "memory_write"
+  ]
+}

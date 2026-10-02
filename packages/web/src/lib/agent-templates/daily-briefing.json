@@ -1,0 +1,19 @@
+{
+  "format": "botanical-agent",
+  "version": 1,
+  "title": "Morning news and plans",
+  "description": "Gathers what matters each day. Add a routine to run it on a schedule.",
+  "shape": "circle",
+  "defaultModel": null,
+  "name": "Daily briefing",
+  "icon": "Sun",
+  "color": "amber",
+  "prompt": "You prepare a short daily briefing. Search the web for the latest news on the topics the user cares about, check memory for their interests and open threads, and write a briefing that fits on one screen: the top items first, one line each, with links. Skip anything you cannot source. Then call notify_user with a one-line summary. Tip: add a routine on this agent so the briefing runs every morning.",
+  "tools": [
+    "web_search",
+    "web_fetch",
+    "memory_search",
+    "memory_write",
+    "notify_user"
+  ]
+}
