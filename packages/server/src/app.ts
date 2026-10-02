@@ -37,6 +37,7 @@ import { registerMessages } from "./routes/messages.ts";
 import { registerNotifications } from "./routes/notifications.ts";
 import { registerPush } from "./routes/push.ts";
 import { createPushService, withPush } from "./push/service.ts";
+import { registerUsage } from "./routes/usage.ts";
 import { registerProfiles } from "./routes/profiles.ts";
 import { registerRoles } from "./routes/roles.ts";
 import { registerRoutines } from "./routes/routines.ts";
@@ -187,6 +188,7 @@ export function createApp(input: AppDeps): App {
   registerGithub(router);
   registerNotifications(router);
   registerPush(router, push);
+  registerUsage(router);
   registerAlwaysOnSettings(router);
   registerAppearance(router);
   registerAgentMessages(router, a2a);

@@ -12,6 +12,7 @@ import {
 import { createDb, ensureDatabase, type BotanicalDb } from './client.ts';
 import { migrateDatabase } from './migrate.ts';
 import { createAlwaysOn, type AlwaysOn } from './always-on.ts';
+import { createUsage, type Usage } from './usage.ts';
 import {
   createMvp2,
   type AgentRoleSummary,
@@ -293,6 +294,7 @@ export interface Store {
   readonly listeners: AlwaysOn['listeners'];
   readonly listenerDeliveries: AlwaysOn['listenerDeliveries'];
   readonly notifications: AlwaysOn['notifications'];
+  readonly usage: Usage;
   /** Instance-admin tuning for background work. Not per-user. */
   readonly alwaysOnSettings: AlwaysOnSettingsRepository;
   readonly accounts: AccountRepository;
@@ -370,6 +372,7 @@ function buildStore(
   }
   const mvp2 = createMvp2(db, bound);
   const alwaysOn = createAlwaysOn(db, legacyUserId);
+  const usage = createUsage(db, legacyUserId);
   const services = createAccountServices(db, { encryptionKey, legacyUserId });
   const alwaysOnKeys = Object.values(ALWAYS_ON_SETTING_KEYS);
   const alwaysOnSettings = createAlwaysOnSettingsAccessor({
@@ -969,6 +972,7 @@ function buildStore(
     listeners: alwaysOn.listeners,
     listenerDeliveries: alwaysOn.listenerDeliveries,
     notifications: alwaysOn.notifications,
+    usage,
     alwaysOnSettings,
     globalProfiles: {
       async list() {

@@ -3,6 +3,7 @@
 import {
   Bot,
   CalendarClock,
+  Gauge,
   Inbox,
   MessageSquare,
   Monitor,
@@ -40,6 +41,7 @@ const PAGES = [
   { href: "/routines", label: "Routines", icon: CalendarClock },
   { href: "/listeners", label: "Listeners", icon: Webhook },
   { href: "/agents", label: "Agents", icon: Bot },
+  { href: "/usage", label: "Usage", icon: Gauge },
 ] as const;
 
 /** ⌘K palette: jump to an agent, a chat, or a page, or run a quick action. */

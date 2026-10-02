@@ -25,7 +25,7 @@ Defined with `pgTable` under `packages/db/src/schema`. Re-exported from `package
 | `sessions` | `packages/db/src/schema/sessions.ts` |
 | `settings` | `packages/db/src/schema/settings.ts` |
 | `secret_refs` | `packages/db/src/schema/secret-refs.ts` |
-| `usage_events` | `packages/db/src/schema/usage-events.ts` |
+| `usage_events` | `packages/db/src/schema/usage-events.ts` (repository: `packages/db/src/usage.ts`, `store.usage`) |
 | `tool_audit` | `packages/db/src/schema/tool-audit.ts` |
 | `memories` | `packages/db/src/schema/memories.ts` |
 | `roles` | `packages/db/src/schema/roles.ts` |
@@ -61,6 +61,7 @@ Enums in `packages/db/src/schema/enums.ts`: `message_role`, `a2a_status`, `agent
 | `packages/db/migrations/0010_github.sql` | listener `events`, delivery status `ignored`, and the `git` and `github` capabilities on the Coder and Orchestrator roles |
 | `packages/db/migrations/0011_password_resets.sql` | `password_resets`: admin-generated, single-use reset links (token hash only) |
 | `packages/db/migrations/0012_user_disabled.sql` | `users.disabled_at`: set when an admin disables an account |
+| `packages/db/migrations/0013_usage_dashboard.sql` | `usage_events.agent_id`, `profile_ref` (public profile id), and `source` (`chat`, `routine`, `listener`, `agent_mail`), plus a `created_at` index |
 | `packages/db/migrations/meta/_journal.json` | Apply order (tags match the SQL filenames) |
 | `packages/db/migrations/meta/0000_snapshot.json` | Drizzle snapshot for `0000` |
 | `packages/db/migrations/meta/0001_snapshot.json` | Drizzle snapshot for `0001` |

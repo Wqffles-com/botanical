@@ -10,6 +10,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+import { agents } from './agents.ts';
 import { chats } from './chats.ts';
 import { messages } from './messages.ts';
 import { modelProfiles } from './model-profiles.ts';
@@ -24,8 +25,13 @@ export const usageEvents = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     chatId: uuid('chat_id').references(() => chats.id, { onDelete: 'cascade' }),
+    agentId: uuid('agent_id').references(() => agents.id, { onDelete: 'set null' }),
     messageId: uuid('message_id').references(() => messages.id, { onDelete: 'set null' }),
     profileId: uuid('profile_id').references(() => modelProfiles.id, { onDelete: 'set null' }),
+    /** Public profile id (`model_profiles.public_id`), kept as text so a deleted profile still groups. */
+    profileRef: text('profile_ref'),
+    /** Where the turn came from: chat, routine, listener, or agent_mail. */
+    source: text('source').notNull().default('chat'),
     provider: text('provider').notNull(),
     model: text('model').notNull(),
     inputTokens: integer('input_tokens').notNull().default(0),
@@ -38,6 +44,8 @@ export const usageEvents = pgTable(
     index('usage_events_user_created_idx').on(t.userId, t.createdAt),
     index('usage_events_profile_created_idx').on(t.profileId, t.createdAt),
     index('usage_events_chat_id_idx').on(t.chatId),
+    index('usage_events_created_idx').on(t.createdAt),
+    check('usage_events_source_check', sql`${t.source} in ('chat', 'routine', 'listener', 'agent_mail')`),
     check('usage_events_tokens_nonneg', sql`${t.inputTokens} >= 0 and ${t.outputTokens} >= 0`),
     check(
       'usage_events_provider_model_not_blank',

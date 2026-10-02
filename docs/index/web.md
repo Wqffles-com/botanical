@@ -29,6 +29,7 @@ There is no `middleware.ts`. `packages/web/src/proxy.ts` is the auth gate: publi
 | `/inbox` | `packages/web/src/app/(app)/inbox/page.tsx` |
 | `/routines` | `packages/web/src/app/(app)/routines/page.tsx` |
 | `/listeners` | `packages/web/src/app/(app)/listeners/page.tsx` |
+| `/usage` | `packages/web/src/app/(app)/usage/page.tsx` (tokens and estimated cost; admins also see everyone and edit the price table) |
 | `/settings` | `packages/web/src/app/(app)/settings/page.tsx` (deep-link fallback; in the app, settings open as a dialog) |
 
 Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packages/web/src/app/(app)/layout.tsx` (`AppShell`).
@@ -56,6 +57,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/lib/memory-title.ts` | `memoryTitle`: a memory's first line, without Markdown markers, cut to one line. Memories have no title field |
 | `packages/web/src/components/chat` | Thread, composer (sending stays open while the agent works), dictation, `@` agent mention autocomplete in the composer, new-chat form (pre-selects the agent's default model, optional group members), agent pill in the middle of the shell header with a menu that opens the agent settings dialog (`chat-agent-header.tsx`), group members popover in the chat header (`chat-members-menu.tsx`), message actions (`message-actions.tsx`: copy, edit, retry, delete), agent mail rows, collapsed to one line each (`inbox-message-card.tsx`), that open every message between the two agents in a settings-sized dialog (`agent-conversation-dialog.tsx`), right side panel (`chat-side-panel.tsx`: Files, Memory, Details tabs) |
 | `packages/web/src/components/inbox/inbox-view.tsx` | Agent inbox |
+| `packages/web/src/components/usage` | Usage dashboard (`packages/web/src/lib/usage-format.ts` formats tokens and dollars and parses price rows) |
 | `packages/web/src/components/routines` | Routine list and editor (`packages/web/src/lib/schedule.ts` humanizes cron) |
 | `packages/web/src/components/listeners` | Listener list and editor. The editor picks the source (webhook or GitHub) and, for GitHub, the events. `packages/web/src/components/listeners/github-hook-dialog.tsx` adds the webhook to a repository with the connected account |
 | `packages/web/src/components/settings/github-panel.tsx` | Settings → GitHub: connect, replace, or disconnect the user's GitHub token, and what agents can do with it |

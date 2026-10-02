@@ -224,7 +224,7 @@ async function runInboxTurn(
       const write = async () => {
         const chat = await store.chats.get(chatId!);
         if (!chat) throw new Error("Inbox chat not found");
-        const result = await collectChatTurn(store, runtime(), { chat, content, profile });
+        const result = await collectChatTurn(store, runtime(), { chat, content, profile, source: "agent_mail" });
         onMessage?.(result.userMessage);
         // An agent can send several messages in one turn, so every stored row goes out.
         for (const message of result.stored) onMessage?.(message);

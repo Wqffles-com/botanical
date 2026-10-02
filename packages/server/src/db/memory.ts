@@ -18,6 +18,7 @@ import {
 import { currentUserId, pinStore } from "@botanical/db";
 import { createAlwaysOn, MEMORY_OPERATOR_ID } from "./always-on.ts";
 import { createMemoryAccounts } from "./memory-accounts.ts";
+import { createMemoryUsage } from "./usage.ts";
 import { createPlatform } from "./platform.ts";
 import {
   AGENT_MESSAGE_STATUSES,
@@ -646,6 +647,7 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date; 
     listeners: alwaysOn.listeners,
     listenerDeliveries: alwaysOn.listenerDeliveries,
     notifications: alwaysOn.notifications,
+    usage: createMemoryUsage(MEMORY_OPERATOR_ID, options?.now),
     alwaysOnSettings: alwaysOn.alwaysOnSettings,
   };
   return store;

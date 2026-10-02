@@ -15,7 +15,7 @@ import {
 import { ProviderError } from "@botanical/providers";
 import { HttpError } from "../http.ts";
 import type { SseEvent } from "../streaming.ts";
-import type { Chat, Message, ModelProfile, Store } from "../types.ts";
+import type { Chat, Message, ModelProfile, Store, UsageSource } from "../types.ts";
 import { handoffs, isGroupChat, respondersFor } from "./group.ts";
 
 export interface TurnErrorBody {
@@ -67,6 +67,8 @@ export interface ChatTurnInput {
   steering?: TurnSteering;
   /** The agent that answers: the owner (default) or a group member. */
   agentId?: string;
+  /** Where the turn came from, for the usage log. Default `chat`. */
+  source?: UsageSource;
 }
 
 /**
@@ -211,6 +213,7 @@ export async function* streamChatTurn(
         return;
       }
       yield* announce();
+      if (event.type === "usage") await recordUsage(store, input, agentId, event);
       const mapped = mapRuntimeEvent(event);
       if (mapped) yield mapped;
     }
@@ -275,6 +278,29 @@ export async function collectChatTurn(
     ...(toolResult !== undefined ? { toolResult } : {}),
     ...(error ? { error } : {}),
   };
+}
+
+/** One model call's tokens go to the usage log. A failed write is logged and never fails the turn. */
+async function recordUsage(
+  store: Store,
+  input: ChatTurnInput,
+  agentId: string,
+  event: Extract<RuntimeEvent, { type: "usage" }>,
+): Promise<void> {
+  try {
+    await store.usage.record({
+      chatId: input.chat.id,
+      agentId,
+      profileId: input.profile.id,
+      provider: input.profile.provider,
+      model: input.profile.model,
+      source: input.source ?? "chat",
+      inputTokens: event.inputTokens,
+      outputTokens: event.outputTokens,
+    });
+  } catch (error) {
+    console.error("[turn] usage not recorded", error);
+  }
 }
 
 function mapRuntimeEvent(event: RuntimeEvent): SseEvent | null {

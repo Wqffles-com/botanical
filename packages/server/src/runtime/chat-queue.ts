@@ -7,7 +7,7 @@ import { HttpError } from "../http.ts";
 import { resolveProfile } from "../profiles.ts";
 import { assertCliProfileReady } from "../routes/profiles.ts";
 import type { SseEvent } from "../streaming.ts";
-import type { ModelProfile, Store } from "../types.ts";
+import type { ModelProfile, Store, UsageSource } from "../types.ts";
 import { streamChatReplies, type TurnErrorBody } from "./turn.ts";
 import type { TurnCoordinator } from "./turns.ts";
 
@@ -283,7 +283,12 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
      * the stored messages, and `error`. Stop aborts it. Queued messages wait for it and are not
      * steered into it. Resolves with the turn's error; throws when the turn cannot start.
      */
-    async runTurn(input: { chatId: string; content: string; profile: ModelProfile }): Promise<{ error?: TurnErrorBody }> {
+    async runTurn(input: {
+      chatId: string;
+      content: string;
+      profile: ModelProfile;
+      source: Exclude<UsageSource, "chat">;
+    }): Promise<{ error?: TurnErrorBody }> {
       const { chatId } = input;
       const state = stateFor(chatId);
       state.background += 1;
@@ -305,6 +310,7 @@ export function createChatQueue(deps: { store: Store; runtime: RuntimeDeps; turn
               content: input.content,
               profile: input.profile,
               signal: controller.signal,
+              source: input.source,
             });
             const error = await pump(chatId, state, seen, turn, (cause) => {
               if (!controller.signal.aborted) publish(state, { event: "error", data: errorBody(cause) });

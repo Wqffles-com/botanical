@@ -1,7 +1,7 @@
 "use client";
 
 import type { Agent, Chat } from "@botanical/core";
-import { CalendarClock, Inbox, Moon, Plus, Search, Settings, SquarePen, Sun, Webhook } from "lucide-react";
+import { CalendarClock, Gauge, Inbox, Moon, Plus, Search, Settings, SquarePen, Sun, Webhook } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -37,6 +37,7 @@ const NAV = [
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/routines", label: "Routines", icon: CalendarClock },
   { href: "/listeners", label: "Listeners", icon: Webhook },
+  { href: "/usage", label: "Usage", icon: Gauge },
 ] as const;
 
 /** Round icon button for the sidebar's top and bottom rows. */

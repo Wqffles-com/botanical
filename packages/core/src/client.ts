@@ -82,7 +82,10 @@ import type {
   WorkspaceFile,
   WorkspaceListing,
   ModelProfile,
+  ModelPrice,
   NotificationPage,
+  UsagePrices,
+  UsageResponse,
   AlwaysOnSettings,
   AppNotification,
   RolePermissions,
@@ -791,6 +794,24 @@ export class BotanicalClient {
     const body = await this.requestJson(API.notificationsReadAll, { method: "POST", body: "{}" });
     const row = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
     return typeof row.updated === "number" ? row.updated : 0;
+  }
+
+  /** Token usage and estimated cost. `scope: "all"` is admin only. */
+  async getUsage(options: { days?: number; scope?: "own" | "all" } = {}): Promise<UsageResponse> {
+    const params = new URLSearchParams();
+    if (options.days !== undefined) params.set("days", String(options.days));
+    if (options.scope) params.set("scope", options.scope);
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return (await this.requestJson(`${API.usage}${query}`)) as UsageResponse;
+  }
+
+  /** Admin only. Replaces every price override. */
+  async setUsagePrices(overrides: Record<string, ModelPrice>): Promise<UsagePrices> {
+    const body = (await this.requestJson(API.usagePrices, {
+      method: "PUT",
+      body: JSON.stringify({ overrides }),
+    })) as { prices: UsagePrices };
+    return body.prices;
   }
 
   private url(path: string): string {
