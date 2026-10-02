@@ -39,6 +39,7 @@ import { fetchMcpServers, fetchProfiles, fetchSettings, fetchTools } from "@/lib
 import type { AppSettings, CatalogTool, McpSnapshot, ProviderKeyStatus } from "@/lib/mvp-types";
 import { deriveProviderKeys } from "@/lib/parse";
 import { AccentCard } from "./accent-card";
+import { AccountCard } from "./account-card";
 import { AdminPanel } from "./admin-panel";
 import { BackgroundWorkCard } from "./background-work-card";
 import { DeploymentBadge } from "./deployment-badge";
@@ -181,6 +182,7 @@ export function SettingsPanels({
   const panels = (
     <>
       <TabsContent value="general" className={cn("space-y-4", !dialog && "mt-4")}>
+        <AccountCard />
         <AccentCard />
         {loading ? (
           <SettingsSkeleton />

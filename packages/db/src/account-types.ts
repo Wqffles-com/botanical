@@ -42,6 +42,17 @@ export interface AccountRepository {
   inviteValid(tokenHash: string, now: Date): Promise<boolean>;
   /** Mark an unused, unexpired invite consumed. False when it cannot be used. */
   takeInvite(tokenHash: string, userId: string, now: Date): Promise<boolean>;
+  listUsers(): Promise<AuthUser[]>;
+  /** Replace a user's password hash. False when the user does not exist. */
+  setPasswordHash(userId: string, passwordHash: string): Promise<boolean>;
+  /** The user's current password hash, for checking the current password. */
+  passwordHashOf(userId: string): Promise<string | null>;
+  createPasswordReset(input: { userId: string; createdBy: string; tokenHash: string; expiresAt: string }): Promise<void>;
+  /**
+   * Consume an unused, unexpired reset link and return the user it belongs to.
+   * Null when the link cannot be used.
+   */
+  takePasswordReset(tokenHash: string, now: Date): Promise<string | null>;
   /** Move pre-account rows onto the first real user. Postgres claims the row instead. */
   adoptLegacyData(userId: string): Promise<void>;
   bootstrapUserId(): Promise<string>;

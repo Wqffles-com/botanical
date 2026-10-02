@@ -102,6 +102,105 @@ export function registerAuth(router: Router): void {
   });
 
   router.add(
+    "POST",
+    "/api/auth/password",
+    authed(async (ctx) => {
+      const session = ctx.session;
+      const user = ctx.user;
+      if (!session || !user) throw new HttpError(401, "unauthorized", "Authentication required");
+      const body = await readJson(ctx.request, ctx.config);
+      if (!isRecord(body)) throw new HttpError(400, "invalid_body", "JSON object expected");
+      const current = readPassword(body.currentPassword, false);
+      const next = readPassword(body.newPassword, true);
+      if (!ctx.rateLimiter.isAllowed(ctx.clientKey)) {
+        throw new HttpError(429, "rate_limited", "Too many attempts. Try again later.");
+      }
+      const hash = await ctx.store.accounts.passwordHashOf(user.id);
+      if (!hash || !(await Bun.password.verify(current, hash))) {
+        ctx.rateLimiter.recordFailure(ctx.clientKey);
+        throw new HttpError(403, "wrong_password", "Current password is incorrect");
+      }
+      ctx.rateLimiter.clear(ctx.clientKey);
+      await ctx.store.accounts.setPasswordHash(user.id, await Bun.password.hash(next, { algorithm: "argon2id" }));
+      const signedOut = await ctx.store.sessions.deleteByUser(user.id, session.id);
+      return json(200, { ok: true, signedOut });
+    }),
+  );
+
+  router.add(
+    "POST",
+    "/api/auth/reset",
+    async (ctx) => {
+      const body = await readJson(ctx.request, ctx.config);
+      if (!isRecord(body)) throw new HttpError(400, "invalid_body", "JSON object expected");
+      if (typeof body.token !== "string" || body.token.trim() === "") {
+        throw new HttpError(400, "invalid_body", "token is required");
+      }
+      const password = readPassword(body.password, true);
+      if (!ctx.rateLimiter.isAllowed(ctx.clientKey)) {
+        throw new HttpError(429, "rate_limited", "Too many attempts. Try again later.");
+      }
+      const userId = await ctx.store.accounts.takePasswordReset(hashToken(body.token.trim()), ctx.now);
+      if (!userId) {
+        ctx.rateLimiter.recordFailure(ctx.clientKey);
+        throw new HttpError(403, "reset_invalid", "That reset link is invalid or expired");
+      }
+      const updated = await ctx.store.accounts.setPasswordHash(
+        userId,
+        await Bun.password.hash(password, { algorithm: "argon2id" }),
+      );
+      const user = updated ? await ctx.store.accounts.findById(userId) : null;
+      if (!user) throw new HttpError(403, "reset_invalid", "That reset link is invalid or expired");
+      await ctx.store.sessions.deleteByUser(userId);
+      ctx.rateLimiter.clear(ctx.clientKey);
+      return issueSession(ctx, user);
+    },
+  );
+
+  router.add(
+    "GET",
+    "/api/auth/sessions",
+    authed(async (ctx) => {
+      const current = ctx.session?.id;
+      const rows = await ctx.store.sessions.listByUser(ctx.user?.id ?? "");
+      const live = rows.filter((row) => Date.parse(row.expiresAt) > ctx.now.getTime());
+      return json(200, {
+        sessions: live.map((row) => ({
+          id: row.id,
+          createdAt: row.createdAt,
+          expiresAt: row.expiresAt,
+          current: row.id === current,
+        })),
+      });
+    }),
+  );
+
+  router.add(
+    "DELETE",
+    "/api/auth/sessions",
+    authed(async (ctx) => {
+      const revoked = await ctx.store.sessions.deleteByUser(ctx.user?.id ?? "", ctx.session?.id);
+      return json(200, { revoked });
+    }),
+  );
+
+  router.add(
+    "DELETE",
+    "/api/auth/sessions/:id",
+    authed(async (ctx) => {
+      const id = ctx.params.id ?? "";
+      if (id === ctx.session?.id) {
+        throw new HttpError(400, "invalid_request", "Use logout to end this session");
+      }
+      const owned = (await ctx.store.sessions.listByUser(ctx.user?.id ?? "")).some((row) => row.id === id);
+      if (!owned || !(await ctx.store.sessions.delete(id))) {
+        throw new HttpError(404, "not_found", "Session not found");
+      }
+      return new Response(null, { status: 204 });
+    }),
+  );
+
+  router.add(
     "GET",
     "/api/auth/me",
     authed(async (ctx) => {

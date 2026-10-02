@@ -60,6 +60,11 @@ Group chats: `POST /api/chats` and `PATCH /api/chats/:id` take `memberIds`, the 
 | POST | `/api/auth/login` | `packages/server/src/routes/auth.ts` |
 | POST | `/api/auth/logout` | `packages/server/src/routes/auth.ts` |
 | GET | `/api/auth/me` | `packages/server/src/routes/auth.ts` |
+| POST | `/api/auth/password` | `packages/server/src/routes/auth.ts` |
+| POST | `/api/auth/reset` | `packages/server/src/routes/auth.ts` |
+| GET | `/api/auth/sessions` | `packages/server/src/routes/auth.ts` |
+| DELETE | `/api/auth/sessions` | `packages/server/src/routes/auth.ts` |
+| DELETE | `/api/auth/sessions/:id` | `packages/server/src/routes/auth.ts` |
 | GET | `/api/agents` | `packages/server/src/routes/agents.ts` |
 | POST | `/api/agents` | `packages/server/src/routes/agents.ts` |
 | GET | `/api/agents/:id` | `packages/server/src/routes/agents.ts` |
@@ -126,6 +131,8 @@ Group chats: `POST /api/chats` and `PATCH /api/chats/:id` take `memberIds`, the 
 | GET | `/api/admin/profiles` | `packages/server/src/routes/account-settings.ts` |
 | POST | `/api/admin/profiles` | `packages/server/src/routes/account-settings.ts` |
 | DELETE | `/api/admin/profiles/:id` | `packages/server/src/routes/account-settings.ts` |
+| GET | `/api/admin/users` | `packages/server/src/routes/account-settings.ts` |
+| POST | `/api/admin/users/:id/reset-link` | `packages/server/src/routes/account-settings.ts` |
 | POST | `/api/admin/invites` | `packages/server/src/routes/account-settings.ts` |
 | GET | `/api/admin/invites` | `packages/server/src/routes/account-settings.ts` |
 | DELETE | `/api/admin/invites/:id` | `packages/server/src/routes/account-settings.ts` |
