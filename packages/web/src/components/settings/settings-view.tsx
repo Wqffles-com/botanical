@@ -195,7 +195,7 @@ export function SettingsPanels({
         )}
       </TabsContent>
       <TabsContent value="profiles" className={cn(!dialog && "mt-4")}>
-        {loading ? <SettingsSkeleton /> : <ProfilesPanel profiles={profiles} />}
+        {loading ? <SettingsSkeleton /> : <ProfilesPanel profiles={profiles} admin={admin} onAddKey={() => onTab("admin")} />}
       </TabsContent>
       <TabsContent value="memory" className={cn(!dialog && "mt-4")}>
         <MemoryPanel agents={agents} />

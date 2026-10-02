@@ -3,16 +3,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { ModelProfile } from "@botanical/core";
 import { Badge } from "@botanical/ui/components/badge";
 import { EmptyState } from "@botanical/ui/components/empty-state";
+import { Button } from "@botanical/ui/components/button";
 import { profileIsAvailable, profileKind } from "@/lib/format";
 import { providerLabel } from "@/lib/format-extra";
 
-export function ProfilesPanel({ profiles }: { profiles: ModelProfile[] }) {
+export function ProfilesPanel({
+  profiles,
+  admin = false,
+  onAddKey,
+}: {
+  profiles: ModelProfile[];
+  admin?: boolean;
+  onAddKey?: () => void;
+}) {
   if (profiles.length === 0) {
     return (
       <EmptyState
         icon={Layers}
         title="No model profiles"
-        body="The server lists API profiles whose provider key is set, plus any CLI profiles, including ones that are not available yet."
+        body={
+          admin
+            ? "Profiles appear once a provider key is set. Supported: OpenAI, Anthropic, xAI, DeepSeek, OpenRouter, and OpenAI-compatible endpoints."
+            : "Profiles appear once an admin sets a provider key (OpenAI, Anthropic, xAI, DeepSeek, OpenRouter, or an OpenAI-compatible endpoint). Ask an admin to add one under Settings → Admin."
+        }
+        action={admin && onAddKey ? <Button onClick={onAddKey}>Add a provider key</Button> : null}
         bordered
       />
     );

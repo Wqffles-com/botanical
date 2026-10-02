@@ -12,6 +12,7 @@ import { Button } from "@botanical/ui/components/button";
 import { Input } from "@botanical/ui/components/input";
 import { Label } from "@botanical/ui/components/label";
 import { agentIdentity } from "@/lib/agent-identity";
+import { NoProfilesNotice } from "@/components/settings/no-profiles-notice";
 import { agentDefaultProfileId, canStartChat } from "@/lib/chat-groups";
 import { MAX_CHAT_MEMBERS, toggleMember } from "@/lib/chat-members";
 import { cn } from "@/lib/utils";
@@ -171,12 +172,7 @@ export function NewChatForm({
       <section className="space-y-2">
         <Label htmlFor="new-chat-profile">Model</Label>
         {profiles.length === 0 ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
-            <p className="text-sm text-muted-foreground">No model profiles yet.</p>
-            <Button variant="outline" size="sm" onClick={() => openSettings("profiles")}>
-              Create one
-            </Button>
-          </div>
+          <NoProfilesNotice />
         ) : (
           // No `needed` here: nothing is wrong until the user tries to start, and the button hint says what is missing.
           <ProfileSelect id="new-chat-profile" profiles={profiles} value={profileId} onChange={setPickedProfileId} />
