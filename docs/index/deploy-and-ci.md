@@ -79,7 +79,7 @@ Smoke env (not the API): `BOTANICAL_SMOKE_BOOT`, `BOTANICAL_BASE_URL`, `BOTANICA
 
 `.github/workflows/ci.yml`:
 
-1. `check` — typecheck for every package, and `bun test` for every package except `packages/e2e` and `packages/ui` (no unit tests yet), after enabling unprivileged user namespaces for the shell jail.
+1. `check` — the codebase index check, `bun run lint` in `packages/web`, typecheck for every package, and `bun test` for every package except `packages/e2e` and `packages/ui` (no unit tests yet), after enabling unprivileged user namespaces for the shell jail.
 2. `package` — `scripts/release/package.sh`, unzip, `scripts/release/start.sh`, curl API health and `/login`.
 3. `release` — on `v*` tags, upload the zip.
 

@@ -1,7 +1,7 @@
 "use client";
 
 import type { MemoryRecord } from "@botanical/core";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Badge } from "@botanical/ui/components/badge";
 import { Button } from "@botanical/ui/components/button";
 import {
@@ -44,11 +44,14 @@ export function MemoryDialog({
   const [content, setContent] = useState("");
   const [tags, setTags] = useState("");
 
-  useEffect(() => {
+  // Reset the draft when a different memory opens (adjusting state during render, not in an effect).
+  const [shownMemory, setShownMemory] = useState(memory);
+  if (shownMemory !== memory) {
+    setShownMemory(memory);
     setEditing(false);
     setContent(memory?.content ?? "");
     setTags(memory?.tags.join(", ") ?? "");
-  }, [memory]);
+  }
 
   return (
     <Dialog open={memory !== null} onOpenChange={onOpenChange}>

@@ -20,6 +20,7 @@ export {
   usersRelations,
 } from './relations.ts';
 export { invites } from './invites.ts';
+export { passwordResets } from './password-resets.ts';
 export { secretRefs } from './secret-refs.ts';
 export { secrets } from './secrets.ts';
 export { sessions } from './sessions.ts';

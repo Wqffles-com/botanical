@@ -40,6 +40,8 @@ import { registerRoles } from "./routes/roles.ts";
 import { registerRoutines } from "./routes/routines.ts";
 import { registerTools } from "./routes/tools.ts";
 import { registerTranscription } from "./routes/transcription.ts";
+import { loadAttachedImages } from "./runtime/attachments.ts";
+import { registerUploads } from "./routes/uploads.ts";
 import { registerWorkspace } from "./routes/workspace.ts";
 import { createChatQueue, type ChatQueue } from "./runtime/chat-queue.ts";
 import { createBackgroundJobs } from "./runtime/jobs.ts";
@@ -167,6 +169,7 @@ export function createApp(deps: AppDeps): App {
   registerAccountSettings(router);
   registerAgents(router);
   registerWorkspace(router);
+  registerUploads(router);
   registerRoles(router);
   registerMemories(router);
   registerChats(router);
@@ -244,6 +247,7 @@ function createRuntime(
       bus,
       profiles,
       workspaceFor: (agentId) => agentWorkspace(agentId),
+      loadImages: loadAttachedImages,
       memories: {
         recall: ({ agentId }) => deps.store.memories.listVisible(agentId, { limit: 200 }),
       },

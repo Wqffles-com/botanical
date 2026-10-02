@@ -52,3 +52,5 @@ Colocated under `packages/core/src`. Script: `bun test src`.
 - **Add a client method.** Path in `packages/core/src/paths.ts`, method on `BotanicalClient` in `packages/core/src/client.ts`, normalizer in `packages/core/src/normalize.ts` if the JSON shape needs it, and a test next to `packages/core/src/client.test.ts`.
 - **Change a shared wire type.** `packages/core/src/types.ts`, then the web callers under `packages/web/src`.
 - **Change SSE parsing.** `packages/core/src/sse.ts`, and `normalizeChatEvent` in `packages/core/src/normalize.ts` for the chat events feed.
+
+- `packages/core/src/attachments.ts`: attachment limits, `withAttachments` / `splitAttachments` (the "Attached files" block at the end of a message), name and MIME sanitizing. `BotanicalClient.uploadAgentFile` and `agentUploadUrl` call the upload routes.
