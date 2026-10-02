@@ -524,6 +524,49 @@ export interface NotificationPage {
   unreadCount: number;
 }
 
+/** USD per million tokens. */
+export interface ModelPrice {
+  inputPerMTok: number;
+  outputPerMTok: number;
+}
+
+export interface UsageRow {
+  key: string;
+  label: string;
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  /** Null when no call in the row has a price. */
+  costUsd: number | null;
+  /** Calls whose model has no price. The cost leaves them out. */
+  unpricedCalls: number;
+}
+
+export interface UsageReport {
+  since: string;
+  until: string;
+  totals: UsageRow;
+  byDay: UsageRow[];
+  byAgent: UsageRow[];
+  byModel: UsageRow[];
+  bySource: UsageRow[];
+  byUser: UsageRow[];
+}
+
+export interface UsagePrices {
+  /** Built-in estimates by model id prefix. */
+  defaults: Record<string, ModelPrice>;
+  /** Admin overrides by model id prefix. */
+  overrides: Record<string, ModelPrice>;
+}
+
+export interface UsageResponse {
+  scope: "own" | "all";
+  days: number;
+  report: UsageReport;
+  prices: UsagePrices;
+}
+
 /** Instance-admin tuning for routines, listeners, and background turns. */
 export interface AlwaysOnSettings {
   schedulerEnabled: boolean;

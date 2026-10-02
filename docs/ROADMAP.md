@@ -32,6 +32,7 @@ Botanical is in early alpha. This page separates what already ships from what is
 - **Message actions**: copy, edit, retry, and delete chat messages. Editing a user message resends it and drops what came after; editing a reply corrects it in place. Deleting can also drop everything after a message. Actions lock while the agent works.
 - **Chat side panel**: Files (browse and read the agent's workspace), Memory (global and the agent's own), and Details (message counts, tool calls, tokens, context length, model). Toggle from the chat header.
 - **GitHub**: each user connects their GitHub account in Settings. Agents clone repositories into their workspace or put their own files under git, then commit, push, and open issues and pull requests (`git_*` and `github_*` tools, capabilities `git` and `github`). GitHub listeners wake an agent when an issue is opened, a comment is posted, or a pull request is opened, and can add their webhook to a repository.
+- **Usage dashboard**: `/usage` shows tokens in and out and estimated cost by day, agent, profile and model, and source (chat, routine, listener, agent mail). A user sees their own usage; an admin can switch to everyone and edit the per-model price table (estimates, not billing). Spending caps are still planned.
 - **Async chat**: keep sending while the agent works. A message sent mid-turn steers the running turn: the model reads it before its next step (Claude Code reads it on stdin). Replies arrive whole. Closing the tab does not stop the turn.
 
 ## Planned

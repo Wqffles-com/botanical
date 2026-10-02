@@ -44,5 +44,6 @@ export { INTERRUPTED_STOPPED, RUN_LEASE_MS, RUN_LEASE_RENEW_MS, shouldReapLease 
 export { normalizeDeploymentMode, resolveDeploymentMode } from './deployment-mode.ts';
 export { migrateDatabase } from './migrate.ts';
 export { createStore } from './store.ts';
+export type { NewUsageEvent, UsageEventRecord, UsageQuery, UsageSource } from './usage.ts';
 export * from './schema/index.ts';
 export * from './types.ts';

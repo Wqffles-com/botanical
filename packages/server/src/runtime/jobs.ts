@@ -65,6 +65,7 @@ export function createBackgroundJobs(deps: {
           chatId: chat.id,
           content: `[Routine · ${label}]\n\n${routine.prompt}`,
           profile,
+          source: "routine",
         });
         const finishedAt = new Date().toISOString();
         if (result.error) {
@@ -157,6 +158,7 @@ export function createBackgroundJobs(deps: {
           chatId: chat.id,
           content: `[${handler.label} · ${label}]\n\n${prompt}`,
           profile,
+          source: "listener",
         });
         if (result.error) {
           await finishDelivery(deliveryId, listener.agentId, chatId, listener.name, result.error.message);

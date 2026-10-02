@@ -53,4 +53,6 @@ export const API = {
   notifications: "/api/notifications",
   notificationRead: (id: string) => `/api/notifications/${encodeURIComponent(id)}/read`,
   notificationsReadAll: "/api/notifications/read-all",
+  usage: "/api/usage",
+  usagePrices: "/api/admin/usage/prices",
 } as const;

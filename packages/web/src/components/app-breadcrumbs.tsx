@@ -28,6 +28,7 @@ const SECTIONS: Record<string, string> = {
   inbox: "Inbox",
   routines: "Routines",
   listeners: "Listeners",
+  usage: "Usage",
 };
 
 /** Where you are, derived from the route and workspace names. */

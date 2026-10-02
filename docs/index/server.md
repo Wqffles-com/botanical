@@ -23,6 +23,7 @@ HTTP API: account auth, agents, chats, streaming turns, agent-to-agent mail, rou
 | `packages/server/src/push` | Web Push: `service.ts` keeps per-user device subscriptions and event toggles in `prefs` (`push.subscriptions`, `push.events`), generates the VAPID key pair on first use (public key in `push.vapid_public`, private key in the secret `push-vapid-private`), and `withPush` wraps the store so every `notifications.create` also pushes to the owner's devices (dead endpoints are dropped). Kinds default on; `BOTANICAL_VAPID_SUBJECT` overrides the VAPID contact |
 | `packages/server/src/db` | In-memory store and Postgres adapter. Routines, listeners, and notifications: `packages/server/src/db/always-on.ts` |
 | `packages/server/src/runtime` | Turn runner, profile resolver, workspace path, store adapter. Background turns: `packages/server/src/runtime/jobs.ts`, `packages/server/src/runtime/turns.ts`. Async chat queue, background turns, and events: `packages/server/src/runtime/chat-queue.ts`. An agent's own chat: `packages/server/src/runtime/agent-chat.ts`. Group chat responders: `packages/server/src/runtime/group.ts` |
+| `packages/server/src/usage` | Usage dashboard: `prices.ts` (default per-model price prefixes, admin overrides in the global pref `usage.prices`, cost estimate) and `report.ts` (groups usage rows by day, agent, profile and model, source, and user). The in-memory log is `packages/server/src/db/usage.ts` |
 | `packages/server/src/routines` | Cron check (`cron.ts`) and in-process scheduler (`scheduler.ts`) |
 | `packages/server/src/listeners` | Webhook signature, body cap, and prompt framing. `packages/server/src/listeners/kinds.ts` maps a listener `kind` (`webhook`, `github`) to its verify, accept, and prompt functions |
 | `packages/server/src/github` | GitHub connection (`packages/server/src/github/connection.ts`), REST client (`packages/server/src/github/api.ts`), GitHub tools (`packages/server/src/github/tools.ts`), git tools (`packages/server/src/github/git.ts`), and GitHub webhook deliveries (`packages/server/src/github/webhook.ts`) |
@@ -35,6 +36,8 @@ HTTP API: account auth, agents, chats, streaming turns, agent-to-agent mail, rou
 | `packages/server/src/speech` | Speech-to-text provider calls |
 | `packages/server/src/provider-host.ts` | Holds the provider registry on the config object |
 | `packages/server/test` | `bun test` files |
+
+Usage: every model call a turn makes is recorded through `store.usage` (`streamChatTurn` in `packages/server/src/runtime/turn.ts`) with its user, agent, chat, profile, model, tokens, and source: `chat`, `routine`, `listener`, or `agent_mail` (`ChatTurnInput.source`; `runTurn` requires one). `GET /api/usage?days=&scope=` (`days` 1-365, default 30; `scope=own` default, `all` is admin only) returns `{ scope, days, report, prices }`. Cost is estimated when read, so a price change applies to past calls; a model with no price is counted in `unpricedCalls` and adds no cost. `PUT /api/admin/usage/prices` replaces the overrides (`{ overrides: { [modelPrefix]: { inputPerMTok, outputPerMTok } } }`).
 
 Admin user management: `GET /api/admin/users` lists accounts with `lastActiveAt` (the newest session's start) and `disabledAt`. `PATCH /api/admin/users/:id` takes `disabled` and `role`; disabling deletes the user's sessions, and a disabled account cannot log in (`403 account_disabled`) or use an existing token. `DELETE /api/admin/users/:id` removes the account with its agents, chats, messages, routines, listeners, notifications, memories, personal profiles, and secrets (`AccountRepository.deleteUser`). Admins cannot disable or delete themselves, and the last active admin cannot be demoted, disabled, or deleted (`409 last_admin`). An account referenced by the append-only tool log cannot be deleted (`409 user_has_history`); disable it instead.
 
@@ -129,6 +132,8 @@ Group chats: `POST /api/chats` and `PATCH /api/chats/:id` take `memberIds`, the 
 | PUT | `/api/github` | `packages/server/src/routes/github.ts` |
 | DELETE | `/api/github` | `packages/server/src/routes/github.ts` |
 | GET | `/api/github/repos` | `packages/server/src/routes/github.ts` |
+| GET | `/api/usage` | `packages/server/src/routes/usage.ts` |
+| PUT | `/api/admin/usage/prices` | `packages/server/src/routes/usage.ts` |
 | GET | `/api/notifications` | `packages/server/src/routes/notifications.ts` |
 | POST | `/api/notifications/read-all` | `packages/server/src/routes/notifications.ts` |
 | POST | `/api/notifications/:id/read` | `packages/server/src/routes/notifications.ts` |

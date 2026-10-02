@@ -663,6 +663,43 @@ export interface NotificationRepository {
   markAllRead(now: Date): Promise<number>;
 }
 
+export type UsageSource = "chat" | "routine" | "listener" | "agent_mail";
+
+/** One model call: who ran it, on which profile and model, where the turn came from, and its tokens. */
+export interface UsageEvent {
+  id: string;
+  userId: string;
+  chatId: string | null;
+  agentId: string | null;
+  profileId: string | null;
+  provider: string;
+  model: string;
+  source: UsageSource;
+  inputTokens: number;
+  outputTokens: number;
+  createdAt: string;
+}
+
+export type NewUsageEvent = Omit<UsageEvent, "id" | "userId" | "createdAt" | "chatId" | "agentId" | "profileId"> & {
+  chatId?: string | null;
+  agentId?: string | null;
+  profileId?: string | null;
+};
+
+export interface UsageQuery {
+  /** Inclusive lower bound on `createdAt` (ISO). */
+  since?: string;
+  /** Exclusive upper bound on `createdAt` (ISO). */
+  until?: string;
+  /** Every user's events. The caller checks admin first. Default: the acting user. */
+  allUsers?: boolean;
+}
+
+export interface UsageRepository {
+  record(input: NewUsageEvent): Promise<void>;
+  list(query?: UsageQuery): Promise<UsageEvent[]>;
+}
+
 export interface Store {
   /** "memory" is process-local. "postgres" is packages/db. */
   readonly kind: "memory" | "postgres";
@@ -686,6 +723,8 @@ export interface Store {
   readonly listeners: ListenerRepository;
   readonly listenerDeliveries: ListenerDeliveryRepository;
   readonly notifications: NotificationRepository;
+  /** Token usage per model call. */
+  readonly usage: UsageRepository;
   /**
    * Instance-admin settings for background work.
    * One value per deployment today. Becomes admin-only when accounts land.
