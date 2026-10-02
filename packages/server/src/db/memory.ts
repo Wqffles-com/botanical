@@ -136,10 +136,28 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date; 
     alwaysOn.reassign(MEMORY_OPERATOR_ID, userId);
   }
 
+  async function purgeUser(userId: string): Promise<void> {
+    const mine = pinStore(store, userId);
+    for (const chat of await mine.chats.list()) await mine.chats.delete(chat.id);
+    for (const agent of await mine.agents.list()) await mine.agents.delete(agent.id);
+    for (const [id, owner] of [...memoryOwners]) {
+      if (owner !== userId) continue;
+      memoryOwners.delete(id);
+      await platform.memories.delete(id);
+    }
+    for (const [key, owner] of [...profileOwners]) {
+      if (owner !== userId) continue;
+      profileOwners.delete(key);
+      profiles.delete(key);
+    }
+    alwaysOn.purgeUser(userId);
+  }
+
   const services = createMemoryAccounts({
     encryptionKey: options?.encryptionKey,
     now: timestamp,
     adoptLegacy,
+    purgeUser,
     legacyUserId: MEMORY_OPERATOR_ID,
   });
 

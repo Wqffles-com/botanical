@@ -8,6 +8,8 @@ export interface AuthUser {
   displayName: string;
   role: UserRole;
   createdAt: string;
+  /** Set while an admin has the account disabled. */
+  disabledAt: string | null;
 }
 
 export interface StoredUser extends AuthUser {
@@ -43,6 +45,16 @@ export interface AccountRepository {
   /** Mark an unused, unexpired invite consumed. False when it cannot be used. */
   takeInvite(tokenHash: string, userId: string, now: Date): Promise<boolean>;
   listUsers(): Promise<AuthUser[]>;
+  /** Disable or re-enable an account. Null when the user does not exist. */
+  setDisabled(userId: string, disabled: boolean): Promise<AuthUser | null>;
+  /** Change a user's role. Null when the user does not exist. */
+  setRole(userId: string, role: UserRole): Promise<AuthUser | null>;
+  /**
+   * Delete an account with its agents, chats, routines, listeners, notifications, memories,
+   * personal model profiles, and secrets. `pinned` when the append-only tool log still
+   * references the account's chats, in which case nothing is removed.
+   */
+  deleteUser(userId: string): Promise<'deleted' | 'missing' | 'pinned'>;
   /** Replace a user's password hash. False when the user does not exist. */
   setPasswordHash(userId: string, passwordHash: string): Promise<boolean>;
   /** The user's current password hash, for checking the current password. */

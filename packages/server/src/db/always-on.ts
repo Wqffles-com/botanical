@@ -60,6 +60,8 @@ export function createAlwaysOn(options: {
   notifications: NotificationRepository;
   alwaysOnSettings: AlwaysOnSettingsRepository;
   reassign(from: string, to: string): void;
+  /** Drop a user's notifications. Routines and listeners go with their agents. */
+  purgeUser(userId: string): void;
   onAgentDeleted(agentId: string): void;
 } {
   const routines = new Map<string, Routine>();
@@ -579,6 +581,11 @@ export function createAlwaysOn(options: {
       for (const row of routines.values()) if (row.userId === from) row.userId = to;
       for (const row of listeners.values()) if (row.userId === from) row.userId = to;
       for (const row of notifications.values()) if (row.userId === from) row.userId = to;
+    },
+    purgeUser(userId) {
+      for (const notice of [...notifications.values()]) {
+        if (notice.userId === userId) notifications.delete(notice.id);
+      }
     },
     onAgentDeleted(agentId) {
       for (const routine of [...routines.values()]) {
