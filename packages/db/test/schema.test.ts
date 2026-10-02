@@ -59,6 +59,7 @@ describe('v0 postgres schema', () => {
       'messages',
       'model_profiles',
       'notifications',
+      'password_resets',
       'roles',
       'routine_runs',
       'routines',

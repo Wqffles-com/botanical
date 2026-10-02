@@ -35,6 +35,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const invite = searchParams.get("invite") ?? "";
+  const reset = searchParams.get("reset") ?? "";
   const [mode, setMode] = useState<"login" | "signup">("signup");
   const [config, setConfig] = useState<AuthConfig | null>(null);
   const [email, setEmail] = useState("");
@@ -64,15 +65,15 @@ function LoginForm() {
   }, []);
 
   const signupOpen = config ? config.signupMode !== "closed" && (config.canSignup || Boolean(invite)) : true;
-  const signingUp = mode === "signup";
+  const signingUp = mode === "signup" && !reset;
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!email.trim()) {
+    if (!reset && !email.trim()) {
       setError("Enter your email.");
       return;
     }
-    const clientError = passwordClientError(password, signingUp);
+    const clientError = passwordClientError(password, signingUp || Boolean(reset));
     if (clientError) {
       setError(clientError);
       return;
@@ -84,7 +85,17 @@ function LoginForm() {
     setError(null);
     setPending(true);
     try {
-      if (signingUp) {
+      if (reset) {
+        const response = await fetch("/api/auth/reset", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ token: reset, password }),
+        });
+        if (!response.ok) {
+          const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+          throw new Error(body?.error?.message ?? "Could not reset the password.");
+        }
+      } else if (signingUp) {
         await api.signup({
           email,
           password,
@@ -133,6 +144,12 @@ function LoginForm() {
                   />
                 </div>
               ) : null}
+              {reset ? (
+                <p className="text-sm text-muted-foreground" data-testid="reset-notice">
+                  Choose a new password. You will be signed out of every other device.
+                </p>
+              ) : null}
+              {reset ? null : (
               <div className="grid gap-1.5">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -148,14 +165,15 @@ function LoginForm() {
                   autoFocus={!signingUp}
                 />
               </div>
+              )}
               <div className="grid gap-1.5">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{reset ? "New password" : "Password"}</Label>
                 <div className="relative">
                   <Input
                     id="password"
                     data-testid="password"
                     type={show ? "text" : "password"}
-                    autoComplete={signingUp ? "new-password" : "current-password"}
+                    autoComplete={signingUp || reset ? "new-password" : "current-password"}
                     value={password}
                     onChange={(event) => {
                       setPassword(event.target.value);
@@ -180,13 +198,13 @@ function LoginForm() {
                   {error}
                 </p>
               ) : null}
-              {config && !signupOpen && signingUp ? (
+              {!reset && config && !signupOpen && signingUp ? (
                 <p className="text-sm text-muted-foreground">Signup is closed.</p>
               ) : null}
               <Button type="submit" disabled={pending || (signingUp && !signupOpen)} className="w-full" data-testid="submit-auth">
-                {pending ? "Checking…" : signingUp ? (config?.hasUsers ? "Create account" : "Create admin account") : "Sign in"}
+                {pending ? "Checking…" : reset ? "Set new password" : signingUp ? (config?.hasUsers ? "Create account" : "Create admin account") : "Sign in"}
               </Button>
-              {config?.hasUsers && signupOpen ? (
+              {!reset && config?.hasUsers && signupOpen ? (
                 <button
                   type="button"
                   className="text-xs text-muted-foreground underline"
@@ -198,7 +216,7 @@ function LoginForm() {
                   {signingUp ? "Already have an account? Sign in" : "Need an account? Sign up"}
                 </button>
               ) : null}
-              {config?.hasUsers && !signupOpen ? (
+              {!reset && config?.hasUsers && !signupOpen ? (
                 <p className="text-xs text-muted-foreground" data-testid="signup-closed">
                   {config.signupMode === "invite"
                     ? "Signup is invite-only. Use the link an admin sent you."

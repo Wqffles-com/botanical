@@ -20,6 +20,7 @@ const PROVIDERS = [
 type SecretMeta = { name: string; last4: string };
 type GlobalProfile = { id: string; name: string; provider: string; model: string; kind?: string };
 type SignupMode = "open" | "invite" | "closed";
+type AdminUser = { id: string; email: string; displayName: string; role: string };
 
 async function request(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(path, {
@@ -45,6 +46,8 @@ export function AdminPanel() {
   const [secrets, setSecrets] = useState<SecretMeta[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [resetUrl, setResetUrl] = useState<{ userId: string; url: string } | null>(null);
   const [profiles, setProfiles] = useState<GlobalProfile[]>([]);
   const [knownModels, setKnownModels] = useState<Record<string, string[]>>({});
 
@@ -126,6 +129,26 @@ export function AdminPanel() {
     const response = await request("/api/admin/invites", { method: "POST", body: JSON.stringify({ days: 7 }) });
     const body = (await response.json()) as { url: string };
     setInviteUrl(body.url);
+  }
+
+  useEffect(() => {
+    request("/api/admin/users")
+      .then((response) => response.json())
+      .then((body: { users: AdminUser[] }) => setUsers(body.users))
+      .catch(() => undefined);
+  }, []);
+
+  async function createResetLink(userId: string) {
+    try {
+      const response = await request(`/api/admin/users/${encodeURIComponent(userId)}/reset-link`, {
+        method: "POST",
+        body: JSON.stringify({ hours: 24 }),
+      });
+      const body = (await response.json()) as { url: string };
+      setResetUrl({ userId, url: body.url });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not create the reset link");
+    }
   }
 
   return (
@@ -228,6 +251,40 @@ export function AdminPanel() {
                 })
               }
             />
+          ))}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Password resets</CardTitle>
+          <CardDescription>
+            Create a one-time reset link for a user who forgot their password. It is valid for 24 hours and signs
+            them out everywhere. Send it to them yourself.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2" data-testid="reset-users">
+          {users.map((user) => (
+            <div key={user.id} className="space-y-1">
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span>
+                  {user.displayName} <span className="text-muted-foreground">{user.email}</span>
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  data-testid={`reset-link-${user.email}`}
+                  onClick={() => void createResetLink(user.id)}
+                >
+                  Reset link
+                </Button>
+              </div>
+              {resetUrl?.userId === user.id ? (
+                <p className="break-all font-mono text-xs" data-testid="reset-url">
+                  {resetUrl.url}
+                </p>
+              ) : null}
+            </div>
           ))}
         </CardContent>
       </Card>

@@ -36,6 +36,7 @@ Defined with `pgTable` under `packages/db/src/schema`. Re-exported from `package
 | `listener_deliveries` | `packages/db/src/schema/listeners.ts` |
 | `notifications` | `packages/db/src/schema/notifications.ts` |
 | `invites` | `packages/db/src/schema/invites.ts` |
+| `password_resets` | `packages/db/src/schema/password-resets.ts` |
 | `secrets` | `packages/db/src/schema/secrets.ts` |
 | `user_settings` | `packages/db/src/schema/user-settings.ts` |
 
@@ -58,6 +59,7 @@ Enums in `packages/db/src/schema/enums.ts`: `message_role`, `a2a_status`, `agent
 | `packages/db/migrations/0008_platform_tools.sql` | adds `PLATFORM_TOOLS` to example agents still on the original seed |
 | `packages/db/migrations/0009_one_chat_per_agent.sql` | keeps each agent's most recently active own chat, deletes the others, adds `chats_agent_direct_uidx` |
 | `packages/db/migrations/0010_github.sql` | listener `events`, delivery status `ignored`, and the `git` and `github` capabilities on the Coder and Orchestrator roles |
+| `packages/db/migrations/0011_password_resets.sql` | `password_resets`: admin-generated, single-use reset links (token hash only) |
 | `packages/db/migrations/meta/_journal.json` | Apply order (tags match the SQL filenames) |
 | `packages/db/migrations/meta/0000_snapshot.json` | Drizzle snapshot for `0000` |
 | `packages/db/migrations/meta/0001_snapshot.json` | Drizzle snapshot for `0001` |
