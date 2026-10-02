@@ -28,7 +28,7 @@ Botanical is in early alpha. This page separates what already ships from what is
 - Dictation in the composer. Speech becomes editable text before send. Server providers: OpenAI-compatible, OpenRouter, xAI, and Qwen. The browser's speech recognition is used when no server provider is set.
 - **Routines**: cron schedules that run an agent on the server. Each run posts into the agent's chat.
 - **Listeners**: generic inbound webhooks (`POST /api/hooks/:id`) that start an agent turn. Typed forge listeners are still planned.
-- **Notifications** when a background run finishes or fails, plus a `notify_user` tool when an agent needs attention.
+- **Notifications** when a background run finishes or fails, plus a `notify_user` tool when an agent needs attention. Installable as a PWA, with opt-in Web Push to each device and per-event toggles in Settings.
 - **Message actions**: copy, edit, retry, and delete chat messages. Editing a user message resends it and drops what came after; editing a reply corrects it in place. Deleting can also drop everything after a message. Actions lock while the agent works.
 - **Chat side panel**: Files (browse and read the agent's workspace), Memory (global and the agent's own), and Details (message counts, tool calls, tokens, context length, model). Toggle from the chat header.
 - **GitHub**: each user connects their GitHub account in Settings. Agents clone repositories into their workspace or put their own files under git, then commit, push, and open issues and pull requests (`git_*` and `github_*` tools, capabilities `git` and `github`). GitHub listeners wake an agent when an issue is opened, a comment is posted, or a pull request is opened, and can add their webhook to a repository.

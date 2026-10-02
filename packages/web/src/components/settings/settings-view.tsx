@@ -42,6 +42,7 @@ import { AccentCard } from "./accent-card";
 import { AccountCard } from "./account-card";
 import { AdminPanel } from "./admin-panel";
 import { BackgroundWorkCard } from "./background-work-card";
+import { PushCard } from "./push-card";
 import { DeploymentBadge } from "./deployment-badge";
 
 export type SettingsTab = "general" | "profiles" | "memory" | "roles" | "cli" | "github" | "admin";
@@ -184,6 +185,7 @@ export function SettingsPanels({
       <TabsContent value="general" className={cn("space-y-4", !dialog && "mt-4")}>
         <AccountCard />
         <AccentCard />
+        <PushCard />
         {loading ? (
           <SettingsSkeleton />
         ) : (

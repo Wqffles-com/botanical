@@ -35,6 +35,8 @@ import { registerListeners, registerHooks } from "./routes/listeners.ts";
 import { registerMemories } from "./routes/memories.ts";
 import { registerMessages } from "./routes/messages.ts";
 import { registerNotifications } from "./routes/notifications.ts";
+import { registerPush } from "./routes/push.ts";
+import { createPushService, withPush } from "./push/service.ts";
 import { registerProfiles } from "./routes/profiles.ts";
 import { registerRoles } from "./routes/roles.ts";
 import { registerRoutines } from "./routes/routines.ts";
@@ -104,7 +106,12 @@ export interface App {
   chatQueue: ChatQueue;
 }
 
-export function createApp(deps: AppDeps): App {
+export function createApp(input: AppDeps): App {
+  const push = createPushService({
+    store: input.store,
+    subject: (input.env ?? process.env).BOTANICAL_VAPID_SUBJECT,
+  });
+  const deps: AppDeps = { ...input, store: withPush(input.store, push) };
   let seeded: Promise<void> | null = null;
   function ensureSeed(): Promise<void> {
     seeded ??= seedInstance(deps.store, deps.config, deps.env ?? process.env).catch((error: unknown) => {
@@ -179,6 +186,7 @@ export function createApp(deps: AppDeps): App {
   registerHooks(router, { jobs, limiter: hookLimiter });
   registerGithub(router);
   registerNotifications(router);
+  registerPush(router, push);
   registerAlwaysOnSettings(router);
   registerAppearance(router);
   registerAgentMessages(router, a2a);
