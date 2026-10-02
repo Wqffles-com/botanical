@@ -127,3 +127,15 @@ export type {
   UpdateAgentMessageInput,
   UpdateChatInput,
 } from "./types";
+export {
+  ATTACHMENT_DIR,
+  ATTACHMENT_IMAGE_TYPES,
+  ATTACHMENT_MAX_BYTES,
+  ATTACHMENT_MAX_COUNT,
+  isImageType,
+  safeAttachmentName,
+  safeMimeType,
+  splitAttachments,
+  withAttachments,
+} from "./attachments";
+export type { AttachmentRef } from "./attachments";

@@ -2,7 +2,7 @@ import type { ToolCall } from "./message";
 
 export type ContentPart =
   | { type: "text"; text: string }
-  | { type: "image"; url: string; mimeType?: string };
+  | { type: "image"; url: string; mimeType?: string; data?: string };
 
 /**
  * Shared provider contract. Orchestration imports this — never a vendor SDK.

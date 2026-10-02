@@ -20,6 +20,7 @@ import { ChatThreadSkeleton } from "@/components/chat/skeletons";
 import { identityFromUnknown } from "@/lib/agent-identity";
 import { isGroupChat, messageAuthor } from "@/lib/chat-members";
 import { pendingToMessage, type PendingMessage } from "@/lib/chat-queue";
+import type { PendingFile } from "@/lib/attachments";
 import { presentThread } from "@/lib/chat-stream";
 import { isInboxMessage } from "@/lib/inbox-message";
 import { useWorkspace } from "@/components/workspace-provider";
@@ -35,6 +36,10 @@ export function ChatThread({
   missing,
   draft,
   onDraft,
+  attachments,
+  onAttach,
+  onRemoveAttachment,
+  uploading,
   pending,
   working,
   workingAgentId,
@@ -63,6 +68,10 @@ export function ChatThread({
   missing: boolean;
   draft: string;
   onDraft: (value: string) => void;
+  attachments: PendingFile[];
+  onAttach: (files: File[]) => void;
+  onRemoveAttachment: (id: string) => void;
+  uploading: boolean;
   pending: PendingMessage[];
   working: boolean;
   /** The agent answering right now, when the server says (group members take turns). */
@@ -224,6 +233,7 @@ export function ChatThread({
                   continued={continuesRun(rows, index, author?.id ?? null, chat, agents)}
                   toolCalls={row.tools.length > 0 ? row.tools : undefined}
                   actions={actionsFor(row.message)}
+                  uploadAgentId={chat.agentId}
                 />
               );
             })}
@@ -236,7 +246,7 @@ export function ChatThread({
               />
             ) : null}
             {pending.map((row) => (
-              <MessageBubble key={row.id} message={pendingToMessage(chat.id, row)} queued />
+              <MessageBubble key={row.id} message={pendingToMessage(chat.id, row)} queued uploadAgentId={chat.agentId} />
             ))}
             <p className="sr-only" aria-live="polite">
               {working ? `${workingAgent?.name ?? "The agent"} is working` : ""}
@@ -248,6 +258,10 @@ export function ChatThread({
       <Composer
         value={draft}
         onChange={onDraft}
+        attachments={attachments}
+        onAttach={onAttach}
+        onRemoveAttachment={onRemoveAttachment}
+        uploading={uploading}
         onSubmit={onSend}
         onStop={onStop}
         working={working}
