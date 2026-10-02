@@ -83,6 +83,7 @@ export function AgentAvatar({
       aria-hidden
     >
       {photo ? (
+        // eslint-disable-next-line @next/next/no-img-element -- user-supplied photo URL, not optimizable
         <img src={photo} alt="" className="size-full object-cover" draggable={false} />
       ) : (
         createElement(AGENT_ICONS[iconName], { className: dim.icon, strokeWidth: 2.1 })

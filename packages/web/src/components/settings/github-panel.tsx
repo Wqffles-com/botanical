@@ -172,7 +172,7 @@ export function GithubPanel() {
         <CardHeader>
           <CardTitle>What agents can do</CardTitle>
           <CardDescription>
-            Add these tools to an agent's tool list. When the agent has roles, they also need the Git or GitHub
+            Add these tools to an agent&apos;s tool list. When the agent has roles, they also need the Git or GitHub
             capability.
           </CardDescription>
         </CardHeader>
@@ -180,8 +180,8 @@ export function GithubPanel() {
           <div className="space-y-1">
             <p className="font-medium">Git</p>
             <p className="text-muted-foreground">
-              Clone repositories into the agent's workspace, or start tracking files it made, then commit, switch
-              branches, pull, and push. Files show in the chat's Files panel.
+              Clone repositories into the agent&apos;s workspace, or start tracking files it made, then commit, switch
+              branches, pull, and push. Files show in the chat&apos;s Files panel.
             </p>
           </div>
           <div className="space-y-1">

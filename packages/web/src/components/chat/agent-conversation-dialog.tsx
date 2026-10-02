@@ -41,7 +41,9 @@ export function AgentConversationDialog({
         data-testid="agent-conversation-dialog"
         className="flex h-[min(88svh,760px)] flex-col gap-0 overflow-hidden rounded-2xl bg-background p-0 sm:max-w-3xl"
       >
-        {target ? <Conversation target={target} /> : null}
+        {target ? (
+          <Conversation key={`${target.fromAgentId}:${target.toAgentId ?? ""}`} target={target} />
+        ) : null}
       </DialogContent>
     </Dialog>
   );
@@ -56,8 +58,6 @@ function Conversation({ target }: { target: AgentConversationTarget }) {
   const { fromAgentId, toAgentId, messageId } = target;
   useEffect(() => {
     let cancelled = false;
-    setMessages(null);
-    setError(null);
     const ids = toAgentId ? [fromAgentId, toAgentId] : [fromAgentId];
     fetchAgentMessages(undefined, ids)
       .then((listed) => {
