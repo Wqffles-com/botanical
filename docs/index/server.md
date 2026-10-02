@@ -20,6 +20,7 @@ HTTP API: account auth, agents, chats, streaming turns, agent-to-agent mail, rou
 | `packages/server/src/auth` | Session cookie, login rate limit. Actor scope is `packages/db/src/actor.ts` |
 | `packages/server/src/provider-keys.ts` | Resolves a provider key from the user, then the global row |
 | `packages/server/src/db/memory-accounts.ts` | In-memory accounts, secrets, and settings |
+| `packages/server/src/push` | Web Push: `service.ts` keeps per-user device subscriptions and event toggles in `prefs` (`push.subscriptions`, `push.events`), generates the VAPID key pair on first use (public key in `push.vapid_public`, private key in the secret `push-vapid-private`), and `withPush` wraps the store so every `notifications.create` also pushes to the owner's devices (dead endpoints are dropped). Kinds default on; `BOTANICAL_VAPID_SUBJECT` overrides the VAPID contact |
 | `packages/server/src/db` | In-memory store and Postgres adapter. Routines, listeners, and notifications: `packages/server/src/db/always-on.ts` |
 | `packages/server/src/runtime` | Turn runner, profile resolver, workspace path, store adapter. Background turns: `packages/server/src/runtime/jobs.ts`, `packages/server/src/runtime/turns.ts`. Async chat queue, background turns, and events: `packages/server/src/runtime/chat-queue.ts`. An agent's own chat: `packages/server/src/runtime/agent-chat.ts`. Group chat responders: `packages/server/src/runtime/group.ts` |
 | `packages/server/src/routines` | Cron check (`cron.ts`) and in-process scheduler (`scheduler.ts`) |
@@ -131,6 +132,10 @@ Group chats: `POST /api/chats` and `PATCH /api/chats/:id` take `memberIds`, the 
 | GET | `/api/notifications` | `packages/server/src/routes/notifications.ts` |
 | POST | `/api/notifications/read-all` | `packages/server/src/routes/notifications.ts` |
 | POST | `/api/notifications/:id/read` | `packages/server/src/routes/notifications.ts` |
+| GET | `/api/push` | `packages/server/src/routes/push.ts` |
+| POST | `/api/push/subscribe` | `packages/server/src/routes/push.ts` |
+| POST | `/api/push/unsubscribe` | `packages/server/src/routes/push.ts` |
+| PATCH | `/api/push/events` | `packages/server/src/routes/push.ts` |
 | GET | `/api/admin/settings` | `packages/server/src/routes/account-settings.ts` |
 | PATCH | `/api/admin/settings` | `packages/server/src/routes/account-settings.ts` |
 | PUT | `/api/admin/secrets/:name` | `packages/server/src/routes/account-settings.ts` |
@@ -187,7 +192,7 @@ Chat attachments: `POST /api/agents/:id/uploads?name=` takes the raw file body (
 
 ## Env vars
 
-`loadConfig` in `packages/server/src/config.ts` reads: `BOTANICAL_GITHUB_API_URL`, `BOTANICAL_GITHUB_URL` (GitHub Enterprise hosts; defaults `https://api.github.com` and `https://github.com`), `BOTANICAL_DEPLOYMENT_MODE`, `BOTANICAL_BRAND_NAME`, `BOTANICAL_ENCRYPTION_KEY`, `DATABASE_URL`, `BOTANICAL_HOST`, `BOTANICAL_PORT`, `PORT`, `BOTANICAL_SESSION_TTL_SECONDS`, `BOTANICAL_COOKIE_SECURE`, `BOTANICAL_CORS_ORIGIN`, `BOTANICAL_TRUST_PROXY`, `BOTANICAL_MAX_BODY_BYTES`, `BOTANICAL_A2A_AUTORUN`, `BOTANICAL_PUBLIC_ORIGIN`, `BOTANICAL_CLI_PROFILES`, `BOTANICAL_STT_MAX_BYTES`, `BOTANICAL_STT_MAX_SECONDS`, `BOTANICAL_STT_DISABLED`, `BOTANICAL_STT_PROVIDER`, `BOTANICAL_STT_BASE_URL`, `BOTANICAL_STT_MODEL`, `BOTANICAL_STT_API_KEY`, `OPENAI_API_KEY`. STT presets also read `OPENROUTER_API_KEY`, `XAI_API_KEY`, or `DASHSCOPE_API_KEY` by provider name.
+`loadConfig` in `packages/server/src/config.ts` reads: `BOTANICAL_GITHUB_API_URL`, `BOTANICAL_GITHUB_URL` (GitHub Enterprise hosts; defaults `https://api.github.com` and `https://github.com`), `BOTANICAL_DEPLOYMENT_MODE`, `BOTANICAL_BRAND_NAME`, `BOTANICAL_ENCRYPTION_KEY`, `DATABASE_URL`, `BOTANICAL_HOST`, `BOTANICAL_PORT`, `PORT`, `BOTANICAL_SESSION_TTL_SECONDS`, `BOTANICAL_COOKIE_SECURE`, `BOTANICAL_CORS_ORIGIN`, `BOTANICAL_TRUST_PROXY`, `BOTANICAL_MAX_BODY_BYTES`, `BOTANICAL_A2A_AUTORUN`, `BOTANICAL_PUBLIC_ORIGIN`, `BOTANICAL_VAPID_SUBJECT` (read in `app.ts`), `BOTANICAL_CLI_PROFILES`, `BOTANICAL_STT_MAX_BYTES`, `BOTANICAL_STT_MAX_SECONDS`, `BOTANICAL_STT_DISABLED`, `BOTANICAL_STT_PROVIDER`, `BOTANICAL_STT_BASE_URL`, `BOTANICAL_STT_MODEL`, `BOTANICAL_STT_API_KEY`, `OPENAI_API_KEY`. STT presets also read `OPENROUTER_API_KEY`, `XAI_API_KEY`, or `DASHSCOPE_API_KEY` by provider name.
 
 Scheduler on/off, tick interval, background concurrency, and webhook body size are not env vars. They are `settings` keys `always_on.scheduler_enabled`, `always_on.scheduler_interval_ms`, `always_on.background_concurrency`, and `always_on.listener_max_bytes` (`packages/db/src/always-on-settings.ts`).
 

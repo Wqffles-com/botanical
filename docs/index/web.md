@@ -60,6 +60,8 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/components/listeners` | Listener list and editor. The editor picks the source (webhook or GitHub) and, for GitHub, the events. `packages/web/src/components/listeners/github-hook-dialog.tsx` adds the webhook to a repository with the connected account |
 | `packages/web/src/components/settings/github-panel.tsx` | Settings → GitHub: connect, replace, or disconnect the user's GitHub token, and what agents can do with it |
 | `packages/web/src/lib/github.ts` | Listener kind labels, event toggles, the host's token page |
+| `packages/web/src/app/manifest.ts`, `packages/web/public/sw.js`, `packages/web/public/icon-*.png` | PWA: web manifest and icons (installable), and the service worker that shows pushes and opens the chat on click. It caches nothing. `Providers` registers it |
+| `packages/web/src/lib/push.ts`, `packages/web/src/components/settings/push-card.tsx` | Push subscription helpers and the Settings → General card (this device on/off, which events push) |
 | `packages/web/src/components/notifications/notification-bell.tsx` | Unread badge in `packages/web/src/components/app-shell.tsx` |
 | `packages/web/src/components/settings/settings-view.tsx` | `SettingsPanels` (every section; `layout` `dialog` puts the tabs in a left rail, `page` on top; a select below `sm`) and `SettingsView` (the `/settings` page) |
 | `packages/web/src/components/settings/admin-panel.tsx` | Admin signup mode, global keys, models per provider (known models from `GET /api/admin/profiles` `knownModels`, or a custom model id), and invites. The user list (reset link, make or remove admin, disable, delete) is `packages/web/src/components/settings/users-card.tsx` |
