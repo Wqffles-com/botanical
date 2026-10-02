@@ -23,7 +23,12 @@ import { cn } from "@/lib/utils";
  * Creates the webhook for a GitHub listener on one repository, with the connected account.
  * The server sends the listener's URL, secret, and events; the secret never reaches the browser.
  */
-export function GithubHookDialog({ listener, onClose }: { listener: Listener | null; onClose: () => void }) {
+export function GithubHookDialog(props: { listener: Listener | null; onClose: () => void }) {
+  // Remount per listener so the picker starts fresh without resetting state in an effect.
+  return <GithubHookDialogBody key={props.listener?.id ?? "closed"} {...props} />;
+}
+
+function GithubHookDialogBody({ listener, onClose }: { listener: Listener | null; onClose: () => void }) {
   const { openSettings } = useAppDialogs();
   const [connection, setConnection] = useState<GithubConnection | null>(null);
   const [repos, setRepos] = useState<GithubRepo[] | null>(null);
@@ -35,11 +40,6 @@ export function GithubHookDialog({ listener, onClose }: { listener: Listener | n
   useEffect(() => {
     if (!listener) return;
     let cancelled = false;
-    setConnection(null);
-    setRepos(null);
-    setPicked(null);
-    setQuery("");
-    setError(null);
     void (async () => {
       try {
         const next = await api.getGithub();

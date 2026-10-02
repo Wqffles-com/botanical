@@ -54,6 +54,7 @@ export function createMemoryAccounts(options: {
 }): { accounts: AccountRepository; secrets: SecretRepository; prefs: PrefsRepository } {
   const users: UserRow[] = [];
   const invites: InviteRow[] = [];
+  const resets: { userId: string; createdBy: string; tokenHash: string; expiresAt: string; usedAt: string | null }[] = [];
   const secretRows: SecretRow[] = [];
   const globalPrefs = new Map<string, unknown>([
     [SETTING_KEYS.signupMode, "open"],
@@ -191,6 +192,27 @@ export function createMemoryAccounts(options: {
       row.usedAt = now.toISOString();
       row.usedBy = userId;
       return true;
+    },
+    async listUsers() {
+      return users.filter((row) => row.passwordHash).map(toAuth);
+    },
+    async setPasswordHash(userId, passwordHash) {
+      const row = users.find((item) => item.id === userId && item.passwordHash);
+      if (!row) return false;
+      row.passwordHash = passwordHash;
+      return true;
+    },
+    async passwordHashOf(userId) {
+      return users.find((item) => item.id === userId)?.passwordHash ?? null;
+    },
+    async createPasswordReset(input) {
+      resets.push({ ...input, usedAt: null });
+    },
+    async takePasswordReset(tokenHash, now) {
+      const row = resets.find((item) => item.tokenHash === tokenHash && !item.usedAt);
+      if (!row || Date.parse(row.expiresAt) <= now.getTime()) return null;
+      row.usedAt = now.toISOString();
+      return row.userId;
     },
     async adoptLegacyData(userId) {
       options.adoptLegacy(userId);

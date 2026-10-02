@@ -198,7 +198,7 @@ export function RoutinesView() {
     <div className={pageContainerVariants()}>
       <PageHeader
         title="Routines"
-        description="Scheduled runs. Each run opens a new chat so the history stays bounded to that slot."
+        description="Scheduled runs. Each run posts into the agent's own chat."
         actions={!loading && routines.length > 0 ? <Button onClick={openCreate}>New routine</Button> : undefined}
       />
       {error ? (
@@ -216,7 +216,7 @@ export function RoutinesView() {
           <EmptyState
             icon={CalendarClock}
             title="No routines yet"
-            body="Run an agent on a schedule while you are away. Each run opens its own chat."
+            body="Run an agent on a schedule while you are away. Each run posts into the agent's chat."
             action={<Button onClick={openCreate}>New routine</Button>}
             bordered
           />

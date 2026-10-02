@@ -31,6 +31,8 @@ async function requestJson(path: string, init: RequestInit = {}): Promise<unknow
   });
   if (response.status === 401) {
     if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      // Plain fetch helper outside React, so there is no router to push with.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign("/login");
     }
     throw new AgentApiError("Sign in to continue.", 401);

@@ -5,6 +5,7 @@ import type { BotanicalDb } from './client.ts';
 import { SETTING_KEYS, SIGNUP_MODES, type SignupMode } from './constants.ts';
 import { decryptSecret, encryptSecret, EncryptionKeyMissing, last4 } from './crypto.ts';
 import { invites } from './schema/invites.ts';
+import { passwordResets } from './schema/password-resets.ts';
 import { secrets } from './schema/secrets.ts';
 import { settings } from './schema/settings.ts';
 import { userSettings } from './schema/user-settings.ts';
@@ -213,6 +214,48 @@ export function createAccountServices(
         .where(and(eq(invites.tokenHash, tokenHash), isNull(invites.usedAt), sql`${invites.expiresAt} > ${now}`))
         .returning({ id: invites.id });
       return updated.length > 0;
+    },
+    async listUsers() {
+      const rows = await db
+        .select()
+        .from(users)
+        .where(sql`${users.passwordHash} is not null`)
+        .orderBy(asc(users.createdAt), asc(users.id));
+      return rows.map(toAuth);
+    },
+    async setPasswordHash(userId, passwordHash) {
+      const updated = await db
+        .update(users)
+        .set({ passwordHash, updatedAt: new Date() })
+        .where(and(eq(users.id, userId), sql`${users.passwordHash} is not null`))
+        .returning({ id: users.id });
+      return updated.length > 0;
+    },
+    async passwordHashOf(userId) {
+      const rows = await db.select({ hash: users.passwordHash }).from(users).where(eq(users.id, userId)).limit(1);
+      return rows[0]?.hash ?? null;
+    },
+    async createPasswordReset(input) {
+      await db.insert(passwordResets).values({
+        userId: input.userId,
+        createdBy: input.createdBy,
+        tokenHash: input.tokenHash,
+        expiresAt: new Date(input.expiresAt),
+      });
+    },
+    async takePasswordReset(tokenHash, now) {
+      const updated = await db
+        .update(passwordResets)
+        .set({ usedAt: now })
+        .where(
+          and(
+            eq(passwordResets.tokenHash, tokenHash),
+            isNull(passwordResets.usedAt),
+            sql`${passwordResets.expiresAt} > ${now}`,
+          ),
+        )
+        .returning({ userId: passwordResets.userId });
+      return updated[0]?.userId ?? null;
     },
     async adoptLegacyData(userId) {
       await options.adoptLegacy?.(userId);

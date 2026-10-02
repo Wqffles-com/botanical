@@ -6,6 +6,7 @@ import { SIGNUP_MODES, type SignupMode } from "@botanical/db";
 import { GITHUB_SECRET_NAME } from "@botanical/core";
 import { ANTHROPIC_DEFAULT_MAX_TOKENS, API_KNOWN_MODELS, retiredModelReplacement } from "@botanical/providers";
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SECRET_NAME = /^[a-z][a-z0-9_-]{0,63}$/;
 
 export function registerAccountSettings(router: Router): void {
@@ -126,6 +127,51 @@ export function registerAccountSettings(router: Router): void {
       return json(201, {
         invite: { ...invite, token },
         url: `${origin.replace(/\/$/, "")}/login?invite=${encodeURIComponent(token)}`,
+      });
+    }),
+  );
+
+  router.add(
+    "GET",
+    "/api/admin/users",
+    adminOnly(async (ctx) => {
+      const users = await ctx.store.accounts.listUsers();
+      return json(200, {
+        users: users.map((user) => ({
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+          role: user.role,
+          createdAt: user.createdAt,
+        })),
+      });
+    }),
+  );
+
+  router.add(
+    "POST",
+    "/api/admin/users/:id/reset-link",
+    adminOnly(async (ctx) => {
+      const body = await readJson(ctx.request, ctx.config).catch(() => ({}));
+      const hours = isRecord(body) && typeof body.hours === "number" ? body.hours : 24;
+      if (!Number.isFinite(hours) || hours < 1 || hours > 168) {
+        throw new HttpError(400, "invalid_body", "hours must be between 1 and 168");
+      }
+      const targetId = ctx.params.id ?? "";
+      const target = UUID.test(targetId) ? await ctx.store.accounts.findById(targetId) : null;
+      if (!target) throw new HttpError(404, "not_found", "User not found");
+      const token = newSessionToken();
+      const expiresAt = new Date(ctx.now.getTime() + hours * 60 * 60 * 1000).toISOString();
+      await ctx.store.accounts.createPasswordReset({
+        userId: target.id,
+        createdBy: ctx.user?.id ?? "",
+        tokenHash: hashToken(token),
+        expiresAt,
+      });
+      const origin = ctx.config.publicOrigin ?? ctx.url.origin;
+      return json(201, {
+        expiresAt,
+        url: `${origin.replace(/\/$/, "")}/login?reset=${encodeURIComponent(token)}`,
       });
     }),
   );

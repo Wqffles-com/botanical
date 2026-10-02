@@ -380,6 +380,22 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date; 
         sessionsByHash.delete(current.tokenHash);
         return true;
       },
+      async listByUser(userId) {
+        return [...sessions.values()]
+          .filter((session) => session.userId === userId)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .map(clone);
+      },
+      async deleteByUser(userId, exceptId) {
+        let removed = 0;
+        for (const session of [...sessions.values()]) {
+          if (session.userId !== userId || session.id === exceptId) continue;
+          sessions.delete(session.id);
+          sessionsByHash.delete(session.tokenHash);
+          removed += 1;
+        }
+        return removed;
+      },
     },
     profiles: {
       async list() {

@@ -6,11 +6,13 @@ Botanical is in early alpha. This page separates what already ships from what is
 
 - Always-on server: self-host on a machine you run, or the same code with `DEPLOYMENT_MODE=SAAS`. A laptop run is for development. This is not a personal-PC app.
 - Accounts on every instance. Email and password signup. The first account is the admin. Signup can be open, invite-only, or closed. Per-user settings and API keys. Admin global keys and settings are edited in the UI and stored encrypted in the database. `DATABASE_URL` and `BOTANICAL_ENCRYPTION_KEY` bootstrap the process. Other env vars only seed.
+- Account security. A user changes their password in Settings (the current password is required), sees their active sessions, and signs out everywhere else. A password change signs out every other session. With no email service, an admin creates a one-time reset link for a user; opening it sets a new password and ends all of that user's sessions.
 - Open source (MIT). Hosted billing is undecided. Nothing charges a customer.
 - Monochrome shadcn/ui, with a light/dark toggle.
 - Model profiles for OpenAI-compatible APIs (the start script offers DeepSeek first) and for OpenAI, Anthropic, xAI, and OpenRouter. No silent default model.
 - Coding-agent CLI profiles (Grok Build, Claude Code, Codex) run headless on the server. Enabled with `BOTANICAL_CLI_PROFILES`. Installed and signed in inside the container from Settings. Each turn exposes Botanical tools through one MCP server named `botanical`.
-- Custom agents with name, description, Lucide icon, color, prompt, and tool allowlist.
+- Custom agents with name, title, description, Lucide icon, color, avatar shape, uploaded picture, prompt, and tool allowlist.
+- **Accent color**: each user picks an accent in Settings → General. It only tints the primary color; the rest stays monochrome shadcn/ui.
 - **One chat per agent**: each agent has a single chat, opened from the sidebar. Routine runs, webhook deliveries, and agent mail land there too. Long chats stay usable: a context window, automatic and manual compaction into a summary, and a clear action.
 - **Group chats**: start a separate chat with several agents. Each answers in turn and reads the others' replies, or only the agents you `@mention` answer. An agent can hand off by mentioning another.
 - Async agent-to-agent messaging with an inbox. `@Name` in a chat mails the mentioned agent, with composer autocomplete. Autorun (on by default; `BOTANICAL_A2A_AUTORUN=false` disables it) wakes the recipient with a real agent turn.
@@ -30,19 +32,6 @@ Botanical is in early alpha. This page separates what already ships from what is
 - **Chat side panel**: Files (browse and read the agent's workspace), Memory (global and the agent's own), and Details (message counts, tool calls, tokens, context length, model). Toggle from the chat header.
 - **GitHub**: each user connects their GitHub account in Settings. Agents clone repositories into their workspace or put their own files under git, then commit, push, and open issues and pull requests (`git_*` and `github_*` tools, capabilities `git` and `github`). GitHub listeners wake an agent when an issue is opened, a comment is posted, or a pull request is opened, and can add their webhook to a repository.
 - **Async chat**: keep sending while the agent works. A message sent mid-turn steers the running turn: the model reads it before its next step (Claude Code reads it on stdin). Replies arrive whole. Closing the tab does not stop the turn.
-
-## In progress
-
-### Accent color
-
-- Main colors stay monochrome shadcn/ui.
-- Settings will let each user pick an accent (blue, red, green, and similar).
-- The picker is not in the tree yet. Light/dark already ships.
-
-### Richer bot customization
-
-- Shipped today: name, description, color, Lucide icon.
-- Still to build: a title, an avatar shape, and an uploaded picture.
 
 ## Planned
 
