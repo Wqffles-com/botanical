@@ -1,6 +1,7 @@
 "use client";
 
-import type { Agent, ChatMessage } from "@botanical/core";
+import { isImageType, splitAttachments, withAttachments, type Agent, type AttachmentRef, type ChatMessage } from "@botanical/core";
+import { FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@botanical/ui/components/button";
 import { Textarea } from "@botanical/ui/components/textarea";
@@ -9,6 +10,8 @@ import { InboxMessageCard } from "@/components/chat/inbox-message-card";
 import { MessageAgentAvatar } from "@/components/chat/message-agent-avatar";
 import { Markdown } from "@/components/chat/markdown";
 import { ToolCallCard } from "@/components/chat/tool-call-card";
+import { api } from "@/lib/api";
+import { formatBytes } from "@/lib/attachments";
 import { agentIdentity } from "@/lib/agent-identity";
 import { parseInboxMessage } from "@/lib/inbox-message";
 import { toolCallsFromMessage, type UiToolCall } from "@/lib/chat-stream";
@@ -41,6 +44,7 @@ export function MessageBubble({
   actions,
   showName,
   continued,
+  uploadAgentId,
 }: {
   message: ChatMessage;
   agent?: Agent | null;
@@ -55,20 +59,24 @@ export function MessageBubble({
   toolCalls?: UiToolCall[];
   /** Copy, edit, retry, and delete. Only stored messages get them. */
   actions?: MessageActionHandlers;
+  /** The agent whose workspace holds this message's attachments. */
+  uploadAgentId?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const inbox = parseInboxMessage(message);
+  // Attachments are listed at the end of the text. The bubble shows them as thumbnails and chips instead.
+  const { text: bodyText, files } = message.role === "user" ? splitAttachments(message.content) : { text: message.content, files: [] };
   // A user message is resent with the new text. A reply is corrected in place.
   const save = message.role === "user" ? actions?.onResend : actions?.onEdit;
   const canEdit = Boolean(save && message.content && !actions?.disabled);
   const editor =
     editing && save ? (
       <MessageEditor
-        initial={message.content}
+        initial={bodyText}
         saveLabel={message.role === "user" ? "Send" : "Save"}
         onCancel={() => setEditing(false)}
         onSave={async (content) => {
-          const ok = await save(content);
+          const ok = await save(withAttachments(content, files));
           if (ok) setEditing(false);
         }}
       />
@@ -101,7 +109,8 @@ export function MessageBubble({
               queued && "opacity-70",
             )}
           >
-            <div className="whitespace-pre-wrap">{message.content}</div>
+            {files.length > 0 ? <AttachmentList files={files} agentId={uploadAgentId ?? agent?.id} /> : null}
+            {bodyText ? <div className="whitespace-pre-wrap">{bodyText}</div> : null}
           </div>
         )}
         {toolbar}
@@ -203,5 +212,45 @@ function MessageEditor({
         </Button>
       </div>
     </div>
+  );
+}
+
+/** Image thumbnails and file chips on a user's message. */
+function AttachmentList({ files, agentId }: { files: AttachmentRef[]; agentId?: string }) {
+  return (
+    <ul className="mb-2 flex flex-wrap gap-2 last:mb-0" data-testid="message-attachments">
+      {files.map((file) => {
+        const href = agentId ? api.agentUploadUrl(agentId, file.path) : null;
+        if (href && isImageType(file.mimeType)) {
+          return (
+            <li key={file.path}>
+              <a href={href} target="_blank" rel="noreferrer" title={file.name}>
+                {/* eslint-disable-next-line @next/next/no-img-element -- an authenticated API route, not a static asset */}
+                <img src={href} alt={file.name} className="max-h-48 max-w-full rounded-xl object-cover" />
+              </a>
+            </li>
+          );
+        }
+        const chip = (
+          <>
+            <FileText className="size-4 shrink-0" aria-hidden />
+            <span className="truncate">{file.name}</span>
+            <span className="shrink-0 text-2xs text-muted-foreground">{formatBytes(file.size)}</span>
+          </>
+        );
+        const className = "flex max-w-56 items-center gap-2 rounded-xl bg-background/60 px-3 py-2 text-xs";
+        return (
+          <li key={file.path}>
+            {href ? (
+              <a href={href} download={file.name} className={className}>
+                {chip}
+              </a>
+            ) : (
+              <span className={className}>{chip}</span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

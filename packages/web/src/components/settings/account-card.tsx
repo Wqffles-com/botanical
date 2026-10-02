@@ -27,6 +27,12 @@ function when(value: string): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+async function fetchSessions(): Promise<SessionRow[]> {
+  const response = await request("/api/auth/sessions");
+  const body = (await response.json()) as { sessions: SessionRow[] };
+  return body.sessions;
+}
+
 export function AccountCard() {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -34,14 +40,20 @@ export function AccountCard() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
 
   const loadSessions = useCallback(async () => {
-    const response = await request("/api/auth/sessions");
-    const body = (await response.json()) as { sessions: SessionRow[] };
-    setSessions(body.sessions);
+    setSessions(await fetchSessions());
   }, []);
 
   useEffect(() => {
-    loadSessions().catch(() => undefined);
-  }, [loadSessions]);
+    let cancelled = false;
+    fetchSessions()
+      .then((rows) => {
+        if (!cancelled) setSessions(rows);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function changePassword(event: FormEvent) {
     event.preventDefault();

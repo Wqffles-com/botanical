@@ -132,6 +132,7 @@ export {
   prepareTurn,
   readTranscript,
   runAgentTurn,
+  type ImageContent,
   type PreparedTurn,
   type RunTurnInput,
   type RuntimeDeps,

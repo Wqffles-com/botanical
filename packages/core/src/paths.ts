@@ -16,6 +16,8 @@ export const API = {
   agentRoles: (id: string) => `/api/agents/${encodeURIComponent(id)}/roles`,
   agentFiles: (id: string) => `/api/agents/${encodeURIComponent(id)}/files`,
   agentFileContent: (id: string) => `/api/agents/${encodeURIComponent(id)}/files/content`,
+  agentUploads: (id: string) => `/api/agents/${encodeURIComponent(id)}/uploads`,
+  agentUpload: (id: string, file: string) => `/api/agents/${encodeURIComponent(id)}/uploads/${encodeURIComponent(file)}`,
   memories: "/api/memories",
   memory: (id: string) => `/api/memories/${encodeURIComponent(id)}`,
   roles: "/api/roles",

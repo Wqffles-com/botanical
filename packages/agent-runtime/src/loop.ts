@@ -51,6 +51,51 @@ export interface RuntimeDeps {
   workspaceFor?: (agentId: string) => string;
   /** When set, relevant memories are appended to the system prompt at turn start. */
   memories?: MemoryRecall;
+  /**
+   * Images a user message carries (attachments in the agent's workspace). Called for user
+   * messages only when the profile supports vision.
+   */
+  loadImages?: (agentId: string, content: string) => Promise<ImageContent[]>;
+}
+
+export interface ImageContent {
+  mimeType: string;
+  /** Base64 file bytes. */
+  data: string;
+}
+
+/** Most recent images sent to the model per step, so a long chat does not resend every picture. */
+const MAX_IMAGES_PER_REQUEST = 4;
+
+export async function withImages(
+  deps: Pick<RuntimeDeps, "loadImages">,
+  agentId: string,
+  messages: ChatMessage[],
+): Promise<ChatMessage[]> {
+  const load = deps.loadImages;
+  if (!load) return messages;
+  const next = [...messages];
+  let remaining = MAX_IMAGES_PER_REQUEST;
+  for (let index = next.length - 1; index >= 0 && remaining > 0; index -= 1) {
+    const message = next[index];
+    if (!message || message.role !== "user" || typeof message.content !== "string") continue;
+    const images = (await load(agentId, message.content)).slice(-remaining);
+    if (images.length === 0) continue;
+    remaining -= images.length;
+    next[index] = {
+      ...message,
+      content: [
+        { type: "text", text: message.content },
+        ...images.map((image) => ({
+          type: "image" as const,
+          url: `data:${image.mimeType};base64,${image.data}`,
+          mimeType: image.mimeType,
+          data: image.data,
+        })),
+      ],
+    };
+  }
+  return next;
 }
 
 export interface RunTurnInput {
@@ -189,7 +234,9 @@ export async function* runAgentTurn(
     const catalog = await collectTools(toolSources);
     const visibleTools = catalog.filter((tool) => toolAccess(agent, tool).ok);
     const budget = profile.provider.capabilities(profile.model).maxContext;
-    const requestMessages = trimToBudget(toProviderMessages(agent, transcript, recalled, chat, group, names), budget);
+    const history = toProviderMessages(agent, transcript, recalled, chat, group, names);
+    const vision = profile.provider.capabilities(profile.model).vision;
+    const requestMessages = trimToBudget(vision ? await withImages(deps, agent.id, history) : history, budget);
     let text = "";
     const toolCalls: ToolCall[] = [];
     let errorMessage: string | null = null;
