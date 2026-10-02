@@ -67,7 +67,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/hooks/use-chat-thread.ts` | Thread loading, queued sends, message edit, resend, retry, and delete, and the chat events feed (reconnects and refetches after a gap) |
 | `packages/web/src/lib/chat-queue.ts` | Pending-bubble and message merge rules for the events feed |
 | `packages/web/src/lib/chat-groups.ts` | `ownChat`, `agentChatHref` (an agent's one chat, or `/agents/[id]/chat` before it exists), `groupChats`, `agentDefaultProfileId` |
-| `packages/web/src/components/chat/chat-actions-menu.tsx` | Chat header menu: compact the conversation, clear the chat |
+| `packages/web/src/components/chat/chat-actions-menu.tsx` | Chat header menu: compact the conversation, export as Markdown or JSON, clear the chat |
 | `packages/web/src/components/chat/compaction-divider.tsx` | Divider where a chat was compacted, with the summary on click |
 | `packages/web/src/lib/chat-details.ts` | Details tab counts (messages, tool calls, tokens, context length) and workspace path helpers |
 | `packages/web/src/lib/chat-members.ts` | Group chat helpers: member toggle, member cap, a reply's author |
@@ -77,6 +77,9 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/lib/agent-api.ts` | Agent helpers |
 | `packages/web/src/components/chat/profile-select.tsx` | Provider and model picker (composer, new chat, agent default model). The value is still one profile id |
 | `packages/web/src/lib/profile-groups.ts` | Groups profiles by provider (API vendor or coding CLI) and labels each profile by its model |
+| `packages/web/src/lib/chat-export.ts` | `chatToMarkdown` / `chatToJson`: chat transcript with tool calls and compaction summaries |
+| `packages/web/src/lib/agent-export.ts` | `agentToExport` / `parseAgentImport`: portable agent JSON (default model by provider and name, no ids, roles, picture, or secrets). Export is on the agent settings, import on the new-agent form |
+| `packages/web/src/lib/download.ts` | `downloadText` browser file save and `fileStem` |
 | `packages/web/src/lib/chat-stream.ts` | Pair tool calls with results for the thread, tool result status. `presentThread` shows replies (`replyIds` from core) as messages and folds the rest of an agent's output into activity entries |
 | `packages/web/src/components/chat/agent-activity.tsx` | An agent's notes between replies (text output and tool calls), collapsed |
 | `packages/web/src/lib/server-api.ts` | RSC client (forwards cookies) |

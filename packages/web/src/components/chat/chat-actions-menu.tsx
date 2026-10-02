@@ -1,6 +1,7 @@
 "use client";
 
-import { Ellipsis, FoldVertical, Trash2 } from "lucide-react";
+import { Download, Ellipsis, FoldVertical, Trash2 } from "lucide-react";
+import type { Chat, ChatMessage } from "@botanical/core";
 import { useState } from "react";
 import { ConfirmDialog } from "@botanical/ui/components/alert-dialog";
 import { Button } from "@botanical/ui/components/button";
@@ -11,16 +12,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@botanical/ui/components/dropdown-menu";
+import { chatToJson, chatToMarkdown } from "@/lib/chat-export";
+import { downloadText, fileStem } from "@/lib/download";
 
 /**
  * Header menu for keeping a long chat in shape: compact it into a summary the agent reads
- * instead of the older messages, or clear it. Both wait until the agent is done.
+ * instead of the older messages, or clear it. Both wait until the agent is done. Export saves
+ * the transcript as Markdown or JSON at any time.
  */
 export function ChatActionsMenu({
   disabled,
   empty,
   onCompact,
   onClear,
+  chat,
+  messages,
+  agentNames,
 }: {
   /** True while the agent works or messages wait. */
   disabled: boolean;
@@ -28,6 +35,10 @@ export function ChatActionsMenu({
   empty: boolean;
   onCompact: () => Promise<boolean>;
   onClear: () => Promise<boolean>;
+  chat: Chat;
+  messages: ChatMessage[];
+  /** Agent names by id, for labeling replies in the export. */
+  agentNames: Record<string, string>;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -45,6 +56,13 @@ export function ChatActionsMenu({
     setCompacting(true);
     await onCompact();
     setCompacting(false);
+  };
+
+  const exportAs = (kind: "md" | "json") => {
+    const context = { chat, messages, agentNames };
+    const stem = fileStem(chat.title, "chat");
+    if (kind === "md") downloadText(`${stem}.md`, chatToMarkdown(context), "text/markdown");
+    else downloadText(`${stem}.json`, chatToJson(context), "application/json");
   };
 
   return (
@@ -71,6 +89,14 @@ export function ChatActionsMenu({
           >
             <FoldVertical />
             {compacting ? "Compacting…" : "Compact conversation"}
+          </DropdownMenuItem>
+          <DropdownMenuItem data-testid="chat-export-md" disabled={empty} onClick={() => exportAs("md")}>
+            <Download />
+            Export as Markdown
+          </DropdownMenuItem>
+          <DropdownMenuItem data-testid="chat-export-json" disabled={empty} onClick={() => exportAs("json")}>
+            <Download />
+            Export as JSON
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
