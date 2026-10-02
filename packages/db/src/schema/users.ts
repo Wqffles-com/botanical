@@ -18,6 +18,8 @@ export const users = pgTable(
     passwordHash: text('password_hash'),
     /** `admin` or `member`. */
     role: text('role').notNull().default('member'),
+    /** Set when an admin disables the account. Null while it is active. */
+    disabledAt: timestamp('disabled_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

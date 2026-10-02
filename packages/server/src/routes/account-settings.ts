@@ -1,6 +1,7 @@
 import { hashToken, newSessionToken } from "../auth/session.ts";
 import { HttpError, isRecord, json, readJson } from "../http.ts";
-import { adminOnly, authed, type Router } from "../router.ts";
+import { adminOnly, authed, type RequestContext, type Router } from "../router.ts";
+import type { AuthUser } from "../types.ts";
 import { MODEL_PROVIDERS, type ModelProfile, type ModelProvider } from "../types.ts";
 import { SIGNUP_MODES, type SignupMode } from "@botanical/db";
 import { GITHUB_SECRET_NAME } from "@botanical/core";
@@ -8,6 +9,22 @@ import { ANTHROPIC_DEFAULT_MAX_TOKENS, API_KNOWN_MODELS, retiredModelReplacement
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SECRET_NAME = /^[a-z][a-z0-9_-]{0,63}$/;
+
+async function findTarget(ctx: RequestContext): Promise<AuthUser> {
+  const id = ctx.params.id ?? "";
+  const target = UUID.test(id) ? await ctx.store.accounts.findById(id) : null;
+  if (!target) throw new HttpError(404, "not_found", "User not found");
+  return target;
+}
+
+function isActiveAdmin(user: AuthUser): boolean {
+  return user.role === "admin" && user.disabledAt === null;
+}
+
+async function otherActiveAdmins(ctx: RequestContext, exceptId: string): Promise<number> {
+  const users = await ctx.store.accounts.listUsers();
+  return users.filter((user) => user.id !== exceptId && isActiveAdmin(user)).length;
+}
 
 export function registerAccountSettings(router: Router): void {
   router.add(
@@ -137,14 +154,89 @@ export function registerAccountSettings(router: Router): void {
     adminOnly(async (ctx) => {
       const users = await ctx.store.accounts.listUsers();
       return json(200, {
-        users: users.map((user) => ({
-          id: user.id,
-          email: user.email,
-          displayName: user.displayName,
-          role: user.role,
-          createdAt: user.createdAt,
-        })),
+        users: await Promise.all(
+          users.map(async (user) => {
+            const [latest] = await ctx.store.sessions.listByUser(user.id);
+            return {
+              id: user.id,
+              email: user.email,
+              displayName: user.displayName,
+              role: user.role,
+              createdAt: user.createdAt,
+              lastActiveAt: latest?.createdAt ?? null,
+              disabledAt: user.disabledAt,
+            };
+          }),
+        ),
       });
+    }),
+  );
+
+  router.add(
+    "PATCH",
+    "/api/admin/users/:id",
+    adminOnly(async (ctx) => {
+      const body = await readJson(ctx.request, ctx.config);
+      if (!isRecord(body)) throw new HttpError(400, "invalid_body", "JSON object expected");
+      if (body.disabled !== undefined && typeof body.disabled !== "boolean") {
+        throw new HttpError(400, "invalid_body", "disabled must be a boolean");
+      }
+      if (body.role !== undefined && body.role !== "admin" && body.role !== "member") {
+        throw new HttpError(400, "invalid_body", "role must be admin or member");
+      }
+      if (body.disabled === undefined && body.role === undefined) {
+        throw new HttpError(400, "invalid_body", "Nothing to change");
+      }
+      const target = await findTarget(ctx);
+      if (body.disabled === true && target.id === ctx.user?.id) {
+        throw new HttpError(400, "invalid_request", "You cannot disable your own account");
+      }
+      const losesAdmin = (body.disabled === true || body.role === "member") && isActiveAdmin(target);
+      if (losesAdmin && (await otherActiveAdmins(ctx, target.id)) === 0) {
+        throw new HttpError(409, "last_admin", "There must be at least one active admin");
+      }
+      let updated: AuthUser | null = target;
+      if (body.role !== undefined) updated = await ctx.store.accounts.setRole(target.id, body.role);
+      if (body.disabled !== undefined && updated) {
+        updated = await ctx.store.accounts.setDisabled(target.id, body.disabled);
+        if (body.disabled) await ctx.store.sessions.deleteByUser(target.id);
+      }
+      if (!updated) throw new HttpError(404, "not_found", "User not found");
+      return json(200, {
+        user: {
+          id: updated.id,
+          email: updated.email,
+          displayName: updated.displayName,
+          role: updated.role,
+          createdAt: updated.createdAt,
+          disabledAt: updated.disabledAt,
+        },
+      });
+    }),
+  );
+
+  router.add(
+    "DELETE",
+    "/api/admin/users/:id",
+    adminOnly(async (ctx) => {
+      const target = await findTarget(ctx);
+      if (target.id === ctx.user?.id) {
+        throw new HttpError(400, "invalid_request", "You cannot delete your own account");
+      }
+      if (isActiveAdmin(target) && (await otherActiveAdmins(ctx, target.id)) === 0) {
+        throw new HttpError(409, "last_admin", "There must be at least one active admin");
+      }
+      await ctx.store.sessions.deleteByUser(target.id);
+      const result = await ctx.store.accounts.deleteUser(target.id);
+      if (result === "missing") throw new HttpError(404, "not_found", "User not found");
+      if (result === "pinned") {
+        throw new HttpError(
+          409,
+          "user_has_history",
+          "This account's tool activity is kept in the audit log, so it cannot be deleted. Disable it instead.",
+        );
+      }
+      return new Response(null, { status: 204 });
     }),
   );
 

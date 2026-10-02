@@ -103,7 +103,8 @@ export function createRouter(): Router & {
         }
 
         const session = await resolveSession(request, deps.store, deps.config, now);
-        const user = session ? await deps.store.accounts.findById(session.userId) : null;
+        const found = session ? await deps.store.accounts.findById(session.userId) : null;
+        const user = found && !found.disabledAt ? found : null;
         const liveSession = user ? session : null;
         const run = () =>
           route.handler({

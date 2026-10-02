@@ -4,7 +4,11 @@ import type { AccountRepository, AuthUser, InviteRecord, PrefsRepository, Secret
 import type { BotanicalDb } from './client.ts';
 import { SETTING_KEYS, SIGNUP_MODES, type SignupMode } from './constants.ts';
 import { decryptSecret, encryptSecret, EncryptionKeyMissing, last4 } from './crypto.ts';
+import { agents } from './schema/agents.ts';
+import { chats } from './schema/chats.ts';
 import { invites } from './schema/invites.ts';
+import { modelProfiles } from './schema/model-profiles.ts';
+import { notifications } from './schema/notifications.ts';
 import { passwordResets } from './schema/password-resets.ts';
 import { secrets } from './schema/secrets.ts';
 import { settings } from './schema/settings.ts';
@@ -21,14 +25,23 @@ function asRole(value: string): UserRole {
   return value === 'admin' ? 'admin' : 'member';
 }
 
-function toAuth(row: { id: string; email: string | null; displayName: string; role: string; createdAt: Date }): AuthUser {
+function toAuth(row: { id: string; email: string | null; displayName: string; role: string; createdAt: Date; disabledAt: Date | null }): AuthUser {
   return {
     id: row.id,
     email: row.email ?? '',
     displayName: row.displayName,
     role: asRole(row.role),
     createdAt: iso(row.createdAt),
+    disabledAt: row.disabledAt ? iso(row.disabledAt) : null,
   };
+}
+
+function isForeignKeyViolation(error: unknown): boolean {
+  for (let current: unknown = error, depth = 0; current && depth < 4; depth += 1) {
+    if ((current as { code?: unknown }).code === '23503') return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
 }
 
 function assertSecretName(name: string): string {
@@ -222,6 +235,40 @@ export function createAccountServices(
         .where(sql`${users.passwordHash} is not null`)
         .orderBy(asc(users.createdAt), asc(users.id));
       return rows.map(toAuth);
+    },
+    async setDisabled(userId, disabled) {
+      const updated = await db
+        .update(users)
+        .set({ disabledAt: disabled ? new Date() : null, updatedAt: new Date() })
+        .where(and(eq(users.id, userId), sql`${users.passwordHash} is not null`))
+        .returning();
+      return updated[0] ? toAuth(updated[0]) : null;
+    },
+    async setRole(userId, role) {
+      const updated = await db
+        .update(users)
+        .set({ role, updatedAt: new Date() })
+        .where(and(eq(users.id, userId), sql`${users.passwordHash} is not null`))
+        .returning();
+      return updated[0] ? toAuth(updated[0]) : null;
+    },
+    async deleteUser(userId) {
+      try {
+        return await db.transaction(async (tx) => {
+          const found = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
+          if (!found[0]) return 'missing' as const;
+          // Chats first: they restrict agents and profiles. Messages and usage events cascade.
+          await tx.delete(chats).where(eq(chats.userId, userId));
+          await tx.delete(agents).where(eq(agents.userId, userId));
+          await tx.delete(notifications).where(eq(notifications.userId, userId));
+          await tx.delete(modelProfiles).where(eq(modelProfiles.userId, userId));
+          await tx.delete(users).where(eq(users.id, userId));
+          return 'deleted' as const;
+        });
+      } catch (error) {
+        if (isForeignKeyViolation(error)) return 'pinned';
+        throw error;
+      }
     },
     async setPasswordHash(userId, passwordHash) {
       const updated = await db

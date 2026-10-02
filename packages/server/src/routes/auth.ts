@@ -79,6 +79,9 @@ export function registerAuth(router: Router): void {
       ctx.rateLimiter.recordFailure(ctx.clientKey);
       throw new HttpError(401, "unauthorized", "Invalid email or password");
     }
+    if (user.disabledAt) {
+      throw new HttpError(403, "account_disabled", "This account has been disabled. Ask an admin.");
+    }
     ctx.rateLimiter.clear(ctx.clientKey);
     return issueSession(ctx, user);
   });
@@ -150,7 +153,7 @@ export function registerAuth(router: Router): void {
         await Bun.password.hash(password, { algorithm: "argon2id" }),
       );
       const user = updated ? await ctx.store.accounts.findById(userId) : null;
-      if (!user) throw new HttpError(403, "reset_invalid", "That reset link is invalid or expired");
+      if (!user || user.disabledAt) throw new HttpError(403, "reset_invalid", "That reset link is invalid or expired");
       await ctx.store.sessions.deleteByUser(userId);
       ctx.rateLimiter.clear(ctx.clientKey);
       return issueSession(ctx, user);

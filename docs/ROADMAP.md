@@ -7,6 +7,7 @@ Botanical is in early alpha. This page separates what already ships from what is
 - Always-on server: self-host on a machine you run, or the same code with `DEPLOYMENT_MODE=SAAS`. A laptop run is for development. This is not a personal-PC app.
 - Accounts on every instance. Email and password signup. The first account is the admin. Signup can be open, invite-only, or closed. Per-user settings and API keys. Admin global keys and settings are edited in the UI and stored encrypted in the database. `DATABASE_URL` and `BOTANICAL_ENCRYPTION_KEY` bootstrap the process. Other env vars only seed.
 - Account security. A user changes their password in Settings (the current password is required), sees their active sessions, and signs out everywhere else. A password change signs out every other session. With no email service, an admin creates a one-time reset link for a user; opening it sets a new password and ends all of that user's sessions.
+- Admin user management. Settings → Admin → Users lists accounts (email, name, created, last active, role). An admin can disable an account (blocks sign-in and ends its sessions), delete it with its data, or promote and demote admins. The last active admin is protected.
 - Open source (MIT). Hosted billing is undecided. Nothing charges a customer.
 - Monochrome shadcn/ui, with a light/dark toggle.
 - Model profiles for OpenAI-compatible APIs (the start script offers DeepSeek first) and for OpenAI, Anthropic, xAI, and OpenRouter. No silent default model.

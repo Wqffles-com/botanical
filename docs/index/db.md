@@ -60,6 +60,7 @@ Enums in `packages/db/src/schema/enums.ts`: `message_role`, `a2a_status`, `agent
 | `packages/db/migrations/0009_one_chat_per_agent.sql` | keeps each agent's most recently active own chat, deletes the others, adds `chats_agent_direct_uidx` |
 | `packages/db/migrations/0010_github.sql` | listener `events`, delivery status `ignored`, and the `git` and `github` capabilities on the Coder and Orchestrator roles |
 | `packages/db/migrations/0011_password_resets.sql` | `password_resets`: admin-generated, single-use reset links (token hash only) |
+| `packages/db/migrations/0012_user_disabled.sql` | `users.disabled_at`: set when an admin disables an account |
 | `packages/db/migrations/meta/_journal.json` | Apply order (tags match the SQL filenames) |
 | `packages/db/migrations/meta/0000_snapshot.json` | Drizzle snapshot for `0000` |
 | `packages/db/migrations/meta/0001_snapshot.json` | Drizzle snapshot for `0001` |

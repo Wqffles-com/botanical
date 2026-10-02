@@ -35,6 +35,8 @@ HTTP API: account auth, agents, chats, streaming turns, agent-to-agent mail, rou
 | `packages/server/src/provider-host.ts` | Holds the provider registry on the config object |
 | `packages/server/test` | `bun test` files |
 
+Admin user management: `GET /api/admin/users` lists accounts with `lastActiveAt` (the newest session's start) and `disabledAt`. `PATCH /api/admin/users/:id` takes `disabled` and `role`; disabling deletes the user's sessions, and a disabled account cannot log in (`403 account_disabled`) or use an existing token. `DELETE /api/admin/users/:id` removes the account with its agents, chats, messages, routines, listeners, notifications, memories, personal profiles, and secrets (`AccountRepository.deleteUser`). Admins cannot disable or delete themselves, and the last active admin cannot be demoted, disabled, or deleted (`409 last_admin`). An account referenced by the append-only tool log cannot be deleted (`409 user_has_history`); disable it instead.
+
 ## Exports
 
 From `packages/server/src/index.ts`: `createApp`, `loadConfig`, `createStore`, `createMemoryStore`, `createA2AService`, `createSendAgentMessageTool`, `startServerMcp`, `emptyServerMcp`, `createDefaultToolRegistry`, `ConfigError`, `SERVER_VERSION`. Types include `App`, `ServerConfig`, `Store`, `Agent`, `Chat`, `Message`.
@@ -137,6 +139,8 @@ Group chats: `POST /api/chats` and `PATCH /api/chats/:id` take `memberIds`, the 
 | POST | `/api/admin/profiles` | `packages/server/src/routes/account-settings.ts` |
 | DELETE | `/api/admin/profiles/:id` | `packages/server/src/routes/account-settings.ts` |
 | GET | `/api/admin/users` | `packages/server/src/routes/account-settings.ts` |
+| PATCH | `/api/admin/users/:id` | `packages/server/src/routes/account-settings.ts` |
+| DELETE | `/api/admin/users/:id` | `packages/server/src/routes/account-settings.ts` |
 | POST | `/api/admin/users/:id/reset-link` | `packages/server/src/routes/account-settings.ts` |
 | POST | `/api/admin/invites` | `packages/server/src/routes/account-settings.ts` |
 | GET | `/api/admin/invites` | `packages/server/src/routes/account-settings.ts` |

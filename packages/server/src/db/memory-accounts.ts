@@ -26,6 +26,7 @@ interface UserRow {
   role: UserRole;
   passwordHash: string | null;
   createdAt: string;
+  disabledAt: string | null;
 }
 
 interface InviteRow {
@@ -50,6 +51,8 @@ export function createMemoryAccounts(options: {
   encryptionKey?: string;
   now: () => string;
   adoptLegacy: (userId: string) => void;
+  /** Remove the agents, chats, and other rows the store holds for a user. */
+  purgeUser: (userId: string) => Promise<void>;
   legacyUserId: string;
 }): { accounts: AccountRepository; secrets: SecretRepository; prefs: PrefsRepository } {
   const users: UserRow[] = [];
@@ -74,6 +77,7 @@ export function createMemoryAccounts(options: {
       displayName: row.displayName,
       role: row.role,
       createdAt: row.createdAt,
+      disabledAt: row.disabledAt,
     };
   }
 
@@ -155,6 +159,7 @@ export function createMemoryAccounts(options: {
         role: input.role,
         passwordHash: input.passwordHash,
         createdAt: stamp(),
+        disabledAt: null,
       };
       users.push(row);
       if (users.filter((item) => item.passwordHash).length === 1) options.adoptLegacy(row.id);
@@ -195,6 +200,32 @@ export function createMemoryAccounts(options: {
     },
     async listUsers() {
       return users.filter((row) => row.passwordHash).map(toAuth);
+    },
+    async setDisabled(userId, disabled) {
+      const row = users.find((item) => item.id === userId && item.passwordHash);
+      if (!row) return null;
+      row.disabledAt = disabled ? stamp() : null;
+      return toAuth(row);
+    },
+    async setRole(userId, role) {
+      const row = users.find((item) => item.id === userId && item.passwordHash);
+      if (!row) return null;
+      row.role = role;
+      return toAuth(row);
+    },
+    async deleteUser(userId) {
+      const index = users.findIndex((item) => item.id === userId);
+      if (index < 0) return "missing";
+      await options.purgeUser(userId);
+      users.splice(index, 1);
+      for (let i = invites.length - 1; i >= 0; i -= 1) if (invites[i]?.createdBy === userId) invites.splice(i, 1);
+      for (let i = resets.length - 1; i >= 0; i -= 1) {
+        if (resets[i]?.userId === userId || resets[i]?.createdBy === userId) resets.splice(i, 1);
+      }
+      for (let i = secretRows.length - 1; i >= 0; i -= 1) if (secretRows[i]?.userId === userId) secretRows.splice(i, 1);
+      for (const keyName of [...userPrefs.keys()]) if (keyName.startsWith(`${userId}\0`)) userPrefs.delete(keyName);
+      for (const invite of invites) if (invite.usedBy === userId) invite.usedBy = null;
+      return "deleted";
     },
     async setPasswordHash(userId, passwordHash) {
       const row = users.find((item) => item.id === userId && item.passwordHash);
