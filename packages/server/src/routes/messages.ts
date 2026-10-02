@@ -21,6 +21,47 @@ export function registerMessages(
 ): void {
   router.add(
     "GET",
+    "/api/messages/search",
+    authed(async (ctx) => {
+      const params = ctx.url.searchParams;
+      const q = (params.get("q") ?? "").trim();
+      if (!q || q.length > 200) throw new HttpError(400, "invalid_query", "q is required (up to 200 characters)");
+      const agentId = params.get("agentId")?.trim() || null;
+      const role = params.get("role");
+      if (role !== null && role !== "user" && role !== "assistant") {
+        throw new HttpError(400, "invalid_query", "role must be user or assistant");
+      }
+      const from = readDate(params.get("from"), "from");
+      const to = readDate(params.get("to"), "to");
+      const limitRaw = params.get("limit");
+      if (limitRaw !== null && !/^\d+$/.test(limitRaw)) {
+        throw new HttpError(400, "invalid_query", "limit must be an integer");
+      }
+      const limit = Math.min(Math.max(Number(limitRaw ?? 20), 1), 50);
+      const chats = new Map(
+        (await ctx.store.chats.list())
+          .filter((chat) => agentId === null || chat.agentId === agentId || chat.memberIds.includes(agentId))
+          .map((chat) => [chat.id, chat]),
+      );
+      const found = await ctx.store.messages.search({
+        q,
+        chatIds: [...chats.keys()],
+        ...(role ? { role } : {}),
+        ...(from ? { from } : {}),
+        ...(to ? { to } : {}),
+        limit,
+      });
+      const results = found.flatMap((message) => {
+        const chat = chats.get(message.chatId);
+        if (!chat) return [];
+        return [{ message, agentId: chat.agentId, chatTitle: chat.title, snippet: searchSnippet(message.content, q) }];
+      });
+      return json(200, { results });
+    }),
+  );
+
+  router.add(
+    "GET",
     "/api/chats/:id/messages",
     authed(async (ctx) => {
       const chat = await loadChat(ctx.store, requireParam(ctx.params, "id"));
@@ -289,4 +330,38 @@ function wantsStream(request: Request, body: Record<string, unknown>): boolean {
   if (typeof body.stream === "boolean") return body.stream;
   const accept = request.headers.get("accept") ?? "";
   return accept.includes("text/event-stream");
+}
+
+function readDate(value: string | null, name: string): string | undefined {
+  if (!value) return undefined;
+  const at = Date.parse(value);
+  if (Number.isNaN(at)) throw new HttpError(400, "invalid_query", `${name} must be an ISO date`);
+  return new Date(at).toISOString();
+}
+
+const SNIPPET_BEFORE = 40;
+const SNIPPET_LENGTH = 160;
+
+/** A window of `content` around the first match of `q` (the phrase, else its first matching word). */
+export function searchSnippet(content: string, q: string): { text: string; start: number; end: number } {
+  const lower = content.toLowerCase();
+  const terms = [q, ...q.split(/\s+/)].map((term) => term.toLowerCase()).filter(Boolean);
+  let at = -1;
+  let length = 0;
+  for (const term of terms) {
+    at = lower.indexOf(term);
+    if (at >= 0) {
+      length = term.length;
+      break;
+    }
+  }
+  const from = Math.max(0, Math.max(at, 0) - SNIPPET_BEFORE);
+  const slice = content.slice(from, from + SNIPPET_LENGTH).replace(/\s+/g, " ");
+  const head = from > 0 ? "…" : "";
+  const text = head + slice + (from + SNIPPET_LENGTH < content.length ? "…" : "");
+  if (at < 0) return { text, start: 0, end: 0 };
+  // Whitespace collapsing can shift offsets, so locate the match again inside the slice.
+  const inSlice = slice.toLowerCase().indexOf(lower.slice(at, at + length).replace(/\s+/g, " "));
+  if (inSlice < 0) return { text, start: 0, end: 0 };
+  return { text, start: head.length + inSlice, end: head.length + inSlice + length };
 }

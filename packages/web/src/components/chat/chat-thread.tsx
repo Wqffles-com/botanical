@@ -96,6 +96,21 @@ export function ChatThread({
   const members = group && chat ? agents.filter((other) => chat.memberIds.includes(other.id)) : [];
   const workingAgent = (workingAgentId ? agents.find((other) => other.id === workingAgentId) : null) ?? agent;
 
+  // A search result opens the chat at `?message=<id>`: scroll to that message and flash it.
+  const focused = useRef<string | null>(null);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("message");
+    if (!id || loading || focused.current === id) return;
+    const target = scroller.current?.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(id)}"]`);
+    if (!target) return;
+    focused.current = id;
+    stick.current = false;
+    target.scrollIntoView({ block: "center" });
+    target.dataset.highlight = "true";
+    const timer = setTimeout(() => delete target.dataset.highlight, 2500);
+    return () => clearTimeout(timer);
+  }, [messages, loading]);
+
   useEffect(() => {
     const el = scroller.current;
     if (!el || !stick.current) return;
@@ -216,15 +231,20 @@ export function ChatThread({
                 return <AgentActivity key={row.key} entry={row} name={group ? author?.name : undefined} />;
               }
               return (
-                <MessageBubble
+                <div
                   key={row.key}
-                  message={row.message}
-                  agent={author}
-                  showName={group}
-                  continued={continuesRun(rows, index, author?.id ?? null, chat, agents)}
-                  toolCalls={row.tools.length > 0 ? row.tools : undefined}
-                  actions={actionsFor(row.message)}
-                />
+                  data-message-id={row.message.id}
+                  className="-mx-2 rounded-2xl px-2 transition-colors duration-700 data-[highlight=true]:bg-accent"
+                >
+                  <MessageBubble
+                    message={row.message}
+                    agent={author}
+                    showName={group}
+                    continued={continuesRun(rows, index, author?.id ?? null, chat, agents)}
+                    toolCalls={row.tools.length > 0 ? row.tools : undefined}
+                    actions={actionsFor(row.message)}
+                  />
+                </div>
               );
             })}
             {working ? (

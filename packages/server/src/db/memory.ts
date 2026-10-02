@@ -323,6 +323,22 @@ export function createMemoryStore(options?: { seed?: boolean; now?: () => Date; 
         if (chatOwners.get(chatId) !== acting()) return [];
         return messages.filter((message) => message.chatId === chatId).map(clone);
       },
+      async search(query) {
+        const needle = query.q.toLowerCase();
+        const chatIds = new Set(query.chatIds.filter((id) => chatOwners.get(id) === acting()));
+        const from = query.from ? Date.parse(query.from) : null;
+        const to = query.to ? Date.parse(query.to) : null;
+        const hits = messages.filter((message) => {
+          if (!chatIds.has(message.chatId) || !message.content) return false;
+          if (message.role !== "user" && message.role !== "assistant") return false;
+          if (query.role && message.role !== query.role) return false;
+          const at = Date.parse(message.createdAt);
+          if (from !== null && at < from) return false;
+          if (to !== null && at > to) return false;
+          return message.content.toLowerCase().includes(needle);
+        });
+        return hits.reverse().slice(0, query.limit).map(clone);
+      },
       async create(input: NewMessage) {
         if (chatOwners.get(input.chatId) !== acting()) throw new Error("chat not found");
         const message = materializeMessage(input, randomUUID(), timestamp());

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 
 import type { AccountRepository, PrefsRepository, SecretRepository } from './account-types.ts';
 import { createAccountServices } from './accounts.ts';
@@ -169,6 +169,15 @@ export interface Message {
   agentId?: string | null;
 }
 
+export interface MessageSearchQuery {
+  q: string;
+  chatIds: readonly string[];
+  role?: 'user' | 'assistant';
+  from?: string;
+  to?: string;
+  limit: number;
+}
+
 export interface NewMessage {
   chatId: string;
   role: MessageRole;
@@ -236,6 +245,8 @@ export interface Store {
   };
   readonly messages: {
     listByChat(chatId: string): Promise<Message[]>;
+    /** User and assistant text rows matching `q` in the given chats (full-text or substring), newest first. */
+    search(query: MessageSearchQuery): Promise<Message[]>;
     create(input: NewMessage): Promise<Message>;
     /** Replace a message's text. Null when the message is not in this chat. */
     updateContent(chatId: string, id: string, content: string): Promise<Message | null>;
@@ -654,6 +665,40 @@ function buildStore(
           .leftJoin(modelProfiles, eq(messages.profileId, modelProfiles.id))
           .where(eq(messages.chatId, chatId))
           .orderBy(asc(messages.seq));
+        return rows.map((row) => toMessage(row.message, row.profilePublicId));
+      },
+      async search(query) {
+        const ids = query.chatIds.filter(isUuid);
+        if (ids.length === 0) return [];
+        // Chat ownership is checked in one query, so ids the caller does not own match nothing.
+        const owned = await db
+          .select({ id: chats.id })
+          .from(chats)
+          .where(and(inArray(chats.id, ids), eq(chats.userId, bound())));
+        if (owned.length === 0) return [];
+        const escaped = query.q.replace(/[\\%_]/g, '\\$&');
+        const match = or(
+          sql`to_tsvector('simple', ${messages.content}) @@ websearch_to_tsquery('simple', ${query.q})`,
+          ilike(messages.content, `%${escaped}%`),
+        );
+        const rows = await db
+          .select({ message: messages, profilePublicId: modelProfiles.publicId })
+          .from(messages)
+          .leftJoin(modelProfiles, eq(messages.profileId, modelProfiles.id))
+          .where(
+            and(
+              inArray(
+                messages.chatId,
+                owned.map((row) => row.id),
+              ),
+              query.role ? eq(messages.role, query.role) : inArray(messages.role, ['user', 'assistant']),
+              query.from ? gte(messages.createdAt, new Date(query.from)) : undefined,
+              query.to ? lte(messages.createdAt, new Date(query.to)) : undefined,
+              match,
+            ),
+          )
+          .orderBy(desc(messages.seq))
+          .limit(query.limit);
         return rows.map((row) => toMessage(row.message, row.profilePublicId));
       },
       async create(input) {

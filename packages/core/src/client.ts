@@ -61,6 +61,8 @@ import type {
   Chat,
   ChatEvent,
   ChatMessage,
+  MessageSearchHit,
+  MessageSearchQuery,
   ChatStreamEvent,
   CreateAgentInput,
   CreateChatInput,
@@ -463,6 +465,30 @@ export class BotanicalClient {
       body: JSON.stringify({ status: input.status }),
     });
     return normalizeAgentMessage(payload);
+  }
+
+  async searchMessages(query: MessageSearchQuery, init?: { signal?: AbortSignal }): Promise<MessageSearchHit[]> {
+    const params = new URLSearchParams({ q: query.q });
+    if (query.agentId) params.set("agentId", query.agentId);
+    if (query.role) params.set("role", query.role);
+    if (query.from) params.set("from", query.from);
+    if (query.to) params.set("to", query.to);
+    if (query.limit) params.set("limit", String(query.limit));
+    const body = await this.requestJson(`${API.messageSearch}?${params}`, init?.signal ? { signal: init.signal } : undefined);
+    return unwrapList(body, ["results"]).map((row) => {
+      const record = row as Record<string, unknown>;
+      const snippet = (record.snippet ?? {}) as Record<string, unknown>;
+      return {
+        message: normalizeMessage(record.message),
+        agentId: typeof record.agentId === "string" ? record.agentId : "",
+        chatTitle: typeof record.chatTitle === "string" ? record.chatTitle : "",
+        snippet: {
+          text: typeof snippet.text === "string" ? snippet.text : "",
+          start: typeof snippet.start === "number" ? snippet.start : 0,
+          end: typeof snippet.end === "number" ? snippet.end : 0,
+        },
+      };
+    });
   }
 
   async listMessages(chatId: string): Promise<ChatMessage[]> {

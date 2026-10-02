@@ -22,6 +22,7 @@ export const API = {
   role: (id: string) => `/api/roles/${encodeURIComponent(id)}`,
   chats: "/api/chats",
   chat: (id: string) => `/api/chats/${encodeURIComponent(id)}`,
+  messageSearch: "/api/messages/search",
   messages: (chatId: string) => `/api/chats/${encodeURIComponent(chatId)}/messages`,
   message: (chatId: string, messageId: string) =>
     `/api/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}`,

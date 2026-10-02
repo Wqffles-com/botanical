@@ -78,6 +78,8 @@ export type {
   Chat,
   ChatEvent,
   ChatMessage,
+  MessageSearchHit,
+  MessageSearchQuery,
   ChatStreamEvent,
   CreateAgentInput,
   CreateChatInput,
