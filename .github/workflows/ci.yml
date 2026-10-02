@@ -36,7 +36,10 @@ jobs:
       - name: Codebase index check
         run: bun run check:index
 
-      # web lint has known react-hooks errors and is left out until fixed.
+      - name: Lint web
+        run: bun run lint
+        working-directory: packages/web
+
       - name: Typecheck
         run: |
           set -e

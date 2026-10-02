@@ -23,6 +23,8 @@ export function AccentProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const id = ++requestId.current;
     const cached = readStoredAccent();
+    // localStorage is only readable after mount; reading it during render would break hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAccentState(cached);
     applyAccent(cached);
     api

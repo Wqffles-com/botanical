@@ -48,7 +48,7 @@ export function AdminPanel() {
   const [profiles, setProfiles] = useState<GlobalProfile[]>([]);
   const [knownModels, setKnownModels] = useState<Record<string, string[]>>({});
 
-  async function load() {
+  async function fetchAdmin() {
     const [settingsResponse, profilesResponse] = await Promise.all([
       request("/api/admin/settings"),
       request("/api/admin/profiles"),
@@ -62,6 +62,10 @@ export function AdminPanel() {
       profiles: GlobalProfile[];
       knownModels?: Record<string, string[]>;
     };
+    return { body, listed };
+  }
+
+  function applyAdmin({ body, listed }: Awaited<ReturnType<typeof fetchAdmin>>) {
     setSignupMode(body.signupMode);
     setAllowGlobalKeys(body.allowGlobalKeys);
     setSecrets(body.secrets);
@@ -69,10 +73,17 @@ export function AdminPanel() {
     setKnownModels(listed.knownModels ?? {});
   }
 
+  async function load() {
+    applyAdmin(await fetchAdmin());
+  }
+
   useEffect(() => {
-    void load().catch((error: unknown) => {
-      toast.error(error instanceof Error ? error.message : "Could not load admin settings");
-    });
+    void fetchAdmin()
+      .then(applyAdmin)
+      .catch((error: unknown) => {
+        toast.error(error instanceof Error ? error.message : "Could not load admin settings");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once on mount
   }, []);
 
   async function savePolicy() {

@@ -32,7 +32,7 @@ export function NewChatForm({
   error?: string | null;
   onSubmit: (input: { agentId: string; memberIds: string[]; profileId: string; title: string }) => void;
 }) {
-  const { openAgent, openSettings } = useAppDialogs();
+  const { openAgent } = useAppDialogs();
   const [query, setQuery] = useState("");
   const [agentId, setAgentId] = useState<string | null>(initialAgentId ?? null);
   // Other agents that answer in the same chat. The owner is never one of them.
