@@ -158,7 +158,15 @@ export function ChatThread({
               />
             ) : null}
             {onClear && onCompact ? (
-              <ChatActionsMenu disabled={locked} empty={messages.length === 0} onClear={onClear} onCompact={onCompact} />
+              <ChatActionsMenu
+                disabled={locked}
+                empty={messages.length === 0}
+                onClear={onClear}
+                onCompact={onCompact}
+                chat={chat}
+                messages={messages}
+                agentNames={Object.fromEntries(agents.map((item) => [item.id, item.name]))}
+              />
             ) : null}
             {headerActions}
           </>

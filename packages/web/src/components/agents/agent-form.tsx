@@ -4,7 +4,7 @@ import { ConfirmDialog } from "@botanical/ui/components/alert-dialog";
 import { pageContainerVariants } from "@botanical/ui/components/page-container";
 import type { Agent, RoleRecord } from "@botanical/core";
 import { useRef, useState, type FormEvent } from "react";
-import { ImageUp } from "lucide-react";
+import { Download, FileUp, ImageUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -26,6 +26,8 @@ import { cn } from "@/lib/utils";
 import { previewEffective } from "@/lib/permissions";
 import { createAgent, deleteAgent, updateAgent } from "@/lib/agent-api";
 import { fileToAgentPicture } from "@/lib/agent-picture";
+import { agentToExport, parseAgentImport } from "@/lib/agent-export";
+import { downloadText, fileStem } from "@/lib/download";
 import {
   AGENT_DESCRIPTION_MAX,
   AGENT_NAME_MAX,
@@ -71,6 +73,7 @@ export function AgentForm({
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const pictureInput = useRef<HTMLInputElement>(null);
+  const importInput = useRef<HTMLInputElement>(null);
   if (seenKey !== agentKey) {
     setSeenKey(agentKey);
     setDraft(agent ? draftFromIdentity(agent) : EMPTY_AGENT_DRAFT);
@@ -110,6 +113,27 @@ export function AgentForm({
       toast.error(error instanceof Error ? error.message : "Could not save the agent.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  function onExport() {
+    const file = agentToExport(draft, profiles);
+    downloadText(`${fileStem(draft.name, "agent")}.json`, JSON.stringify(file, null, 2), "application/json");
+  }
+
+  async function onImport(file: File) {
+    try {
+      const { draft: imported, notes } = parseAgentImport(
+        await file.text(),
+        profiles,
+        tools.map((tool) => tool.id),
+      );
+      // Keep the picture and roles: they are not part of the file.
+      setDraft((current) => ({ ...imported, picture: current.picture, roleIds: current.roleIds }));
+      toast.success(`Imported ${imported.name}. Review it, then create the agent.`);
+      for (const note of notes) toast.info(note);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not read that file.");
     }
   }
 
@@ -174,6 +198,40 @@ export function AgentForm({
                 </p>
               ) : null}
             </div>
+          </div>
+          <div className="flex gap-2">
+            {agent ? (
+              <Button type="button" variant="outline" onClick={onExport} data-testid="agent-export">
+                <Download />
+                Export
+              </Button>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={saving}
+                  onClick={() => importInput.current?.click()}
+                  data-testid="agent-import"
+                >
+                  <FileUp />
+                  Import
+                </Button>
+                <input
+                  ref={importInput}
+                  type="file"
+                  accept="application/json,.json"
+                  className="sr-only"
+                  tabIndex={-1}
+                  data-testid="agent-import-file"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (file) void onImport(file);
+                  }}
+                />
+              </>
+            )}
           </div>
         </div>
 
