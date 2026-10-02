@@ -12,6 +12,7 @@ import {
   type AgentColor,
   type AgentShape,
 } from "./agents";
+import type { AttachmentRef } from "./attachments";
 import { ACCENT_COLORS, isAccentColor, type AccentColor } from "./appearance";
 import {
   BotanicalApiError,
@@ -303,6 +304,22 @@ export class BotanicalClient {
       `${API.agentFileContent(agentId)}?${new URLSearchParams({ path }).toString()}`,
     )) as WorkspaceFile;
     return { path: body.path, content: String(body.content ?? ""), bytes: Number(body.bytes ?? 0) };
+  }
+
+  /** Save a file in the agent's workspace under `uploads/` and get back the reference to put on a message. */
+  async uploadAgentFile(agentId: string, file: Blob, name: string): Promise<AttachmentRef> {
+    const type = file.type || "application/octet-stream";
+    const body = (await this.requestJson(`${API.agentUploads(agentId)}?${new URLSearchParams({ name }).toString()}`, {
+      method: "POST",
+      body: file,
+      headers: { "content-type": type },
+    })) as { file: AttachmentRef };
+    return body.file;
+  }
+
+  /** URL of an uploaded file, for an image thumbnail or a download link. */
+  agentUploadUrl(agentId: string, path: string): string {
+    return this.url(API.agentUpload(agentId, path.split("/").pop() ?? path));
   }
 
   async listRoles(): Promise<RoleRecord[]> {

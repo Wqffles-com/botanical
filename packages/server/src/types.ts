@@ -394,6 +394,10 @@ export interface SessionRepository {
   create(session: Session): Promise<Session>;
   getByTokenHash(tokenHash: string): Promise<Session | null>;
   delete(id: string): Promise<boolean>;
+  /** Newest first. */
+  listByUser(userId: string): Promise<Session[]>;
+  /** Delete a user's sessions, keeping `exceptId` when given. Returns how many were removed. */
+  deleteByUser(userId: string, exceptId?: string): Promise<number>;
 }
 
 /**

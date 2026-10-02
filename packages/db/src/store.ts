@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, ne, or, sql } from 'drizzle-orm';
 
 import type { AccountRepository, PrefsRepository, SecretRepository } from './account-types.ts';
 import { createAccountServices } from './accounts.ts';
@@ -258,6 +258,9 @@ export interface Store {
     create(session: Session): Promise<Session>;
     getByTokenHash(tokenHash: string): Promise<Session | null>;
     delete(id: string): Promise<boolean>;
+    listByUser(userId: string): Promise<Session[]>;
+    /** Delete a user's sessions, keeping `exceptId` when given. Returns how many were removed. */
+    deleteByUser(userId: string, exceptId?: string): Promise<number>;
   };
   readonly profiles: {
     list(): Promise<ModelProfile[]>;
@@ -783,6 +786,20 @@ function buildStore(
         if (!isUuid(id)) return false;
         const removed = await db.delete(sessions).where(eq(sessions.id, id)).returning({ id: sessions.id });
         return removed.length > 0;
+      },
+      async listByUser(userId) {
+        if (!isUuid(userId)) return [];
+        const rows = await db.select().from(sessions).where(eq(sessions.userId, userId)).orderBy(desc(sessions.createdAt));
+        return rows.map(toSession);
+      },
+      async deleteByUser(userId, exceptId) {
+        if (!isUuid(userId)) return 0;
+        const keep = exceptId && isUuid(exceptId) ? ne(sessions.id, exceptId) : undefined;
+        const removed = await db
+          .delete(sessions)
+          .where(and(eq(sessions.userId, userId), keep))
+          .returning({ id: sessions.id });
+        return removed.length;
       },
     },
     profiles: {

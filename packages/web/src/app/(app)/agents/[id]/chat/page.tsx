@@ -1,6 +1,5 @@
 "use client";
 
-import { useAppDialogs } from "@/components/app-dialogs";
 import { Bot } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -11,6 +10,7 @@ import { pageContainerVariants } from "@botanical/ui/components/page-container";
 import { PageHeader } from "@botanical/ui/components/page-header";
 import { ProfileSelect } from "@/components/chat/profile-select";
 import { ChatThreadSkeleton } from "@/components/chat/skeletons";
+import { NoProfilesNotice } from "@/components/settings/no-profiles-notice";
 import { useWorkspace } from "@/components/workspace-provider";
 import { api } from "@/lib/api";
 import { agentDefaultProfileId, ownChat } from "@/lib/chat-groups";
@@ -25,7 +25,6 @@ export default function AgentChatPage() {
   const agentId = params.id;
   const router = useRouter();
   const { ready, agents, chats, profiles, createChat, refresh } = useWorkspace();
-  const { openSettings } = useAppDialogs();
   const agent = agents.find((item) => item.id === agentId) ?? null;
   const [asking, setAsking] = useState(false);
   const [profileId, setProfileId] = useState<string | null>(null);
@@ -100,12 +99,7 @@ export default function AgentChatPage() {
       <section className="space-y-2">
         <Label htmlFor="agent-chat-profile">Model profile</Label>
         {profiles.length === 0 ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
-            <p className="text-sm text-muted-foreground">No model profiles yet.</p>
-            <Button variant="outline" size="sm" onClick={() => openSettings("profiles")}>
-              Create one
-            </Button>
-          </div>
+          <NoProfilesNotice />
         ) : (
           <ProfileSelect id="agent-chat-profile" profiles={profiles} value={profileId} onChange={setProfileId} />
         )}
@@ -119,6 +113,9 @@ export default function AgentChatPage() {
         <Button data-testid="start-chat" disabled={!profileId || pending} onClick={() => void start()}>
           {pending ? "Starting…" : "Start chatting"}
         </Button>
+        {profiles.length === 0 ? (
+          <p className="mt-2 text-xs text-muted-foreground">Add a provider key to enable chatting.</p>
+        ) : null}
       </div>
     </div>
   );

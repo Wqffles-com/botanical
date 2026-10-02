@@ -1,14 +1,15 @@
 "use client";
 
 import { activeMentionQuery, type Agent, type ModelProfile } from "@botanical/core";
-import { ArrowUp, Square } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { ArrowUp, FileText, Paperclip, Square, X } from "lucide-react";
+import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent } from "react";
 import { AgentAvatar } from "@/components/agent-avatar";
 import { DictationActions, DictationNotice } from "@/components/chat/dictation-button";
 import { spliceTranscript } from "@/components/chat/dictation";
 import { useDictation } from "@/components/chat/use-dictation";
 import { ProfileSelect } from "@/components/chat/profile-select";
 import { Button } from "@botanical/ui/components/button";
+import { formatBytes, type PendingFile } from "@/lib/attachments";
 import { unavailableProfileHint } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,10 @@ export function Composer({
   onProfile,
   profileNeeded,
   mentionables,
+  attachments,
+  onAttach,
+  onRemoveAttachment,
+  uploading,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -40,6 +45,11 @@ export function Composer({
   profileNeeded?: boolean;
   /** Agents offered after `@`. Mentioning one sends it the message as agent mail. */
   mentionables?: Agent[];
+  /** Files chosen, dropped, or pasted, uploaded when the message is sent. */
+  attachments: PendingFile[];
+  onAttach: (files: File[]) => void;
+  onRemoveAttachment: (id: string) => void;
+  uploading: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const valueRef = useRef(value);
@@ -92,7 +102,10 @@ export function Composer({
     setHighlight(0);
     onChange(next);
   }
-  const canSubmit = !disabled && !recording && !unavailableHint && value.trim().length > 0;
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const canSubmit =
+    !disabled && !recording && !unavailableHint && !uploading && (value.trim().length > 0 || attachments.length > 0);
 
   useEffect(() => {
     const el = ref.current;
@@ -135,6 +148,19 @@ export function Composer({
     if (canSubmit) onSubmit();
   }
 
+  function handlePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const files = Array.from(event.clipboardData.files);
+    if (files.length === 0 || disabled) return;
+    event.preventDefault();
+    onAttach(files);
+  }
+
+  function handleDrop(event: DragEvent) {
+    event.preventDefault();
+    setDragging(false);
+    if (!disabled) onAttach(Array.from(event.dataTransfer.files));
+  }
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (canSubmit) onSubmit();
@@ -146,8 +172,47 @@ export function Composer({
         className={cn(
           "relative mx-auto flex max-w-3xl flex-col rounded-[1.75rem] bg-bubble shadow-sm ring-1 ring-border transition-shadow",
           disabled ? "opacity-70" : "focus-within:ring-foreground/20",
+          dragging && "ring-2 ring-primary",
         )}
+        onDragOver={(event) => {
+          if (disabled || !event.dataTransfer.types.includes("Files")) return;
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
+        }}
+        onDrop={handleDrop}
       >
+        {attachments.length > 0 ? (
+          <ul className="flex flex-wrap gap-2 px-4 pt-3" data-testid="composer-attachments">
+            {attachments.map((item) => (
+              <li
+                key={item.id}
+                className="relative flex max-w-56 items-center gap-2 rounded-xl bg-background/60 p-1.5 pr-8 text-xs ring-1 ring-border"
+              >
+                {item.previewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- a local object URL
+                  <img src={item.previewUrl} alt="" className="size-10 rounded-lg object-cover" />
+                ) : (
+                  <FileText className="mx-2 size-5 shrink-0 text-muted-foreground" aria-hidden />
+                )}
+                <span className="min-w-0">
+                  <span className="block truncate">{item.name}</span>
+                  <span className="block text-2xs text-muted-foreground">{formatBytes(item.file.size)}</span>
+                </span>
+                <button
+                  type="button"
+                  className="absolute right-1.5 top-1.5 rounded-full p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                  aria-label={`Remove ${item.name}`}
+                  onClick={() => onRemoveAttachment(item.id)}
+                >
+                  <X className="size-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {suggestions.length > 0 ? (
           <ul
             id="composer-mentions"
@@ -204,6 +269,7 @@ export function Composer({
             suggestions.length > 0 ? `composer-mention-${(suggestions[active] as Agent).id}` : undefined
           }
           onKeyDown={handleKey}
+          onPaste={handlePaste}
           placeholder={placeholder}
           disabled={disabled}
           rows={1}
@@ -221,6 +287,30 @@ export function Composer({
         ) : null}
         <DictationNotice dictation={dictation} />
         <div className="flex items-center gap-1.5 px-2.5 pb-2.5">
+          <input
+            ref={fileInput}
+            type="file"
+            multiple
+            hidden
+            data-testid="composer-file-input"
+            onChange={(event) => {
+              onAttach(Array.from(event.target.files ?? []));
+              event.target.value = "";
+            }}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-9 rounded-full text-muted-foreground"
+            data-testid="attach"
+            aria-label="Attach files"
+            title="Attach files, or drop or paste them"
+            disabled={disabled}
+            onClick={() => fileInput.current?.click()}
+          >
+            <Paperclip className="size-4" />
+          </Button>
           {profiles && onProfile ? (
             <ProfileSelect
               id="composer-profile"

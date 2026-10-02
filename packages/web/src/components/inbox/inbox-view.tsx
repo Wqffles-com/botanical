@@ -119,7 +119,7 @@ export function InboxView() {
     <div className={pageContainerVariants({ className: "flex flex-col gap-6" })}>
       <PageHeader
         title="Inbox"
-        description="Async agent-to-agent notes. They never merge into the user thread."
+        description="Async agent-to-agent notes. They show in chats as collapsed rows, and the recipient is woken with a real turn when autorun is on."
       />
 
       {error ? (

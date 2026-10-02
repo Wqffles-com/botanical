@@ -1,6 +1,13 @@
 "use client";
 
-import { BotanicalApiError, isAbortError, type Chat, type ChatEvent, type ChatMessage } from "@botanical/core";
+import {
+  BotanicalApiError,
+  isAbortError,
+  withAttachments,
+  type Chat,
+  type ChatEvent,
+  type ChatMessage,
+} from "@botanical/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWorkspace } from "@/components/workspace-provider";
 import { api } from "@/lib/api";
@@ -14,6 +21,7 @@ import {
   settlePending,
   type PendingMessage,
 } from "@/lib/chat-queue";
+import { acceptFiles, releasePending, toPending, type PendingFile } from "@/lib/attachments";
 import { errorText, isProfileRequired, isProfileUnavailable, profileRequiredMessage, profileUnavailableText } from "@/lib/errors";
 import { unavailableProfileHint } from "@/lib/format";
 import { toast } from "sonner";
@@ -31,6 +39,8 @@ export function useChatThread(chatId: string) {
   const [missing, setMissing] = useState(false);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<PendingMessage[]>([]);
+  const [attachments, setAttachments] = useState<PendingFile[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [working, setWorking] = useState(false);
   // The agent answering right now. Group members take turns.
   const [workingAgentId, setWorkingAgentId] = useState<string | null>(null);
@@ -53,6 +63,7 @@ export function useChatThread(chatId: string) {
     setWorking(false);
     setWorkingAgentId(null);
     setDraft("");
+    setAttachments([]);
   }
 
   useEffect(() => {
@@ -202,12 +213,44 @@ export function useChatThread(chatId: string) {
     [canPost, chatId, profileId, unavailableCopy],
   );
 
+  const attach = useCallback(
+    (files: File[]) => {
+      const { accepted, errors } = acceptFiles(attachments, files);
+      for (const message of new Set(errors)) toast.error(message);
+      if (accepted.length === 0) return;
+      setAttachments((current) => [...current, ...toPending(accepted, current.length)]);
+    },
+    [attachments],
+  );
+
+  const removeAttachment = useCallback((id: string) => {
+    setAttachments((current) => {
+      releasePending(current.filter((item) => item.id === id));
+      return current.filter((item) => item.id !== id);
+    });
+  }, []);
+
   const send = useCallback(async () => {
-    const content = draft.trim();
-    if (!content || !canPost()) return false;
+    const text = draft.trim();
+    if ((!text && attachments.length === 0) || !chat || uploading || !canPost()) return false;
+    let content = text;
+    if (attachments.length > 0) {
+      setUploading(true);
+      try {
+        const files = await Promise.all(attachments.map((item) => api.uploadAgentFile(chat.agentId, item.file, item.name)));
+        content = withAttachments(text, files);
+      } catch (err) {
+        toast.error(errorText(err));
+        return false;
+      } finally {
+        setUploading(false);
+      }
+      releasePending(attachments);
+      setAttachments([]);
+    }
     setDraft("");
-    return post(content, true);
-  }, [canPost, draft, post]);
+    return post(content, attachments.length === 0);
+  }, [attachments, canPost, chat, draft, post, uploading]);
 
   /** Delete a message, or it and everything after it. */
   const deleteMessage = useCallback(
@@ -315,6 +358,10 @@ export function useChatThread(chatId: string) {
     missing,
     draft,
     setDraft,
+    attachments,
+    attach,
+    removeAttachment,
+    uploading,
     pending,
     working,
     workingAgentId,

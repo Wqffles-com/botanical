@@ -457,7 +457,7 @@ function GithubSecretCard({ revealed, onClose }: { revealed: Revealed; onClose: 
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <p className="text-muted-foreground">
-          Connect repository adds the webhook for you. To add it by hand, open the repository's Settings → Webhooks on
+          Connect repository adds the webhook for you. To add it by hand, open the repository&apos;s Settings → Webhooks on
           GitHub, paste this URL and secret, and pick the content type application/json.
         </p>
         <CopyRow label="URL" value={revealed.url} />

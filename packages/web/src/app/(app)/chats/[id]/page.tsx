@@ -81,6 +81,10 @@ export default function ChatPage() {
           missing={thread.missing}
           draft={thread.draft}
           onDraft={thread.setDraft}
+          attachments={thread.attachments}
+          onAttach={thread.attach}
+          onRemoveAttachment={thread.removeAttachment}
+          uploading={thread.uploading}
           pending={thread.pending}
           working={thread.working}
           workingAgentId={thread.workingAgentId}
