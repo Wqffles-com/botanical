@@ -42,7 +42,7 @@ Layouts: `packages/web/src/app/layout.tsx` (root, fonts, `Providers`) and `packa
 | `packages/web/src/components/app-sidebar.tsx` | Sidebar: brand with round search and new-chat buttons, workspace nav, agents (avatar, name, title pill, description, last activity; each opens its chat), group chats (two-mark cluster, member names), and a footer with the account avatar, a Settings pill, and a theme toggle |
 | `packages/web/src/components/app-breadcrumbs.tsx` | Header breadcrumb derived from the route and workspace names. Hidden on chats, where the agent pill takes the center |
 | `packages/web/src/components/agent-stack.tsx` | Overlapping agent marks for group chats (header pill, empty state) |
-| `packages/web/src/components/command-menu.tsx` | ⌘K palette: agents, chats, pages, theme. New agent and Settings open their dialogs |
+| `packages/web/src/components/command-menu.tsx` | ⌘K palette: agents, chats, pages, theme, and message search (`?message=<id>` opens a chat at that message, which `chat-thread.tsx` scrolls to and highlights). New agent and Settings open their dialogs |
 | `packages/web/src/components/nav-user.tsx` | Round account avatar in the sidebar footer; its menu has settings (dialog), theme (light, dark, system), sign out |
 | `packages/web/src/hooks/use-sign-out.ts` | Logout and redirect to `/login` |
 | `packages/web/src/components/workspace-provider.tsx` | Agents, chats, profiles in client state |

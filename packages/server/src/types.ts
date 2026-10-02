@@ -365,8 +365,23 @@ export interface ChatRepository {
   countByAgent(agentId: string): Promise<number>;
 }
 
+/** Message search over the caller's own chats. */
+export interface MessageSearchQuery {
+  q: string;
+  /** Chats to search. The caller passes only chats it owns. */
+  chatIds: readonly string[];
+  /** `user` is the person's own messages, `assistant` is replies. Both when unset. */
+  role?: "user" | "assistant";
+  /** Inclusive ISO bounds on `createdAt`. */
+  from?: string;
+  to?: string;
+  limit: number;
+}
+
 export interface MessageRepository {
   listByChat(chatId: string): Promise<Message[]>;
+  /** User and assistant text rows matching `q`, newest first. Tool and system rows are never returned. */
+  search(query: MessageSearchQuery): Promise<Message[]>;
   create(input: NewMessage): Promise<Message>;
   /** Replace a message's text. Null when the message is not in this chat. */
   updateContent(chatId: string, id: string, content: string): Promise<Message | null>;

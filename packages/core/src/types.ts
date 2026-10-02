@@ -303,6 +303,27 @@ export interface ChatMessage {
   usage?: TokenUsage | null;
 }
 
+/** One message found by search, with the chat it lives in and a snippet around the match. */
+export interface MessageSearchHit {
+  message: ChatMessage;
+  /** The chat's owner agent. */
+  agentId: string;
+  chatTitle: string;
+  /** `start`/`end` bound the highlighted match inside `text`. Both 0 when nothing could be highlighted. */
+  snippet: { text: string; start: number; end: number };
+}
+
+export interface MessageSearchQuery {
+  q: string;
+  agentId?: string;
+  /** `user` is your own messages, `assistant` is replies. */
+  role?: "user" | "assistant";
+  /** Inclusive ISO timestamps. */
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
 export interface SendMessageInput {
   content: string;
   /** Required on every turn. The client refuses to post without it. */
